@@ -20,7 +20,7 @@
         android:id="@+id/clearAllButton"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Clear All"
+        android:text="@string/clear_all"
         android:textColor="@color/brand_orange"
         android:textSize="14sp"
         android:fontFamily="sans-serif-medium"
@@ -32,71 +32,26 @@
         app:layout_constraintTop_toTopOf="@id/modernToolbar"
         app:layout_constraintBottom_toBottomOf="@id/modernToolbar" />
 
-    <!-- Downloads RecyclerView -->
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/recyclerView"
+    <!-- Tab Layout -->
+    <com.google.android.material.tabs.TabLayout
+        android:id="@+id/tabLayout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/background_primary"
+        app:tabIndicatorColor="@color/brand_orange"
+        app:tabIndicatorFullWidth="false"
+        app:tabSelectedTextColor="@color/brand_orange"
+        app:tabTextColor="@color/text_secondary"
+        app:tabMode="fixed"
+        app:tabGravity="fill"
+        app:layout_constraintTop_toBottomOf="@id/modernToolbar" />
+
+    <!-- ViewPager2 for tabs -->
+    <androidx.viewpager2.widget.ViewPager2
+        android:id="@+id/viewPager"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:paddingHorizontal="@dimen/spacing_m"
-        android:paddingTop="@dimen/spacing_l"
-        android:clipToPadding="false"
-        android:visibility="gone"
-        app:layout_constraintTop_toBottomOf="@id/modernToolbar"
-        app:layout_constraintBottom_toBottomOf="parent"
-        tools:listitem="@layout/item_download"
-        tools:visibility="visible" />
-
-    <!-- Loading -->
-    <ProgressBar
-        android:id="@+id/progressBar"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:indeterminateTint="@color/brand_orange"
-        android:visibility="gone"
-        app:layout_constraintTop_toBottomOf="@id/modernToolbar"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent" />
-
-    <!-- Empty State -->
-    <LinearLayout
-        android:id="@+id/emptyView"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:gravity="center"
-        android:visibility="gone"
-        app:layout_constraintTop_toBottomOf="@id/modernToolbar"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
-
-        <ImageView
-            android:id="@+id/emptyIcon"
-            android:layout_width="@dimen/empty_state_icon_size"
-            android:layout_height="@dimen/empty_state_icon_size"
-            android:src="@drawable/ic_download"
-            android:alpha="0.3"
-            android:contentDescription="@string/no_downloads"
-            app:tint="@color/text_tertiary" />
-
-        <TextView
-            android:id="@+id/emptyText"
-            style="@style/TextAppearance.App.Title"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/no_downloads"
-            android:textColor="@color/text_secondary"
-            android:layout_marginTop="@dimen/spacing_l" />
-
-        <TextView
-            style="@style/TextAppearance.App.Body"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/start_downloading"
-            android:textColor="@color/text_tertiary"
-            android:layout_marginTop="@dimen/spacing_s" />
-
-    </LinearLayout>
+        app:layout_constraintTop_toBottomOf="@id/tabLayout"
+        app:layout_constraintBottom_toBottomOf="parent" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

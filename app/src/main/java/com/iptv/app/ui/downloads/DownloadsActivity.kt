@@ -1,178 +1,154 @@
 package com.iptv.app.ui.downloads
 
-import android.content.Intent
 import android.os.Bundle
-import android.view.View
-import android.widget.ImageView
-import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.util.UnstableApi
-import androidx.recyclerview.widget.GridLayoutManager
-import androidx.recyclerview.widget.RecyclerView
+import androidx.viewpager2.widget.ViewPager2
+import com.google.android.material.tabs.TabLayout
+import com.google.android.material.tabs.TabLayoutMediator
 import com.iptv.app.R
 import com.iptv.app.data.repository.DownloadRepository
 import com.iptv.app.ui.common.ModernToolbar
-import com.iptv.app.ui.player.PlayerActivity
 import kotlinx.coroutines.launch
 
 @UnstableApi
 class DownloadsActivity : AppCompatActivity() {
-    
+
     private lateinit var modernToolbar: ModernToolbar
+    private lateinit var tabLayout: TabLayout
+    private lateinit var viewPager: ViewPager2
+    private lateinit var clearAllButton: TextView
     private lateinit var downloadRepository: DownloadRepository
-    private lateinit var recyclerView: RecyclerView
-    private lateinit var progressBar: ProgressBar
-    private lateinit var emptyView: View
-    private lateinit var emptyIcon: ImageView
-    private lateinit var emptyText: TextView
-    private lateinit var adapter: DownloadsAdapter
-    
+    private lateinit var pagerAdapter: DownloadsPagerAdapter
+
+    private val tabTitles = arrayOf(
+        R.string.tab_active,
+        R.string.tab_completed
+    )
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_downloads)
-        
+
         downloadRepository = DownloadRepository(this)
-        
+
         initViews()
-        setupRecyclerView()
-        observeDownloads()
+        setupTabs()
     }
-    
+
     private fun initViews() {
         modernToolbar = findViewById(R.id.modernToolbar)
-        recyclerView = findViewById(R.id.recyclerView)
-        progressBar = findViewById(R.id.progressBar)
-        emptyView = findViewById(R.id.emptyView)
-        emptyIcon = findViewById(R.id.emptyIcon)
-        emptyText = findViewById(R.id.emptyText)
-        
+        tabLayout = findViewById(R.id.tabLayout)
+        viewPager = findViewById(R.id.viewPager)
+        clearAllButton = findViewById(R.id.clearAllButton)
+
         modernToolbar.onBackClick = { finish() }
-        
-        findViewById<TextView>(R.id.clearAllButton).setOnClickListener {
+
+        clearAllButton.setOnClickListener {
             showClearAllDialog()
         }
     }
-    
-    private fun setupRecyclerView() {
-        adapter = DownloadsAdapter(
-            onPlayClick = { download ->
-                playDownload(download)
-            },
-            onDeleteClick = { download ->
-                showDeleteDialog(download)
-            }
-        )
-        
-        recyclerView.layoutManager = GridLayoutManager(this, 3)
-        recyclerView.adapter = adapter
+
+    private fun setupTabs() {
+        pagerAdapter = DownloadsPagerAdapter(this)
+        viewPager.adapter = pagerAdapter
+
+        // Connect TabLayout with ViewPager2
+        TabLayoutMediator(tabLayout, viewPager) { tab, position ->
+            tab.text = getString(tabTitles[position])
+        }.attach()
+
+        // Observe active downloads count for badge
+        observeActiveDownloadsCount()
     }
-    
-    private fun observeDownloads() {
-        showLoading(true)
-        
+
+    private fun observeActiveDownloadsCount() {
         lifecycleScope.launch {
-            downloadRepository.getCompletedDownloads().collect { downloads ->
-                showLoading(false)
-                
-                if (downloads.isEmpty()) {
-                    showEmptyState(true)
+            downloadRepository.getActiveDownloads().collect { downloads ->
+                val activeTab = tabLayout.getTabAt(DownloadsPagerAdapter.TAB_ACTIVE)
+                if (downloads.isNotEmpty()) {
+                    activeTab?.orCreateBadge?.apply {
+                        number = downloads.size
+                        backgroundColor = getColor(R.color.brand_orange)
+                        badgeTextColor = getColor(R.color.text_primary)
+                    }
                 } else {
-                    showEmptyState(false)
-                    adapter.submitList(downloads)
+                    activeTab?.removeBadge()
                 }
             }
         }
     }
-    
-    private fun playDownload(download: com.iptv.app.data.db.entities.DownloadEntity) {
-        val uri = download.downloadUri
-        if (uri.isNullOrEmpty()) {
-            Toast.makeText(this, "Download not available", Toast.LENGTH_SHORT).show()
-            return
+
+    private fun showClearAllDialog() {
+        val currentTab = viewPager.currentItem
+
+        val title: String
+        val message: String
+        val action: () -> Unit
+
+        if (currentTab == DownloadsPagerAdapter.TAB_ACTIVE) {
+            title = getString(R.string.cancel_all_downloads)
+            message = getString(R.string.cancel_all_downloads_message)
+            action = { cancelAllActiveDownloads() }
+        } else {
+            title = getString(R.string.clear_all_downloads)
+            message = getString(R.string.clear_all_downloads_message)
+            action = { clearAllCompletedDownloads() }
         }
-        
-        val intent = Intent(this, PlayerActivity::class.java).apply {
-            putExtra("STREAM_URL", uri)
-            putExtra("TITLE", download.contentName)
-            putExtra("CONTENT_ID", download.contentId)
-            putExtra("CONTENT_TYPE", download.contentType)
-            putExtra("POSTER_URL", download.posterUrl)
-            putExtra("RESUME_POSITION", 0L)
-        }
-        startActivity(intent)
-    }
-    
-    private fun showDeleteDialog(download: com.iptv.app.data.db.entities.DownloadEntity) {
+
         AlertDialog.Builder(this)
-            .setTitle(R.string.delete_download)
-            .setMessage("Delete ${download.contentName}?")
-            .setPositiveButton(R.string.delete_download) { _, _ ->
-                deleteDownload(download)
-            }
+            .setTitle(title)
+            .setMessage(message)
+            .setPositiveButton(R.string.confirm) { _, _ -> action() }
             .setNegativeButton(R.string.cancel, null)
             .show()
     }
-    
-    private fun deleteDownload(download: com.iptv.app.data.db.entities.DownloadEntity) {
+
+    private fun cancelAllActiveDownloads() {
         lifecycleScope.launch {
             try {
-                downloadRepository.deleteDownload(download.contentId)
-                Toast.makeText(
-                    this@DownloadsActivity,
-                    "Download deleted",
-                    Toast.LENGTH_SHORT
-                ).show()
+                // Get all active downloads and cancel them
+                downloadRepository.getActiveDownloads().collect { downloads ->
+                    downloads.forEach { download ->
+                        downloadRepository.cancelDownload(download.contentId)
+                    }
+                    Toast.makeText(
+                        this@DownloadsActivity,
+                        R.string.all_downloads_cancelled,
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    return@collect
+                }
             } catch (e: Exception) {
                 Toast.makeText(
                     this@DownloadsActivity,
-                    "Failed to delete: ${e.message}",
+                    getString(R.string.cancel_failed, e.message),
                     Toast.LENGTH_SHORT
                 ).show()
             }
         }
     }
-    
-    private fun showClearAllDialog() {
-        AlertDialog.Builder(this)
-            .setTitle("Clear All Downloads")
-            .setMessage("Delete all downloaded content?")
-            .setPositiveButton("Delete All") { _, _ ->
-                clearAllDownloads()
-            }
-            .setNegativeButton(R.string.cancel, null)
-            .show()
-    }
-    
-    private fun clearAllDownloads() {
+
+    private fun clearAllCompletedDownloads() {
         lifecycleScope.launch {
             try {
                 downloadRepository.deleteAllDownloads()
                 Toast.makeText(
                     this@DownloadsActivity,
-                    "All downloads deleted",
+                    R.string.all_downloads_deleted,
                     Toast.LENGTH_SHORT
                 ).show()
             } catch (e: Exception) {
                 Toast.makeText(
                     this@DownloadsActivity,
-                    "Failed to clear downloads: ${e.message}",
+                    getString(R.string.delete_failed, e.message),
                     Toast.LENGTH_SHORT
                 ).show()
             }
         }
-    }
-    
-    private fun showLoading(show: Boolean) {
-        progressBar.visibility = if (show) View.VISIBLE else View.GONE
-        recyclerView.visibility = if (show) View.GONE else View.VISIBLE
-    }
-    
-    private fun showEmptyState(show: Boolean) {
-        emptyView.visibility = if (show) View.VISIBLE else View.GONE
-        recyclerView.visibility = if (show) View.GONE else View.VISIBLE
     }
 }
