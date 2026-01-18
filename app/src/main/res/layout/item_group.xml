@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.iptv.app.ui.common.JellyfinCard
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_margin="@dimen/spacing_xs">
+    
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="@dimen/spacing_l"
+        android:background="@drawable/bg_group_gradient">
+        
+        <!-- Icon/Image -->
+        <ImageView
+            android:id="@+id/groupIcon"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:src="@drawable/ic_folder_24"
+            app:tint="@color/brand_orange"
+            android:contentDescription="Group icon"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent" />
+        
+        <!-- Group Name -->
+        <TextView
+            android:id="@+id/groupName"
+            style="@style/TextAppearance.App.Title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/spacing_l"
+            android:textColor="@color/text_primary"
+            app:layout_constraintStart_toEndOf="@id/groupIcon"
+            app:layout_constraintEnd_toStartOf="@id/groupCount"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
+            tools:text="UK Channels" />
+        
+        <!-- Count Badge -->
+        <com.google.android.material.chip.Chip
+            android:id="@+id/groupCount"
+            style="@style/Widget.Material3.Chip.Assist"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="@dimen/spacing_s"
+            android:textColor="@color/brand_orange"
+            app:chipBackgroundColor="@color/surface_elevated"
+            app:layout_constraintEnd_toStartOf="@id/chevronIcon"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
+            tools:text="45" />
+        
+        <!-- Chevron (Material icon!) -->
+        <ImageView
+            android:id="@+id/chevronIcon"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_chevron_right_24"
+            app:tint="@color/text_tertiary"
+            android:contentDescription="Navigate"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent" />
+        
+    </androidx.constraintlayout.widget.ConstraintLayout>
+    
+</com.iptv.app.ui.common.JellyfinCard>

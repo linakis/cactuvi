@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">IPTV Player</string>
+    
+    <!-- Add Playlist -->
+    <string name="add_playlist">Add Playlist</string>
+    <string name="server_url">Server URL</string>
+    <string name="server_url_hint">http://server.com:port</string>
+    <string name="username">Username</string>
+    <string name="username_hint">Enter username</string>
+    <string name="password">Password</string>
+    <string name="password_hint">Enter password</string>
+    <string name="test_connection">Test Connection</string>
+    <string name="save">Save</string>
+    <string name="cancel">Cancel</string>
+    <string name="testing">Testing connection...</string>
+    <string name="connection_successful">Connection successful!</string>
+    <string name="connection_failed">Connection failed: %s</string>
+    <string name="please_fill_all_fields">Please fill in all fields</string>
+    
+    <!-- Navigation -->
+    <string name="nav_live_tv">Live TV</string>
+    <string name="nav_movies">Movies</string>
+    <string name="nav_series">Series</string>
+    <string name="nav_favorites">Favorites</string>
+    <string name="nav_search">Search</string>
+    
+    <!-- Content -->
+    <string name="all_categories">All Categories</string>
+    <string name="loading">Loading...</string>
+    <string name="error_loading">Error loading content</string>
+    <string name="no_content">No content available</string>
+    <string name="retry">Retry</string>
+    
+    <!-- Player -->
+    <string name="playback_error">Playback error occurred</string>
+    
+    <!-- Common -->
+    <string name="ok">OK</string>
+    <string name="search_hint">Search...</string>
+    <string name="back">Back</string>
+    <string name="play">Play</string>
+    <string name="my_list">My List</string>
+    <string name="resume_from">Resume from %s</string>
+    
+    <!-- Detail Screen -->
+    <string name="backdrop_image">Backdrop Image</string>
+    <string name="poster_image">Poster Image</string>
+    <string name="plot">Plot</string>
+    <string name="genre">Genre</string>
+    <string name="director">Director</string>
+    <string name="cast">Cast</string>
+    <string name="duration">Duration</string>
+    <string name="release_date">Release Date</string>
+    <string name="rating">Rating</string>
+    <string name="seasons">Seasons</string>
+    <string name="episodes">Episodes</string>
+    <string name="season">Season %d</string>
+    <string name="episode_count">%d episodes</string>
+    <string name="episode_number">Episode %d</string>
+    <string name="add_to_favorites">Add to Favorites</string>
+    <string name="remove_from_favorites">Remove from Favorites</string>
+    <string name="expand">Expand</string>
+    <string name="collapse">Collapse</string>
+    
+    <!-- Search -->
+    <string name="search">Search</string>
+    <string name="search_results">Search Results</string>
+    <string name="no_results">No results found</string>
+    <string name="live_channels">Live Channels</string>
+    <string name="movies">Movies</string>
+    <string name="series">Series</string>
+    <string name="search_placeholder">Search for channels, movies, and series</string>
+    
+    <!-- Continue Watching -->
+    <string name="continue_watching">Continue Watching</string>
+    <string name="no_watch_history">No watch history</string>
+    <string name="start_watching">Start watching to see your progress here</string>
+    
+    <!-- Settings -->
+    <string name="settings">Settings</string>
+    <string name="clear_cache">Clear Cache</string>
+    <string name="clear_watch_history">Clear Watch History</string>
+    <string name="app_version">App Version</string>
+    <string name="cache_management">Cache Management</string>
+    <string name="privacy">Privacy</string>
+    <string name="about">About</string>
+    <string name="confirm_clear_cache">Clear all cached data?</string>
+    <string name="confirm_clear_history">Clear watch history?</string>
+    <string name="cache_cleared">Cache cleared successfully</string>
+    <string name="history_cleared">Watch history cleared</string>
+    
+    <!-- Downloads -->
+    <string name="download">Download</string>
+    <string name="downloaded">Downloaded</string>
+    <string name="downloading">Downloading…</string>
+    <string name="downloads">Downloads</string>
+    <string name="no_downloads">No downloads</string>
+    <string name="start_downloading">Download content to watch offline</string>
+    <string name="delete_download">Delete Download</string>
+    <string name="pause_download">Pause</string>
+    <string name="resume_download">Resume</string>
+    <string name="cancel_download">Cancel</string>
+</resources>

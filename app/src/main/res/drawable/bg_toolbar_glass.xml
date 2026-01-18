@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Dark semi-transparent background -->
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="@color/glass_overlay" />
+        </shape>
+    </item>
+    <!-- Bottom border (subtle) -->
+    <item android:gravity="bottom">
+        <shape android:shape="rectangle">
+            <solid android:color="@color/glass_border" />
+            <size android:height="1dp" />
+        </shape>
+    </item>
+</layer-list>

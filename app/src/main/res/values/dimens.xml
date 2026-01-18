@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Spacing Scale (8dp base) -->
+    <dimen name="spacing_xxs">2dp</dimen>
+    <dimen name="spacing_xs">4dp</dimen>
+    <dimen name="spacing_s">8dp</dimen>
+    <dimen name="spacing_m">12dp</dimen>
+    <dimen name="spacing_l">16dp</dimen>
+    <dimen name="spacing_xl">24dp</dimen>
+    <dimen name="spacing_xxl">32dp</dimen>
+    <dimen name="spacing_xxxl">48dp</dimen>
+    
+    <!-- Corner Radius -->
+    <dimen name="corner_radius_small">6dp</dimen>
+    <dimen name="corner_radius_medium">8dp</dimen>
+    <dimen name="corner_radius_large">12dp</dimen>
+    <dimen name="corner_radius_xlarge">16dp</dimen>
+    
+    <!-- Component Sizes -->
+    <dimen name="poster_width">120dp</dimen>
+    <dimen name="poster_height">180dp</dimen>          <!-- 2:3 ratio -->
+    <dimen name="backdrop_height">220dp</dimen>
+    <dimen name="control_button_size">48dp</dimen>
+    <dimen name="icon_size_small">16dp</dimen>
+    <dimen name="icon_size_medium">24dp</dimen>
+    <dimen name="icon_size_large">32dp</dimen>
+    <dimen name="icon_size_xlarge">48dp</dimen>
+    
+    <!-- Grid Columns -->
+    <dimen name="grid_poster_width">130dp</dimen>
+    <dimen name="grid_poster_height">195dp</dimen>    <!-- 2:3 ratio -->
+    
+    <!-- Detail Screen -->
+    <dimen name="detail_poster_width">120dp</dimen>
+    <dimen name="detail_poster_height">180dp</dimen>
+    <dimen name="detail_poster_overlap">40dp</dimen>
+    
+    <!-- Episode List -->
+    <dimen name="episode_item_height">56dp</dimen>
+    <dimen name="season_header_height">48dp</dimen>
+    
+    <!-- Search -->
+    <dimen name="search_item_height">72dp</dimen>
+    <dimen name="search_movie_item_height">96dp</dimen>
+    <dimen name="search_thumbnail_size">48dp</dimen>
+    <dimen name="search_poster_width">56dp</dimen>
+    <dimen name="search_poster_height">84dp</dimen>
+    
+    <!-- Empty State -->
+    <dimen name="empty_state_icon_size">64dp</dimen>
+    
+    <!-- Jellyfin-style Dimensions -->
+    <!-- Toolbar -->
+    <dimen name="toolbar_height">64dp</dimen>
+    <dimen name="toolbar_elevation">8dp</dimen>
+    
+    <!-- Blur Effects -->
+    <dimen name="blur_radius">25dp</dimen>
+    <dimen name="blur_sampling">2dp</dimen>
+    
+    <!-- Card Elevation -->
+    <dimen name="elevation_card">4dp</dimen>
+    <dimen name="elevation_floating">12dp</dimen>
+</resources>

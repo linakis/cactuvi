@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- ModernToolbar custom attributes -->
+    <declare-styleable name="ModernToolbar">
+        <attr name="title" format="string" />
+        <attr name="showActionButton" format="boolean" />
+        <attr name="actionIcon" format="reference" />
+    </declare-styleable>
+</resources>

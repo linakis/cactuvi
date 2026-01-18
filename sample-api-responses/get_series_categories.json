@@ -1,0 +1,1177 @@
+[
+    {
+        "category_id": "1914",
+        "category_name": "\u2074\u1d37 \u00b3\u2078\u2074\u2070\u1d3e \u1d30\u1d3c\u1d38\u1d2e\u02b8 \u1d2c\u1d41\u1d30\u1d35\u1d3c \u0645\u0633\u0644\u0633\u0644\u0627\u062a \u0639\u0631\u0628\u064a\u0629",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1315",
+        "category_name": "OSN+ SERIES \u2074\u1d37 \u00b3\u2078\u2074\u2070\u1d3e",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1149",
+        "category_name": "CRUNCHYROLL SERIES (MULTI-SUBS)",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1154",
+        "category_name": "ASIA SERIES (MULTI-SUBS)",
+        "parent_id": 0
+    },
+    {
+        "category_id": "907",
+        "category_name": "DISNEY+ SERIES MENA \u2074\u1d37 \u00b3\u2078\u2074\u2070\u1d3e",
+        "parent_id": 0
+    },
+    {
+        "category_id": "908",
+        "category_name": "DISNEY+ SERIES MENA",
+        "parent_id": 0
+    },
+    {
+        "category_id": "899",
+        "category_name": "DISCOVERY+ SERIES MENA",
+        "parent_id": 0
+    },
+    {
+        "category_id": "427",
+        "category_name": "NETFLIX SERIES \u1d30\u1d3c\u1d38\u1d2e\u02b8 \u1d2c\u1d41\u1d30\u1d35\u1d3c \u2074\u1d37 \u00b3\u2078\u2074\u2070\u1d3e",
+        "parent_id": 0
+    },
+    {
+        "category_id": "428",
+        "category_name": "NETFLIX KIDS \u1d30\u1d3c\u1d38\u1d2e\u02b8 \u1d2c\u1d41\u1d30\u1d35\u1d3c \u2074\u1d37 \u00b3\u2078\u2074\u2070\u1d3e",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1973",
+        "category_name": "NETFLIX SERIES \u1d30\u1d3c\u1d38\u1d2e\u02b8 \u1d2c\u1d41\u1d30\u1d35\u1d3c",
+        "parent_id": 0
+    },
+    {
+        "category_id": "138",
+        "category_name": "NETFLIX  SERIES",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1722",
+        "category_name": "NETFLIX REALITY",
+        "parent_id": 0
+    },
+    {
+        "category_id": "2070",
+        "category_name": "NETFLIX ADULT-SWIM",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1660",
+        "category_name": "NETFLIX DOCU-SERIES",
+        "parent_id": 0
+    },
+    {
+        "category_id": "386",
+        "category_name": "NETFLIX ASIA",
+        "parent_id": 0
+    },
+    {
+        "category_id": "2072",
+        "category_name": "NETFLIX WWE",
+        "parent_id": 0
+    },
+    {
+        "category_id": "519",
+        "category_name": "NETFLIX ANIME",
+        "parent_id": 0
+    },
+    {
+        "category_id": "213",
+        "category_name": "NETFLIX KIDS",
+        "parent_id": 0
+    },
+    {
+        "category_id": "761",
+        "category_name": "DISNEY+ SERIES EU \u2074\u1d37 \u00b3\u2078\u2074\u2070\u1d3e",
+        "parent_id": 0
+    },
+    {
+        "category_id": "762",
+        "category_name": "DISNEY+ KIDS EU \u2074\u1d37 \u00b3\u2078\u2074\u2070\u1d3e",
+        "parent_id": 0
+    },
+    {
+        "category_id": "321",
+        "category_name": "DISNEY+ EU SERIES",
+        "parent_id": 0
+    },
+    {
+        "category_id": "486",
+        "category_name": "DISNEY+ EU DOCUMENTARY",
+        "parent_id": 0
+    },
+    {
+        "category_id": "322",
+        "category_name": "DISNEY+ EU KIDS",
+        "parent_id": 0
+    },
+    {
+        "category_id": "434",
+        "category_name": "APPLE+ SERIES \u2074\u1d37 \u00b3\u2078\u2074\u2070\u1d3e",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1053",
+        "category_name": "APPLE+ DOCU-SERIES \u2074\u1d37 \u00b3\u2078\u2074\u2070\u1d3e",
+        "parent_id": 0
+    },
+    {
+        "category_id": "435",
+        "category_name": "APPLE+ KIDS \u2074\u1d37 \u00b3\u2078\u2074\u2070\u1d3e",
+        "parent_id": 0
+    },
+    {
+        "category_id": "323",
+        "category_name": "APPLE+ SERIES",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1052",
+        "category_name": "APPLE+ DOCU-SERIES",
+        "parent_id": 0
+    },
+    {
+        "category_id": "324",
+        "category_name": "APPLE+ KIDS",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1004",
+        "category_name": "AMAZON SERIES \u2074\u1d37 \u00b3\u2078\u2074\u2070\u1d3e",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1005",
+        "category_name": "AMAZON KIDS \u2074\u1d37 \u00b3\u2078\u2074\u2070\u1d3e",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1032",
+        "category_name": "AMAZON DOCU-SERIES \u2074\u1d37 \u00b3\u2078\u2074\u2070\u1d3e",
+        "parent_id": 0
+    },
+    {
+        "category_id": "497",
+        "category_name": "AMAZON SERIES",
+        "parent_id": 0
+    },
+    {
+        "category_id": "498",
+        "category_name": "AMAZON KIDS",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1042",
+        "category_name": "AMAZON REALITY",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1851",
+        "category_name": "HBO MAX SERIES \u2074\u1d37 \u00b3\u2078\u2074\u2070\u1d3e",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1852",
+        "category_name": "HBO MAX SERIES",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1854",
+        "category_name": "HBO MAX (ADULT SWIM)",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1855",
+        "category_name": "HBO MAX DOCU-SERIES",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1031",
+        "category_name": "AMAZON DOCU-SERIES",
+        "parent_id": 0
+    },
+    {
+        "category_id": "526",
+        "category_name": "DISCOVERY+ SERIES",
+        "parent_id": 0
+    },
+    {
+        "category_id": "617",
+        "category_name": "VIAPLAY SERIES",
+        "parent_id": 0
+    },
+    {
+        "category_id": "618",
+        "category_name": "VIAPLAY KIDS",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1081",
+        "category_name": "SKY",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1080",
+        "category_name": "SHOWTIME",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1078",
+        "category_name": "PARAMOUNT+",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1079",
+        "category_name": "PEACOCK",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1077",
+        "category_name": "NICKELODEON",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1611",
+        "category_name": "MARVEL SERIES 3840P (MULTI)",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1610",
+        "category_name": "MARVEL SERIES (MULTI)",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1270",
+        "category_name": "ENGLISH SERIES \u2074\u1d37 \u00b3\u2078\u2074\u2070\u1d3e",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1898",
+        "category_name": "ENGLISH SERIES \u1d30\u1d3c\u1d38\u1d2e\u02b8 \u1d2c\u1d41\u1d30\u1d35\u1d3c",
+        "parent_id": 0
+    },
+    {
+        "category_id": "156",
+        "category_name": "ENGLISH SERIES",
+        "parent_id": 0
+    },
+    {
+        "category_id": "216",
+        "category_name": "ENGLISH KIDS",
+        "parent_id": 0
+    },
+    {
+        "category_id": "2151",
+        "category_name": "TURKSIH SERIES \u2074\u1d37 \u00b3\u2078\u2074\u2070\u1d3e",
+        "parent_id": 0
+    },
+    {
+        "category_id": "480",
+        "category_name": "TURKSIH SERIES (SUB EN)",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1400",
+        "category_name": "TURKISH ATV SERIES",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1405",
+        "category_name": "TURKISH SHOWTV SERIES",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1403",
+        "category_name": "TURKISH TABII SERIES",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1404",
+        "category_name": "TURKISH EXXEN SERIES",
+        "parent_id": 0
+    },
+    {
+        "category_id": "540",
+        "category_name": "TURKISH DIZILER",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1367",
+        "category_name": "TURKISH BLUTV SERIES",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1369",
+        "category_name": "TURKISH BLUTV \u00c7OCUKLAR",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1600",
+        "category_name": "TURKISH NOW TV SERIES",
+        "parent_id": 0
+    },
+    {
+        "category_id": "95",
+        "category_name": "MALTA DRAMA",
+        "parent_id": 0
+    },
+    {
+        "category_id": "726",
+        "category_name": "GREECE INTERNATIONAL SERIES",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1048",
+        "category_name": "GREECE TURKISH SERIES",
+        "parent_id": 0
+    },
+    {
+        "category_id": "727",
+        "category_name": "GREECE KIDS",
+        "parent_id": 0
+    },
+    {
+        "category_id": "795",
+        "category_name": "GREEK SERIES TV",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1650",
+        "category_name": "GREEK REALITY SHOWS",
+        "parent_id": 0
+    },
+    {
+        "category_id": "160",
+        "category_name": "ITALY SERIE",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1331",
+        "category_name": "ITALY DISNEY+",
+        "parent_id": 0
+    },
+    {
+        "category_id": "215",
+        "category_name": "ITALY BAMBINI",
+        "parent_id": 0
+    },
+    {
+        "category_id": "2043",
+        "category_name": "ITALY DOCUMENTARIO",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1785",
+        "category_name": "AFRICA IROKO TV SERIES",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1818",
+        "category_name": "AFRICA CINAF TV SERIES",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1681",
+        "category_name": "FRANCE SERIES \u2074\u1d37 \u00b3\u2078\u2074\u2070\u1d3e",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1741",
+        "category_name": "FRANCE ANIMATION SERIES \u2074\u1d37 \u00b3\u2078\u2074\u2070\u1d3e",
+        "parent_id": 0
+    },
+    {
+        "category_id": "153",
+        "category_name": "FRANCE S\u00c9RIES",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1205",
+        "category_name": "FRANCE DERNIER AJOUT",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1723",
+        "category_name": "FRANCE REALITY SHOW",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1708",
+        "category_name": "FRANCE VOSTFR",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1724",
+        "category_name": "FRANCE NETFLIX 2025",
+        "parent_id": 0
+    },
+    {
+        "category_id": "628",
+        "category_name": "FRANCE NETFLIX",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1104",
+        "category_name": "FRANCE FOX+",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1628",
+        "category_name": "FRANCE DRAMA",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1625",
+        "category_name": "FRANCE ACTION",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1622",
+        "category_name": "FRANCE COMEDIE",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1691",
+        "category_name": "FRANCE ASIA SERIES",
+        "parent_id": 0
+    },
+    {
+        "category_id": "874",
+        "category_name": "FRANCE DOCUMENTAIRE",
+        "parent_id": 0
+    },
+    {
+        "category_id": "214",
+        "category_name": "FRANCE ENFANTS",
+        "parent_id": 0
+    },
+    {
+        "category_id": "610",
+        "category_name": "FRANCE ANIME",
+        "parent_id": 0
+    },
+    {
+        "category_id": "732",
+        "category_name": "QU\u00c9BEC SERIES",
+        "parent_id": 0
+    },
+    {
+        "category_id": "733",
+        "category_name": "QU\u00c9BEC ANIMATION",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1036",
+        "category_name": "QU\u00c9BEC DOCUMENTAIRE",
+        "parent_id": 0
+    },
+    {
+        "category_id": "710",
+        "category_name": "ALBANIA SERIALE",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1583",
+        "category_name": "INDIA WEB SERIE \u2074\u1d37 \u00b3\u2078\u2074\u2070\u1d3e",
+        "parent_id": 0
+    },
+    {
+        "category_id": "145",
+        "category_name": "INDIA SERIES",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1494",
+        "category_name": "INDIA EN DUBBED",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1500",
+        "category_name": "INDIAN DAILY SOAP",
+        "parent_id": 0
+    },
+    {
+        "category_id": "2114",
+        "category_name": "INDIA ANIMATION SERIES WEB",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1481",
+        "category_name": "HINDI DUBBED (KOREAN)",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1671",
+        "category_name": "HINDI TV SHOWS",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1683",
+        "category_name": "HINDI WEB SERIES",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1548",
+        "category_name": "HINDI TAMIL",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1585",
+        "category_name": "HINDI ULLU",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1499",
+        "category_name": "HINDI TURKISH DUBBED URDU",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1309",
+        "category_name": "PAKISTAN HUMTV",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1318",
+        "category_name": "PAKISTAN GREEN TV",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1595",
+        "category_name": "PAKISTAN DRAMA",
+        "parent_id": 0
+    },
+    {
+        "category_id": "211",
+        "category_name": "NETHERLANDS SERIE",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1711",
+        "category_name": "NETHERLANDS NPO+",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1890",
+        "category_name": "NETHERLANDS SKY SHOWTIME",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1796",
+        "category_name": "NETHERLANDS AMAZON PRIME",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1066",
+        "category_name": "NETHERLANDS VIAPLAY",
+        "parent_id": 0
+    },
+    {
+        "category_id": "212",
+        "category_name": "NETHERLANDS KINDEREN",
+        "parent_id": 0
+    },
+    {
+        "category_id": "744",
+        "category_name": "VIDEOLAND SERIES (NL)",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1350",
+        "category_name": "VIDEOLAND KID (NL)",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1000",
+        "category_name": "BELGIUM SERIES (NL)",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1001",
+        "category_name": "BELGIUM REALITY (NL)",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1002",
+        "category_name": "BELGIUM KIDS (NL)",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1003",
+        "category_name": "BELGIUM DOCU-SERIES (NL)",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1010",
+        "category_name": "BELGIUM SERIES (FR)",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1012",
+        "category_name": "BELGIUM KIDS (FR)",
+        "parent_id": 0
+    },
+    {
+        "category_id": "756",
+        "category_name": "GERMANY SERIE \u2074\u1d37 \u00b3\u2078\u2074\u2070\u1d3e",
+        "parent_id": 0
+    },
+    {
+        "category_id": "2037",
+        "category_name": "GERMANY PRIME PRODUKTION \u2074\u1d37 \u00b3\u2078\u2074\u2070\u1d3e",
+        "parent_id": 0
+    },
+    {
+        "category_id": "2093",
+        "category_name": "GERMANY APPLE PRODUKTION \u2074\u1d37 \u00b3\u2078\u2074\u2070\u1d3e",
+        "parent_id": 0
+    },
+    {
+        "category_id": "2141",
+        "category_name": "GERMANY PARAMOUNT+ & MTV STUDIOS \u2074\u1d37 \u00b3\u2078\u2074\u2070\u1d3e",
+        "parent_id": 0
+    },
+    {
+        "category_id": "209",
+        "category_name": "GERMANY SERIE",
+        "parent_id": 0
+    },
+    {
+        "category_id": "630",
+        "category_name": "GERMANY NETFLIX PRODUKTION",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1659",
+        "category_name": "GERMANY KIDS NETFLIX PRODUKTION",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1395",
+        "category_name": "GERMANY ANIME NETFLIX PRODUKTION",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1492",
+        "category_name": "GERMANY APPLE+ PRODUKTION",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1236",
+        "category_name": "GERMANY PRIME PRODUKTION",
+        "parent_id": 0
+    },
+    {
+        "category_id": "847",
+        "category_name": "GERMANY PARAMOUNT+",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1974",
+        "category_name": "GERMANY RTL+",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1136",
+        "category_name": "GERMANY MARVEL STUDIOS",
+        "parent_id": 0
+    },
+    {
+        "category_id": "951",
+        "category_name": "GERMANY REALITY TV SHOW",
+        "parent_id": 0
+    },
+    {
+        "category_id": "817",
+        "category_name": "GERMANY DOKUMENTATION",
+        "parent_id": 0
+    },
+    {
+        "category_id": "210",
+        "category_name": "GERMANY KINDER",
+        "parent_id": 0
+    },
+    {
+        "category_id": "663",
+        "category_name": "GERMANY ANIME",
+        "parent_id": 0
+    },
+    {
+        "category_id": "900",
+        "category_name": "GERMANY ANIME SUBS",
+        "parent_id": 0
+    },
+    {
+        "category_id": "643",
+        "category_name": "POLSKA SERIA",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1529",
+        "category_name": "VIAPLAY POLSKA SERIA",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1256",
+        "category_name": "ESPA\u00d1A SERIES \u2074\u1d37 \u00b3\u2078\u2074\u2070\u1d3e \u1d30\u1d3c\u1d38\u1d2e\u02b8 \u1d2c\u1d41\u1d30\u1d35\u1d3c",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1894",
+        "category_name": "ESPA\u00d1A SERIES \u1d30\u1d3c\u1d38\u1d2e\u02b8 \u1d2c\u1d41\u1d30\u1d35\u1d3c",
+        "parent_id": 0
+    },
+    {
+        "category_id": "562",
+        "category_name": "ESPA\u00d1A SERIES",
+        "parent_id": 0
+    },
+    {
+        "category_id": "2011",
+        "category_name": "ESPA\u00d1A SERIES SUBTITLES",
+        "parent_id": 0
+    },
+    {
+        "category_id": "563",
+        "category_name": "ESPA\u00d1A INFANTILES",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1213",
+        "category_name": "ESPA\u00d1A ANIMACI\u00d3N",
+        "parent_id": 0
+    },
+    {
+        "category_id": "677",
+        "category_name": "ESPA\u00d1A TELENOVELAS",
+        "parent_id": 0
+    },
+    {
+        "category_id": "893",
+        "category_name": "ESPA\u00d1A NETFLIX",
+        "parent_id": 0
+    },
+    {
+        "category_id": "896",
+        "category_name": "ESPA\u00d1A AMAZON PRIME",
+        "parent_id": 0
+    },
+    {
+        "category_id": "894",
+        "category_name": "ESPA\u00d1A DISNEY+",
+        "parent_id": 0
+    },
+    {
+        "category_id": "895",
+        "category_name": "ESPA\u00d1A APPLE TV+",
+        "parent_id": 0
+    },
+    {
+        "category_id": "897",
+        "category_name": "ESPA\u00d1A PARAMOUNT+",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1434",
+        "category_name": "ESPA\u00d1A SKYSHOWTIME",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1436",
+        "category_name": "ESPA\u00d1A ATRESPLAYER - STARZ - RTVE",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1814",
+        "category_name": "ESPA\u00d1A VIX PREMIUM",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1209",
+        "category_name": "ESPA\u00d1A MOVISTAR",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1324",
+        "category_name": "ESPA\u00d1A HULU",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1085",
+        "category_name": "ESPA\u00d1A HBO MAX",
+        "parent_id": 0
+    },
+    {
+        "category_id": "683",
+        "category_name": "ESPA\u00d1A REALITY TV SHOWS",
+        "parent_id": 0
+    },
+    {
+        "category_id": "673",
+        "category_name": "ESPA\u00d1A DOCUMENTAL",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1190",
+        "category_name": "LATINO SERIE",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1191",
+        "category_name": "LATINO NI\u00d1AS",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1889",
+        "category_name": "PT\/BR SERIE \u2074\u1d37 \u00b3\u2078\u2074\u2070\u1d3e \u1d30\u1d3c\u1d38\u1d2e\u02b8 \u1d2c\u1d41\u1d30\u1d35\u1d3c",
+        "parent_id": 0
+    },
+    {
+        "category_id": "857",
+        "category_name": "PT\/BR SERIE",
+        "parent_id": 0
+    },
+    {
+        "category_id": "851",
+        "category_name": "PT\/BR NETFLIX",
+        "parent_id": 0
+    },
+    {
+        "category_id": "853",
+        "category_name": "PT\/BR DISNEY+",
+        "parent_id": 0
+    },
+    {
+        "category_id": "852",
+        "category_name": "PT\/BR APPLE TV+",
+        "parent_id": 0
+    },
+    {
+        "category_id": "854",
+        "category_name": "PT\/BR AMAZON PRIME",
+        "parent_id": 0
+    },
+    {
+        "category_id": "864",
+        "category_name": "PT\/BR PARAMOUNT+",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1341",
+        "category_name": "PT\/BR - SHOWTIME",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1397",
+        "category_name": "PT\/BR HBO MAX",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1407",
+        "category_name": "PT\/BR - STAR WARS",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1349",
+        "category_name": "PT\/BR - MARVEL STUDIOS",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1370",
+        "category_name": "PT\/BR - GLOBOPLAY",
+        "parent_id": 0
+    },
+    {
+        "category_id": "855",
+        "category_name": "PT\/BR ANIMA\u00c7\u00c3O",
+        "parent_id": 0
+    },
+    {
+        "category_id": "2031",
+        "category_name": "PT\/BR DOCUMENTARIO",
+        "parent_id": 0
+    },
+    {
+        "category_id": "394",
+        "category_name": "PERSIAN SERIES",
+        "parent_id": 0
+    },
+    {
+        "category_id": "712",
+        "category_name": "PERSIAN \u0627\u0646\u06af\u0644\u06cc\u0633\u06cc",
+        "parent_id": 0
+    },
+    {
+        "category_id": "753",
+        "category_name": "PERSIAN \u062a\u0631\u06a9\u06cc",
+        "parent_id": 0
+    },
+    {
+        "category_id": "2066",
+        "category_name": "PERSIAN \u062a\u0631\u06a9\u06cc \u062f\u0648\u0628\u0644\u0647",
+        "parent_id": 0
+    },
+    {
+        "category_id": "2026",
+        "category_name": "PERSIAN \u06a9\u0631\u0647 \u0627\u06cc",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1157",
+        "category_name": "PERSIAN \u0646\u0648\u0633\u062a\u0627\u0644\u0698\u06cc",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1211",
+        "category_name": "PERSIAN \u0627\u0646\u06cc\u0645\u0647",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1057",
+        "category_name": "KURDISH BADINI",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1248",
+        "category_name": "KURDISH CARTOON BADINI",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1148",
+        "category_name": "KURDISH SORANI",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1247",
+        "category_name": "KURDISH CARTOON SORANI",
+        "parent_id": 0
+    },
+    {
+        "category_id": "2046",
+        "category_name": "HEBREW TR \u05e1\u05d3\u05e8\u05d5\u05ea \u05d8\u05d5\u05e8\u05e7\u05d9\u05d5\u05ea",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1618",
+        "category_name": "HEBREW \u05d3\u05d9\u05e1\u05e0\u05d9+ \u05e1\u05d3\u05e8\u05d5\u05ea",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1129",
+        "category_name": "HEBREW \u05d4\u05de\u05d4\u05d3\u05d5\u05e8\u05d5\u05ea \u05d4\u05d0\u05d7\u05e8\u05d5\u05e0\u05d5\u05ea",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1471",
+        "category_name": "HEBREW MAKO +",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1555",
+        "category_name": "HEBREW KAN BOX 11",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1130",
+        "category_name": "HEBREW \u05d9\u05e9\u05df",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1261",
+        "category_name": "HEBREW \u05d0\u05e0\u05d9\u05de\u05e6\u05d9\u05d4",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1703",
+        "category_name": "HEBREW \u05e0\u05d8\u05e4\u05dc\u05d9\u05e7\u05e1 \u05d1\u05e2\u05d1\u05e8\u05d9\u05ea",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1388",
+        "category_name": "BULGARIYA SERIAL",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1046",
+        "category_name": "RUSSAIN SERIES",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1184",
+        "category_name": "AFRICA SERIES",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1183",
+        "category_name": "SOUTH AFRICA SERIES",
+        "parent_id": 0
+    },
+    {
+        "category_id": "233",
+        "category_name": "CHINA ANIMATION",
+        "parent_id": 0
+    },
+    {
+        "category_id": "914",
+        "category_name": "PHILIPPINES SERIES",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1264",
+        "category_name": "NORDIC SERIES \u2074\u1d37 \u00b3\u2078\u2074\u2070\u1d3e \u1d30\u1d3c\u1d38\u1d2e\u02b8 \u1d2c\u1d41\u1d30\u1d35\u1d3c",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1892",
+        "category_name": "NORDIC SERIE \u1d30\u1d3c\u1d38\u1d2e\u02b8 \u1d2c\u1d41\u1d30\u1d35\u1d3c",
+        "parent_id": 0
+    },
+    {
+        "category_id": "204",
+        "category_name": "NORDIC SERIES",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1917",
+        "category_name": "NORDIC SKY SHOWTIME",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1907",
+        "category_name": "NORDIC PRIME VIDEO",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1908",
+        "category_name": "NORDIC APPLE TV+",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1909",
+        "category_name": "NORDIC DISNEY+",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1910",
+        "category_name": "NORDIC HBO MAX",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1911",
+        "category_name": "NORDIC NETFLIX",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1912",
+        "category_name": "NORDIC VIAPLAY",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1733",
+        "category_name": "NORDIC ANIME",
+        "parent_id": 0
+    },
+    {
+        "category_id": "208",
+        "category_name": "NORDIC KIDS",
+        "parent_id": 0
+    },
+    {
+        "category_id": "96",
+        "category_name": "SVENSK SERIE",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1901",
+        "category_name": "SVENSK SVT PLAY",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1902",
+        "category_name": "SVENSK TV4 PLAY",
+        "parent_id": 0
+    },
+    {
+        "category_id": "775",
+        "category_name": "SVENSKA BARN",
+        "parent_id": 0
+    },
+    {
+        "category_id": "2120",
+        "category_name": "DANSK SERIES \u2074\u1d37 \u00b3\u2078\u2074\u2070\u1d3e \u1d30\u1d3c\u1d38\u1d2e\u02b8 \u1d2c\u1d41\u1d30\u1d35\u1d3c",
+        "parent_id": 0
+    },
+    {
+        "category_id": "776",
+        "category_name": "DANSK SERIE",
+        "parent_id": 0
+    },
+    {
+        "category_id": "777",
+        "category_name": "DANSKE B\u00d8RN",
+        "parent_id": 0
+    },
+    {
+        "category_id": "809",
+        "category_name": "NORSK SERIE",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1903",
+        "category_name": "NORSK NRK",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1904",
+        "category_name": "NORSK TV2 PLAY",
+        "parent_id": 0
+    },
+    {
+        "category_id": "810",
+        "category_name": "NORSK BARN",
+        "parent_id": 0
+    },
+    {
+        "category_id": "811",
+        "category_name": "SUOMI SARJA",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1919",
+        "category_name": "SUOMI MTV KATSOMO",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1921",
+        "category_name": "SUOMI YLE AREENA",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1918",
+        "category_name": "SUOMI RUUTU",
+        "parent_id": 0
+    },
+    {
+        "category_id": "812",
+        "category_name": "SUOMEN LAPSET",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1612",
+        "category_name": "\u00cdSLANDS SERIES",
+        "parent_id": 0
+    },
+    {
+        "category_id": "1508",
+        "category_name": "\u00cdSLANDS VIAPLAY R\u00d6\u00d0",
+        "parent_id": 0
+    }
+]

@@ -1,0 +1,286 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background_primary"
+    android:fillViewport="true">
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <!-- Backdrop Image with Gradient -->
+        <FrameLayout
+            android:id="@+id/backdropContainer"
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/backdrop_height"
+            app:layout_constraintTop_toTopOf="parent">
+
+            <ImageView
+                android:id="@+id/backdropImage"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="centerCrop"
+                android:contentDescription="@string/backdrop_image"
+                tools:src="@drawable/placeholder_movie" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@drawable/bg_backdrop_gradient" />
+
+            <!-- Back Button -->
+            <ImageView
+                android:id="@+id/backButton"
+                android:layout_width="@dimen/control_button_size"
+                android:layout_height="@dimen/control_button_size"
+                android:layout_margin="@dimen/spacing_s"
+                android:src="@drawable/ic_back"
+                android:contentDescription="@string/back"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:padding="@dimen/spacing_m"
+                app:tint="@color/text_primary" />
+
+            <!-- Poster Image (overlapping) -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/posterCard"
+                android:layout_width="@dimen/detail_poster_width"
+                android:layout_height="@dimen/detail_poster_height"
+                android:layout_gravity="bottom|start"
+                android:layout_marginStart="@dimen/spacing_l"
+                android:layout_marginBottom="-40dp"
+                app:cardCornerRadius="@dimen/corner_radius_medium"
+                app:cardElevation="4dp">
+
+                <ImageView
+                    android:id="@+id/posterImage"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:scaleType="centerCrop"
+                    android:contentDescription="@string/poster_image"
+                    tools:src="@drawable/placeholder_movie" />
+
+            </com.google.android.material.card.MaterialCardView>
+
+        </FrameLayout>
+
+        <!-- Title and Metadata -->
+        <LinearLayout
+            android:id="@+id/titleContainer"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginTop="@dimen/spacing_xxxl"
+            android:layout_marginStart="@dimen/spacing_l"
+            android:layout_marginEnd="@dimen/spacing_l"
+            app:layout_constraintTop_toBottomOf="@id/backdropContainer"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent">
+
+            <TextView
+                android:id="@+id/titleText"
+                style="@style/TextAppearance.App.Headline1"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:maxLines="2"
+                android:ellipsize="end"
+                tools:text="The Dark Knight" />
+
+            <TextView
+                android:id="@+id/metadataText"
+                style="@style/TextAppearance.App.Body"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/spacing_xs"
+                android:textColor="@color/text_tertiary"
+                tools:text="2008 · 2h 32m · ★ 9.0" />
+
+        </LinearLayout>
+
+        <!-- Action Buttons -->
+        <LinearLayout
+            android:id="@+id/actionsContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="@dimen/spacing_l"
+            android:layout_marginStart="@dimen/spacing_l"
+            android:layout_marginEnd="@dimen/spacing_l"
+            android:gravity="start"
+            app:layout_constraintTop_toBottomOf="@id/titleContainer">
+
+            <!-- Play Button - Keep text -->
+            <Button
+                android:id="@+id/playButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="@dimen/spacing_m"
+                android:text="@string/play"
+                android:textColor="@color/text_primary"
+                android:textSize="16sp"
+                android:drawableStart="@drawable/ic_play"
+                android:drawablePadding="@dimen/spacing_s"
+                android:background="@drawable/bg_button_filled"
+                android:paddingVertical="@dimen/spacing_s"
+                android:paddingHorizontal="@dimen/spacing_l"
+                app:drawableTint="@color/text_primary" />
+
+            <!-- Favorite Icon Button -->
+            <ImageButton
+                android:id="@+id/favoriteButton"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_marginEnd="@dimen/spacing_m"
+                android:src="@drawable/ic_favorite_border"
+                android:background="@drawable/bg_icon_button_circular"
+                android:scaleType="centerInside"
+                android:padding="@dimen/spacing_s"
+                android:contentDescription="@string/my_list"
+                app:tint="@color/text_tertiary" />
+
+            <!-- Download Icon Button -->
+            <ImageButton
+                android:id="@+id/downloadButton"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:src="@drawable/ic_download"
+                android:background="@drawable/bg_icon_button_circular"
+                android:scaleType="centerInside"
+                android:padding="@dimen/spacing_s"
+                android:contentDescription="@string/download"
+                app:tint="@color/text_tertiary" />
+
+        </LinearLayout>
+
+        <!-- Resume Button (conditional) -->
+        <Button
+            android:id="@+id/resumeButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/spacing_m"
+            android:layout_marginStart="@dimen/spacing_l"
+            android:layout_marginEnd="@dimen/spacing_l"
+            android:text="@string/resume_from"
+            android:textColor="@color/text_tertiary"
+            android:textSize="16sp"
+            android:drawableStart="@drawable/ic_play"
+            android:drawablePadding="@dimen/spacing_s"
+            android:background="@drawable/bg_button_outlined"
+            android:paddingVertical="@dimen/spacing_m"
+            android:paddingHorizontal="@dimen/spacing_l"
+            android:visibility="gone"
+            app:drawableTint="@color/text_tertiary"
+            app:layout_constraintTop_toBottomOf="@id/actionsContainer"
+            tools:visibility="visible"
+            tools:text="Resume from 15:32" />
+
+        <!-- Loading State -->
+        <ProgressBar
+            android:id="@+id/progressBar"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:indeterminateTint="@color/brand_orange"
+            android:visibility="gone"
+            app:layout_constraintTop_toBottomOf="@id/actionsContainer"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintBottom_toTopOf="@id/infoContainer" />
+
+        <!-- Information Section -->
+        <LinearLayout
+            android:id="@+id/infoContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginTop="@dimen/spacing_xl"
+            android:paddingStart="@dimen/spacing_l"
+            android:paddingEnd="@dimen/spacing_l"
+            android:paddingBottom="@dimen/spacing_xl"
+            android:visibility="gone"
+            app:layout_constraintTop_toBottomOf="@id/resumeButton"
+            tools:visibility="visible">
+
+            <!-- Plot -->
+            <TextView
+                style="@style/TextAppearance.App.Caption"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/plot"
+                android:textColor="@color/brand_orange"
+                android:textAllCaps="true"
+                android:letterSpacing="0.05" />
+
+            <TextView
+                android:id="@+id/plotText"
+                style="@style/TextAppearance.App.Body"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/spacing_s"
+                android:lineSpacingExtra="4dp"
+                tools:text="When the menace known as the Joker wreaks havoc and chaos on the people of Gotham, Batman must accept one of the greatest psychological and physical tests of his ability to fight injustice." />
+
+            <!-- Genre -->
+            <TextView
+                style="@style/TextAppearance.App.Caption"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/spacing_l"
+                android:text="@string/genre"
+                android:textColor="@color/brand_orange"
+                android:textAllCaps="true"
+                android:letterSpacing="0.05" />
+
+            <TextView
+                android:id="@+id/genreText"
+                style="@style/TextAppearance.App.Body"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/spacing_s"
+                tools:text="Action, Crime, Drama" />
+
+            <!-- Director -->
+            <TextView
+                style="@style/TextAppearance.App.Caption"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/spacing_l"
+                android:text="@string/director"
+                android:textColor="@color/brand_orange"
+                android:textAllCaps="true"
+                android:letterSpacing="0.05" />
+
+            <TextView
+                android:id="@+id/directorText"
+                style="@style/TextAppearance.App.Body"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/spacing_s"
+                tools:text="Christopher Nolan" />
+
+            <!-- Cast -->
+            <TextView
+                style="@style/TextAppearance.App.Caption"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/spacing_l"
+                android:text="@string/cast"
+                android:textColor="@color/brand_orange"
+                android:textAllCaps="true"
+                android:letterSpacing="0.05" />
+
+            <TextView
+                android:id="@+id/castText"
+                style="@style/TextAppearance.App.Body"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/spacing_s"
+                tools:text="Christian Bale, Heath Ledger, Aaron Eckhart, Michael Caine" />
+
+        </LinearLayout>
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+</ScrollView>
