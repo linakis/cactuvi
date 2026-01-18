@@ -5,6 +5,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.animation.RotateAnimation
+import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
@@ -27,7 +28,7 @@ sealed class SeasonEpisodeItem {
 
 class SeasonEpisodeAdapter(
     private val onEpisodeClick: (Episode, Int) -> Unit,
-    private val onEpisodeLongClick: ((Episode, Int) -> Unit)? = null
+    private val onDownloadClick: (Episode, Int) -> Unit
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
     
     private val items = mutableListOf<SeasonEpisodeItem>()
@@ -231,6 +232,7 @@ class SeasonEpisodeAdapter(
         private val episodeTitle: TextView = itemView.findViewById(R.id.episodeTitle)
         private val episodeDuration: TextView = itemView.findViewById(R.id.episodeDuration)
         private val progressIndicator: View = itemView.findViewById(R.id.progressIndicator)
+        private val downloadButton: ImageButton = itemView.findViewById(R.id.downloadButton)
         
         fun bind(item: SeasonEpisodeItem.EpisodeItem) {
             val episode = item.episode
@@ -248,13 +250,14 @@ class SeasonEpisodeAdapter(
             // Show progress indicator if episode has watch history
             progressIndicator.visibility = if (item.hasProgress) View.VISIBLE else View.GONE
             
+            // Episode row click - plays episode
             itemView.setOnClickListener {
                 onEpisodeClick(episode, item.seasonNumber)
             }
             
-            itemView.setOnLongClickListener {
-                onEpisodeLongClick?.invoke(episode, item.seasonNumber)
-                true
+            // Download button click - downloads episode directly
+            downloadButton.setOnClickListener {
+                onDownloadClick(episode, item.seasonNumber)
             }
         }
     }

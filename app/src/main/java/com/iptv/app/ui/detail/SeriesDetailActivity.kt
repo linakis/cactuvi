@@ -113,8 +113,8 @@ class SeriesDetailActivity : AppCompatActivity() {
             onEpisodeClick = { episode, seasonNumber ->
                 playEpisode(episode, seasonNumber)
             },
-            onEpisodeLongClick = { episode, seasonNumber ->
-                showEpisodeDownloadDialog(episode, seasonNumber)
+            onDownloadClick = { episode, seasonNumber ->
+                downloadEpisode(episode, seasonNumber)
             }
         )
         
@@ -418,19 +418,6 @@ class SeriesDetailActivity : AppCompatActivity() {
         seasonEpisodes.forEach { episode ->
             downloadEpisodeInternal(episode, season.seasonNumber)
         }
-    }
-    
-    private fun showEpisodeDownloadDialog(episode: Episode, seasonNumber: Int) {
-        val episodeTitle = "S${seasonNumber}E${episode.episodeNum}: ${episode.title}"
-        
-        androidx.appcompat.app.AlertDialog.Builder(this)
-            .setTitle("Download Episode")
-            .setMessage("Download $episodeTitle?")
-            .setPositiveButton("Download") { _, _ ->
-                downloadEpisode(episode, seasonNumber)
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
     }
     
     private fun downloadEpisode(episode: Episode, seasonNumber: Int) {

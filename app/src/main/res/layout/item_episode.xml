@@ -60,10 +60,23 @@
     <TextView
         android:id="@+id/episodeDuration"
         style="@style/TextAppearance.App.Body"
-        android:layout_width="64dp"
+        android:layout_width="56dp"
         android:layout_height="wrap_content"
         android:gravity="end"
         android:textColor="@color/text_tertiary"
         tools:text="45 min" />
+
+    <!-- Download Button -->
+    <ImageButton
+        android:id="@+id/downloadButton"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:layout_marginStart="@dimen/spacing_s"
+        android:src="@drawable/ic_download"
+        android:contentDescription="@string/download"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:padding="6dp"
+        app:tint="@color/text_tertiary"
+        android:focusable="true" />
 
 </LinearLayout>
