@@ -2,6 +2,13 @@
 
 This file contains essential information for AI coding agents working on this codebase.
 
+## Communication Style
+
+- **No summaries:** Do not produce summary sections after completing tasks
+- **Be concise:** Brief confirmations are sufficient (e.g., "Done" or "Fixed")
+- **Action-oriented:** Focus on doing the work, not explaining what was done
+- **Ask when unclear:** If requirements are ambiguous, ask before implementing
+
 ## Project Overview
 
 **Type:** Android IPTV streaming application (Netflix-style UI)  
