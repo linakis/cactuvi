@@ -97,6 +97,22 @@
             android:name=".ui.downloads.DownloadsActivity"
             android:theme="@style/Theme.IPTVPlayer" />
 
+        <activity
+            android:name=".ui.settings.MoviesFilterSettingsActivity"
+            android:theme="@style/Theme.IPTVPlayer" />
+
+        <activity
+            android:name=".ui.settings.SeriesFilterSettingsActivity"
+            android:theme="@style/Theme.IPTVPlayer" />
+
+        <activity
+            android:name=".ui.settings.LiveTvFilterSettingsActivity"
+            android:theme="@style/Theme.IPTVPlayer" />
+
+        <activity
+            android:name=".ui.settings.ManageFoldersActivity"
+            android:theme="@style/Theme.IPTVPlayer" />
+
         <!-- Download Service -->
         <service
             android:name=".services.DownloadService"

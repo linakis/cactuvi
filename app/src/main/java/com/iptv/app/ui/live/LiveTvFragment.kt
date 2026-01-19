@@ -24,10 +24,12 @@ import com.iptv.app.ui.common.GroupAdapter
 import com.iptv.app.ui.common.LiveChannelPagingAdapter
 import com.iptv.app.ui.common.ModernToolbar
 import com.iptv.app.ui.player.PlayerActivity
+import com.iptv.app.data.models.ContentFilterSettings
 import com.iptv.app.utils.CategoryGrouper
 import com.iptv.app.utils.CategoryGrouper.GroupNode
 import com.iptv.app.utils.CategoryGrouper.NavigationTree
 import com.iptv.app.utils.CredentialsManager
+import com.iptv.app.utils.PreferencesManager
 import com.iptv.app.utils.StreamUrlBuilder
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -137,6 +139,14 @@ class LiveTvFragment : Fragment() {
         showLoading(true)
         
         lifecycleScope.launch {
+            val preferencesManager = PreferencesManager.getInstance(requireContext())
+            
+            // Get filter settings
+            val groupingEnabled = preferencesManager.isGroupingEnabled(ContentFilterSettings.ContentType.LIVE_TV)
+            val separator = preferencesManager.getCustomSeparator(ContentFilterSettings.ContentType.LIVE_TV)
+            val hiddenItems = preferencesManager.getHiddenItems(ContentFilterSettings.ContentType.LIVE_TV)
+            val filterMode = preferencesManager.getFilterMode(ContentFilterSettings.ContentType.LIVE_TV)
+            
             // Try to load cached navigation tree first
             navigationTree = repository.getCachedLiveNavigationTree()
             
@@ -145,9 +155,15 @@ class LiveTvFragment : Fragment() {
             if (categoriesResult.isSuccess) {
                 categories = categoriesResult.getOrNull() ?: emptyList()
                 
-                // Build navigation tree if cache miss
+                // Build navigation tree with filter settings if cache miss
                 if (navigationTree == null) {
-                    navigationTree = CategoryGrouper.buildLiveNavigationTree(categories)
+                    navigationTree = CategoryGrouper.buildLiveNavigationTree(
+                        categories,
+                        groupingEnabled,
+                        separator,
+                        hiddenItems,
+                        filterMode
+                    )
                 }
             }
             

@@ -1,5 +1,6 @@
 package com.iptv.app.ui.settings
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.View
 import android.widget.Toast
@@ -44,6 +45,19 @@ class SettingsActivity : AppCompatActivity() {
         // Clear Watch History
         findViewById<View>(R.id.clearHistoryCard).setOnClickListener {
             showClearHistoryDialog()
+        }
+        
+        // Content Filters
+        findViewById<View>(R.id.moviesFilterCard).setOnClickListener {
+            startActivity(Intent(this, MoviesFilterSettingsActivity::class.java))
+        }
+        
+        findViewById<View>(R.id.seriesFilterCard).setOnClickListener {
+            startActivity(Intent(this, SeriesFilterSettingsActivity::class.java))
+        }
+        
+        findViewById<View>(R.id.liveTvFilterCard).setOnClickListener {
+            startActivity(Intent(this, LiveTvFilterSettingsActivity::class.java))
         }
     }
     

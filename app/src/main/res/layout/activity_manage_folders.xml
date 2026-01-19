@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout 
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background_primary">
+
+    <com.iptv.app.ui.common.ModernToolbar
+        android:id="@+id/modernToolbar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:title="Manage Folders"
+        app:showActionButton="false"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <!-- Controls Section -->
+    <LinearLayout
+        android:id="@+id/controlsSection"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="@dimen/spacing_m"
+        android:background="@color/background_secondary"
+        app:layout_constraintTop_toBottomOf="@id/modernToolbar">
+        
+        <!-- Search Bar -->
+        <EditText
+            android:id="@+id/searchInput"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:hint="Search folders..."
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:background="@color/background_primary"
+            android:textColor="@color/text_primary"
+            android:textColorHint="@color/text_tertiary"
+            android:inputType="text"
+            android:imeOptions="actionSearch" />
+        
+        <!-- Mode Toggle -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/spacing_m"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+            
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Show only selected folders"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp" />
+            
+            <com.google.android.material.switchmaterial.SwitchMaterial
+                android:id="@+id/modeSwitch"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+        </LinearLayout>
+        
+        <!-- Action Buttons -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/spacing_m"
+            android:orientation="horizontal"
+            android:gravity="center">
+            
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/selectAllButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="@dimen/spacing_s"
+                android:text="Select All"
+                android:textColor="@color/text_primary"
+                app:backgroundTint="@color/background_tertiary"
+                style="@style/Widget.Material3.Button.OutlinedButton" />
+            
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/deselectAllButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="@dimen/spacing_s"
+                android:text="Deselect All"
+                android:textColor="@color/text_primary"
+                app:backgroundTint="@color/background_tertiary"
+                style="@style/Widget.Material3.Button.OutlinedButton" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- RecyclerView -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/foldersRecyclerView"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:clipToPadding="false"
+        android:paddingTop="@dimen/spacing_m"
+        android:paddingBottom="@dimen/spacing_m"
+        app:layout_constraintTop_toBottomOf="@id/controlsSection"
+        app:layout_constraintBottom_toTopOf="@id/applyButton" />
+
+    <!-- Empty State -->
+    <LinearLayout
+        android:id="@+id/emptyState"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:visibility="gone"
+        app:layout_constraintTop_toTopOf="@id/foldersRecyclerView"
+        app:layout_constraintBottom_toBottomOf="@id/foldersRecyclerView"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+        
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="No folders found"
+            android:textColor="@color/text_tertiary"
+            android:textSize="16sp" />
+        
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/spacing_s"
+            android:text="Enable grouping to see folders"
+            android:textColor="@color/text_tertiary"
+            android:textSize="14sp" />
+    </LinearLayout>
+
+    <!-- Apply Button -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/applyButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_margin="@dimen/spacing_m"
+        android:text="Apply"
+        android:textColor="@android:color/white"
+        app:backgroundTint="@color/brand_orange"
+        app:layout_constraintBottom_toBottomOf="parent" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

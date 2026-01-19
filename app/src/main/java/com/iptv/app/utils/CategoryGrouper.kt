@@ -1,7 +1,7 @@
 package com.iptv.app.utils
 
 import com.iptv.app.data.models.Category
-import com.iptv.app.data.models.FilterMode
+import com.iptv.app.data.models.ContentFilterSettings
 
 /**
  * Utility class for building tree-based navigation from categories
@@ -34,7 +34,7 @@ object CategoryGrouper {
         groupingEnabled: Boolean = true,
         separator: String = "|",
         hiddenItems: Set<String> = emptySet(),
-        filterMode: FilterMode = FilterMode.BLACKLIST
+        filterMode: ContentFilterSettings.FilterMode = ContentFilterSettings.FilterMode.BLACKLIST
     ): NavigationTree {
         if (!groupingEnabled) {
             // No grouping - return all categories in single group
@@ -60,7 +60,7 @@ object CategoryGrouper {
         groupingEnabled: Boolean = true,
         separator: String = "-",
         hiddenItems: Set<String> = emptySet(),
-        filterMode: FilterMode = FilterMode.BLACKLIST
+        filterMode: ContentFilterSettings.FilterMode = ContentFilterSettings.FilterMode.BLACKLIST
     ): NavigationTree {
         if (!groupingEnabled) {
             // No grouping - return all categories in single group
@@ -86,7 +86,7 @@ object CategoryGrouper {
         groupingEnabled: Boolean = true,
         separator: String = "FIRST_WORD",
         hiddenItems: Set<String> = emptySet(),
-        filterMode: FilterMode = FilterMode.BLACKLIST
+        filterMode: ContentFilterSettings.FilterMode = ContentFilterSettings.FilterMode.BLACKLIST
     ): NavigationTree {
         if (!groupingEnabled) {
             // No grouping - return all categories in single group
@@ -136,16 +136,16 @@ object CategoryGrouper {
     private fun filterCategories(
         categories: List<Category>,
         hiddenItems: Set<String>,
-        filterMode: FilterMode
+        filterMode: ContentFilterSettings.FilterMode
     ): List<Category> {
         if (hiddenItems.isEmpty()) return categories
         
         return when (filterMode) {
-            FilterMode.BLACKLIST -> {
+            ContentFilterSettings.FilterMode.BLACKLIST -> {
                 // Hide selected items
                 categories.filter { it.categoryName !in hiddenItems }
             }
-            FilterMode.WHITELIST -> {
+            ContentFilterSettings.FilterMode.WHITELIST -> {
                 // Show only selected items
                 categories.filter { it.categoryName in hiddenItems }
             }
@@ -158,16 +158,16 @@ object CategoryGrouper {
     private fun filterNavigationTree(
         tree: NavigationTree,
         hiddenItems: Set<String>,
-        filterMode: FilterMode
+        filterMode: ContentFilterSettings.FilterMode
     ): NavigationTree {
         if (hiddenItems.isEmpty()) return tree
         
         val filteredGroups = when (filterMode) {
-            FilterMode.BLACKLIST -> {
+            ContentFilterSettings.FilterMode.BLACKLIST -> {
                 // Hide selected groups
                 tree.groups.filter { it.name !in hiddenItems }
             }
-            FilterMode.WHITELIST -> {
+            ContentFilterSettings.FilterMode.WHITELIST -> {
                 // Show only selected groups
                 tree.groups.filter { it.name in hiddenItems }
             }

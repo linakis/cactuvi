@@ -4,7 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-import com.iptv.app.data.models.FilterMode
+import com.iptv.app.data.models.ContentFilterSettings
 
 class PreferencesManager private constructor(context: Context) {
     
@@ -100,17 +100,17 @@ class PreferencesManager private constructor(context: Context) {
     }
     
     // Movies filter settings
-    fun getMoviesFilterMode(): FilterMode {
-        val mode = prefs.getString(KEY_MOVIES_FILTER_MODE, FilterMode.BLACKLIST.name) 
-            ?: FilterMode.BLACKLIST.name
+    fun getMoviesFilterMode(): ContentFilterSettings.FilterMode {
+        val mode = prefs.getString(KEY_MOVIES_FILTER_MODE, ContentFilterSettings.FilterMode.BLACKLIST.name) 
+            ?: ContentFilterSettings.FilterMode.BLACKLIST.name
         return try {
-            FilterMode.valueOf(mode)
+            ContentFilterSettings.FilterMode.valueOf(mode)
         } catch (e: IllegalArgumentException) {
-            FilterMode.BLACKLIST
+            ContentFilterSettings.FilterMode.BLACKLIST
         }
     }
     
-    fun setMoviesFilterMode(mode: FilterMode) {
+    fun setMoviesFilterMode(mode: ContentFilterSettings.FilterMode) {
         prefs.edit().putString(KEY_MOVIES_FILTER_MODE, mode.name).apply()
     }
     
@@ -130,17 +130,17 @@ class PreferencesManager private constructor(context: Context) {
     }
     
     // Series filter settings
-    fun getSeriesFilterMode(): FilterMode {
-        val mode = prefs.getString(KEY_SERIES_FILTER_MODE, FilterMode.BLACKLIST.name) 
-            ?: FilterMode.BLACKLIST.name
+    fun getSeriesFilterMode(): ContentFilterSettings.FilterMode {
+        val mode = prefs.getString(KEY_SERIES_FILTER_MODE, ContentFilterSettings.FilterMode.BLACKLIST.name) 
+            ?: ContentFilterSettings.FilterMode.BLACKLIST.name
         return try {
-            FilterMode.valueOf(mode)
+            ContentFilterSettings.FilterMode.valueOf(mode)
         } catch (e: IllegalArgumentException) {
-            FilterMode.BLACKLIST
+            ContentFilterSettings.FilterMode.BLACKLIST
         }
     }
     
-    fun setSeriesFilterMode(mode: FilterMode) {
+    fun setSeriesFilterMode(mode: ContentFilterSettings.FilterMode) {
         prefs.edit().putString(KEY_SERIES_FILTER_MODE, mode.name).apply()
     }
     
@@ -160,17 +160,17 @@ class PreferencesManager private constructor(context: Context) {
     }
     
     // Live TV filter settings
-    fun getLiveFilterMode(): FilterMode {
-        val mode = prefs.getString(KEY_LIVE_FILTER_MODE, FilterMode.BLACKLIST.name) 
-            ?: FilterMode.BLACKLIST.name
+    fun getLiveFilterMode(): ContentFilterSettings.FilterMode {
+        val mode = prefs.getString(KEY_LIVE_FILTER_MODE, ContentFilterSettings.FilterMode.BLACKLIST.name) 
+            ?: ContentFilterSettings.FilterMode.BLACKLIST.name
         return try {
-            FilterMode.valueOf(mode)
+            ContentFilterSettings.FilterMode.valueOf(mode)
         } catch (e: IllegalArgumentException) {
-            FilterMode.BLACKLIST
+            ContentFilterSettings.FilterMode.BLACKLIST
         }
     }
     
-    fun setLiveFilterMode(mode: FilterMode) {
+    fun setLiveFilterMode(mode: ContentFilterSettings.FilterMode) {
         prefs.edit().putString(KEY_LIVE_FILTER_MODE, mode.name).apply()
     }
     
@@ -199,8 +199,73 @@ class PreferencesManager private constructor(context: Context) {
         }
         
         return when (filterMode) {
-            FilterMode.BLACKLIST -> itemName in hiddenItems
-            FilterMode.WHITELIST -> itemName !in hiddenItems
+            ContentFilterSettings.FilterMode.BLACKLIST -> itemName in hiddenItems
+            ContentFilterSettings.FilterMode.WHITELIST -> itemName !in hiddenItems
+        }
+    }
+    
+    // Generic wrapper methods for use with ContentType enum
+    fun isGroupingEnabled(contentType: ContentFilterSettings.ContentType): Boolean {
+        return when (contentType) {
+            ContentFilterSettings.ContentType.MOVIES -> isMoviesGroupingEnabled()
+            ContentFilterSettings.ContentType.SERIES -> isSeriesGroupingEnabled()
+            ContentFilterSettings.ContentType.LIVE_TV -> isLiveGroupingEnabled()
+        }
+    }
+    
+    fun setGroupingEnabled(contentType: ContentFilterSettings.ContentType, enabled: Boolean) {
+        when (contentType) {
+            ContentFilterSettings.ContentType.MOVIES -> setMoviesGroupingEnabled(enabled)
+            ContentFilterSettings.ContentType.SERIES -> setSeriesGroupingEnabled(enabled)
+            ContentFilterSettings.ContentType.LIVE_TV -> setLiveGroupingEnabled(enabled)
+        }
+    }
+    
+    fun getCustomSeparator(contentType: ContentFilterSettings.ContentType): String {
+        return when (contentType) {
+            ContentFilterSettings.ContentType.MOVIES -> getMoviesGroupingSeparator()
+            ContentFilterSettings.ContentType.SERIES -> getSeriesGroupingSeparator()
+            ContentFilterSettings.ContentType.LIVE_TV -> getLiveGroupingSeparator()
+        }
+    }
+    
+    fun setCustomSeparator(contentType: ContentFilterSettings.ContentType, separator: String) {
+        when (contentType) {
+            ContentFilterSettings.ContentType.MOVIES -> setMoviesGroupingSeparator(separator)
+            ContentFilterSettings.ContentType.SERIES -> setSeriesGroupingSeparator(separator)
+            ContentFilterSettings.ContentType.LIVE_TV -> setLiveGroupingSeparator(separator)
+        }
+    }
+    
+    fun getFilterMode(contentType: ContentFilterSettings.ContentType): ContentFilterSettings.FilterMode {
+        return when (contentType) {
+            ContentFilterSettings.ContentType.MOVIES -> getMoviesFilterMode()
+            ContentFilterSettings.ContentType.SERIES -> getSeriesFilterMode()
+            ContentFilterSettings.ContentType.LIVE_TV -> getLiveFilterMode()
+        }
+    }
+    
+    fun setFilterMode(contentType: ContentFilterSettings.ContentType, mode: ContentFilterSettings.FilterMode) {
+        when (contentType) {
+            ContentFilterSettings.ContentType.MOVIES -> setMoviesFilterMode(mode)
+            ContentFilterSettings.ContentType.SERIES -> setSeriesFilterMode(mode)
+            ContentFilterSettings.ContentType.LIVE_TV -> setLiveFilterMode(mode)
+        }
+    }
+    
+    fun getHiddenItems(contentType: ContentFilterSettings.ContentType): Set<String> {
+        return when (contentType) {
+            ContentFilterSettings.ContentType.MOVIES -> getMoviesHiddenItems()
+            ContentFilterSettings.ContentType.SERIES -> getSeriesHiddenItems()
+            ContentFilterSettings.ContentType.LIVE_TV -> getLiveHiddenItems()
+        }
+    }
+    
+    fun setHiddenItems(contentType: ContentFilterSettings.ContentType, items: Set<String>) {
+        when (contentType) {
+            ContentFilterSettings.ContentType.MOVIES -> setMoviesHiddenItems(items)
+            ContentFilterSettings.ContentType.SERIES -> setSeriesHiddenItems(items)
+            ContentFilterSettings.ContentType.LIVE_TV -> setLiveHiddenItems(items)
         }
     }
 }

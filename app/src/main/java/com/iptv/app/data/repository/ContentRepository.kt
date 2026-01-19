@@ -664,6 +664,11 @@ class ContentRepository(
         database.navigationGroupDao().clear()
     }
     
+    // Aliases for consistency
+    suspend fun invalidateMovieNavigationCache() = invalidateVodNavigationTree()
+    suspend fun invalidateSeriesNavigationCache() = invalidateSeriesNavigationTree()
+    suspend fun invalidateLiveNavigationCache() = invalidateLiveNavigationTree()
+    
     // ========== CACHE MANAGEMENT ==========
     
     suspend fun clearAllCache(): Result<Unit> = withContext(Dispatchers.IO) {

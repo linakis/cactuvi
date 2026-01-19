@@ -20,9 +20,15 @@ data class ContentFilterSettings(
     
     val liveFilterMode: FilterMode = FilterMode.BLACKLIST,
     val liveHiddenItems: Set<String> = emptySet()
-)
-
-enum class FilterMode {
-    BLACKLIST,  // Hide selected items
-    WHITELIST   // Show only selected items
+) {
+    enum class ContentType {
+        MOVIES,
+        SERIES,
+        LIVE_TV
+    }
+    
+    enum class FilterMode {
+        BLACKLIST,  // Hide selected items
+        WHITELIST   // Show only selected items
+    }
 }
