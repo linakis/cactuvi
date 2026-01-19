@@ -29,12 +29,18 @@ class PreferencesManager private constructor(context: Context) {
         // Filter mode keys
         private const val KEY_MOVIES_FILTER_MODE = "movies_filter_mode"
         private const val KEY_MOVIES_HIDDEN_ITEMS = "movies_hidden_items"
+        private const val KEY_MOVIES_HIDDEN_GROUPS = "movies_hidden_groups"
+        private const val KEY_MOVIES_HIDDEN_CATEGORIES = "movies_hidden_categories"
         
         private const val KEY_SERIES_FILTER_MODE = "series_filter_mode"
         private const val KEY_SERIES_HIDDEN_ITEMS = "series_hidden_items"
+        private const val KEY_SERIES_HIDDEN_GROUPS = "series_hidden_groups"
+        private const val KEY_SERIES_HIDDEN_CATEGORIES = "series_hidden_categories"
         
         private const val KEY_LIVE_FILTER_MODE = "live_filter_mode"
         private const val KEY_LIVE_HIDDEN_ITEMS = "live_hidden_items"
+        private const val KEY_LIVE_HIDDEN_GROUPS = "live_hidden_groups"
+        private const val KEY_LIVE_HIDDEN_CATEGORIES = "live_hidden_categories"
         
         @Volatile
         private var instance: PreferencesManager? = null
@@ -268,4 +274,133 @@ class PreferencesManager private constructor(context: Context) {
             ContentFilterSettings.ContentType.LIVE_TV -> setLiveHiddenItems(items)
         }
     }
+    
+    // ========== HIERARCHICAL FILTERING (Groups + Categories) ==========
+    
+    // Movies hierarchical filtering
+    fun getMoviesHiddenGroups(): Set<String> {
+        val json = prefs.getString(KEY_MOVIES_HIDDEN_GROUPS, null) ?: return emptySet()
+        return try {
+            val type = object : TypeToken<Set<String>>() {}.type
+            gson.fromJson(json, type) ?: emptySet()
+        } catch (e: Exception) {
+            emptySet()
+        }
+    }
+    
+    fun setMoviesHiddenGroups(groups: Set<String>) {
+        val json = gson.toJson(groups)
+        prefs.edit().putString(KEY_MOVIES_HIDDEN_GROUPS, json).apply()
+    }
+    
+    fun getMoviesHiddenCategories(): Set<String> {
+        val json = prefs.getString(KEY_MOVIES_HIDDEN_CATEGORIES, null) ?: return emptySet()
+        return try {
+            val type = object : TypeToken<Set<String>>() {}.type
+            gson.fromJson(json, type) ?: emptySet()
+        } catch (e: Exception) {
+            emptySet()
+        }
+    }
+    
+    fun setMoviesHiddenCategories(categories: Set<String>) {
+        val json = gson.toJson(categories)
+        prefs.edit().putString(KEY_MOVIES_HIDDEN_CATEGORIES, json).apply()
+    }
+    
+    // Series hierarchical filtering
+    fun getSeriesHiddenGroups(): Set<String> {
+        val json = prefs.getString(KEY_SERIES_HIDDEN_GROUPS, null) ?: return emptySet()
+        return try {
+            val type = object : TypeToken<Set<String>>() {}.type
+            gson.fromJson(json, type) ?: emptySet()
+        } catch (e: Exception) {
+            emptySet()
+        }
+    }
+    
+    fun setSeriesHiddenGroups(groups: Set<String>) {
+        val json = gson.toJson(groups)
+        prefs.edit().putString(KEY_SERIES_HIDDEN_GROUPS, json).apply()
+    }
+    
+    fun getSeriesHiddenCategories(): Set<String> {
+        val json = prefs.getString(KEY_SERIES_HIDDEN_CATEGORIES, null) ?: return emptySet()
+        return try {
+            val type = object : TypeToken<Set<String>>() {}.type
+            gson.fromJson(json, type) ?: emptySet()
+        } catch (e: Exception) {
+            emptySet()
+        }
+    }
+    
+    fun setSeriesHiddenCategories(categories: Set<String>) {
+        val json = gson.toJson(categories)
+        prefs.edit().putString(KEY_SERIES_HIDDEN_CATEGORIES, json).apply()
+    }
+    
+    // Live TV hierarchical filtering
+    fun getLiveHiddenGroups(): Set<String> {
+        val json = prefs.getString(KEY_LIVE_HIDDEN_GROUPS, null) ?: return emptySet()
+        return try {
+            val type = object : TypeToken<Set<String>>() {}.type
+            gson.fromJson(json, type) ?: emptySet()
+        } catch (e: Exception) {
+            emptySet()
+        }
+    }
+    
+    fun setLiveHiddenGroups(groups: Set<String>) {
+        val json = gson.toJson(groups)
+        prefs.edit().putString(KEY_LIVE_HIDDEN_GROUPS, json).apply()
+    }
+    
+    fun getLiveHiddenCategories(): Set<String> {
+        val json = prefs.getString(KEY_LIVE_HIDDEN_CATEGORIES, null) ?: return emptySet()
+        return try {
+            val type = object : TypeToken<Set<String>>() {}.type
+            gson.fromJson(json, type) ?: emptySet()
+        } catch (e: Exception) {
+            emptySet()
+        }
+    }
+    
+    fun setLiveHiddenCategories(categories: Set<String>) {
+        val json = gson.toJson(categories)
+        prefs.edit().putString(KEY_LIVE_HIDDEN_CATEGORIES, json).apply()
+    }
+    
+    // Generic wrapper methods for hierarchical filtering
+    fun getHiddenGroups(contentType: ContentFilterSettings.ContentType): Set<String> {
+        return when (contentType) {
+            ContentFilterSettings.ContentType.MOVIES -> getMoviesHiddenGroups()
+            ContentFilterSettings.ContentType.SERIES -> getSeriesHiddenGroups()
+            ContentFilterSettings.ContentType.LIVE_TV -> getLiveHiddenGroups()
+        }
+    }
+    
+    fun setHiddenGroups(contentType: ContentFilterSettings.ContentType, groups: Set<String>) {
+        when (contentType) {
+            ContentFilterSettings.ContentType.MOVIES -> setMoviesHiddenGroups(groups)
+            ContentFilterSettings.ContentType.SERIES -> setSeriesHiddenGroups(groups)
+            ContentFilterSettings.ContentType.LIVE_TV -> setLiveHiddenGroups(groups)
+        }
+    }
+    
+    fun getHiddenCategories(contentType: ContentFilterSettings.ContentType): Set<String> {
+        return when (contentType) {
+            ContentFilterSettings.ContentType.MOVIES -> getMoviesHiddenCategories()
+            ContentFilterSettings.ContentType.SERIES -> getSeriesHiddenCategories()
+            ContentFilterSettings.ContentType.LIVE_TV -> getLiveHiddenCategories()
+        }
+    }
+    
+    fun setHiddenCategories(contentType: ContentFilterSettings.ContentType, categories: Set<String>) {
+        when (contentType) {
+            ContentFilterSettings.ContentType.MOVIES -> setMoviesHiddenCategories(categories)
+            ContentFilterSettings.ContentType.SERIES -> setSeriesHiddenCategories(categories)
+            ContentFilterSettings.ContentType.LIVE_TV -> setLiveHiddenCategories(categories)
+        }
+    }
 }
+

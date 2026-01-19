@@ -17,8 +17,9 @@ import com.google.android.material.switchmaterial.SwitchMaterial
 import com.iptv.app.R
 import com.iptv.app.data.models.ContentFilterSettings
 import com.iptv.app.data.repository.ContentRepository
-import com.iptv.app.ui.common.FolderItem
-import com.iptv.app.ui.common.FolderItemAdapter
+import com.iptv.app.ui.common.HierarchicalFolderAdapter
+import com.iptv.app.ui.common.HierarchicalItem
+import com.iptv.app.ui.common.HierarchicalItemHelper
 import com.iptv.app.ui.common.ModernToolbar
 import com.iptv.app.utils.CategoryGrouper
 import com.iptv.app.utils.CredentialsManager
@@ -38,11 +39,10 @@ class ManageFoldersActivity : AppCompatActivity() {
     
     private lateinit var repository: ContentRepository
     private lateinit var preferencesManager: PreferencesManager
-    private lateinit var folderAdapter: FolderItemAdapter
+    private lateinit var hierarchicalAdapter: HierarchicalFolderAdapter
     
     private lateinit var contentType: ContentFilterSettings.ContentType
-    private var allFolderNames: List<String> = emptyList()
-    private var filteredFolderNames: List<String> = emptyList()
+    private var groups: List<HierarchicalItem.GroupItem> = emptyList()
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -84,11 +84,6 @@ class ManageFoldersActivity : AppCompatActivity() {
         val filterMode = preferencesManager.getFilterMode(contentType)
         modeSwitch.isChecked = filterMode == ContentFilterSettings.FilterMode.WHITELIST
         
-        // Setup RecyclerView
-        folderAdapter = FolderItemAdapter(emptyList()) { _, _ -> }
-        foldersRecyclerView.layoutManager = LinearLayoutManager(this)
-        foldersRecyclerView.adapter = folderAdapter
-        
         setupListeners()
     }
     
@@ -97,29 +92,25 @@ class ManageFoldersActivity : AppCompatActivity() {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
             override fun afterTextChanged(s: Editable?) {
-                filterFolders(s.toString())
+                hierarchicalAdapter.filter(s.toString())
             }
         })
         
-        modeSwitch.setOnCheckedChangeListener { _, isChecked ->
-            updateModeDescription(isChecked)
+        modeSwitch.setOnCheckedChangeListener { _, _ ->
+            // Mode change doesn't affect UI immediately, only on apply
         }
         
         selectAllButton.setOnClickListener {
-            folderAdapter.selectAll()
+            hierarchicalAdapter.selectAll()
         }
         
         deselectAllButton.setOnClickListener {
-            folderAdapter.deselectAll()
+            hierarchicalAdapter.deselectAll()
         }
         
         applyButton.setOnClickListener {
             applyChanges()
         }
-    }
-    
-    private fun updateModeDescription(isWhitelist: Boolean) {
-        // Update UI to reflect mode change if needed
     }
     
     private fun loadFolders() {
@@ -146,7 +137,7 @@ class ManageFoldersActivity : AppCompatActivity() {
                     return@launch
                 }
                 
-                // Build navigation tree to get folder names
+                // Build navigation tree to get groups with categories
                 val separator = preferencesManager.getCustomSeparator(contentType)
                 val tree = when (contentType) {
                     ContentFilterSettings.ContentType.MOVIES -> 
@@ -157,57 +148,54 @@ class ManageFoldersActivity : AppCompatActivity() {
                         CategoryGrouper.buildLiveNavigationTree(categories, true, separator, emptySet(), ContentFilterSettings.FilterMode.BLACKLIST)
                 }
                 
-                allFolderNames = tree.groups.map { it.name }.sorted()
-                filteredFolderNames = allFolderNames
+                // Convert to hierarchical items
+                groups = tree.groups.map { groupNode ->
+                    HierarchicalItem.GroupItem(
+                        name = groupNode.name,
+                        categories = groupNode.categories,
+                        isExpanded = false,
+                        isChecked = false,
+                        isIndeterminate = false
+                    )
+                }.sortedBy { it.name }
                 
-                // Load current selections
-                val hiddenItems = preferencesManager.getHiddenItems(contentType)
-                val filterMode = preferencesManager.getFilterMode(contentType)
+                // Load current selections from hierarchical preferences
+                val hiddenGroups = preferencesManager.getHiddenGroups(contentType)
+                val hiddenCategories = preferencesManager.getHiddenCategories(contentType)
                 
-                val folderItems = allFolderNames.map { folderName ->
-                    val isChecked = when (filterMode) {
-                        ContentFilterSettings.FilterMode.BLACKLIST -> folderName in hiddenItems
-                        ContentFilterSettings.FilterMode.WHITELIST -> folderName in hiddenItems
+                // Apply selections to hierarchical items
+                HierarchicalItemHelper.applySelections(groups, hiddenGroups, hiddenCategories)
+                
+                // Setup adapter
+                hierarchicalAdapter = HierarchicalFolderAdapter(
+                    groups = groups,
+                    onGroupToggled = { group ->
+                        // When group checkbox is toggled, update all children
+                        val displayList = hierarchicalAdapter.getSelectedCategories() // triggers update
+                        hierarchicalAdapter.updateDisplayList()
+                    },
+                    onCategoryToggled = { category ->
+                        // When category is toggled, update parent state
+                        val displayList = HierarchicalItemHelper.buildDisplayList(groups)
+                        HierarchicalItemHelper.updateParentState(groups, displayList, category.groupName)
+                        hierarchicalAdapter.updateDisplayList()
+                    },
+                    onGroupExpanded = { groupName ->
+                        // Toggle expansion
+                        groups.find { it.name == groupName }?.let { group ->
+                            group.isExpanded = !group.isExpanded
+                        }
                     }
-                    FolderItem(folderName, isChecked)
-                }
+                )
                 
-                folderAdapter.updateItems(folderItems)
+                foldersRecyclerView.layoutManager = LinearLayoutManager(this@ManageFoldersActivity)
+                foldersRecyclerView.adapter = hierarchicalAdapter
+                
                 hideEmptyState()
             } catch (e: Exception) {
-                Toast.makeText(this@ManageFoldersActivity, "Failed to load folders", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@ManageFoldersActivity, "Failed to load folders: ${e.message}", Toast.LENGTH_SHORT).show()
                 showEmptyState()
             }
-        }
-    }
-    
-    private fun filterFolders(query: String) {
-        if (query.isBlank()) {
-            filteredFolderNames = allFolderNames
-        } else {
-            filteredFolderNames = allFolderNames.filter { 
-                it.contains(query, ignoreCase = true) 
-            }
-        }
-        
-        // Get current filter mode and hidden items
-        val hiddenItems = preferencesManager.getHiddenItems(contentType)
-        val filterMode = preferencesManager.getFilterMode(contentType)
-        
-        val folderItems = filteredFolderNames.map { folderName ->
-            val isChecked = when (filterMode) {
-                ContentFilterSettings.FilterMode.BLACKLIST -> folderName in hiddenItems
-                ContentFilterSettings.FilterMode.WHITELIST -> folderName in hiddenItems
-            }
-            FolderItem(folderName, isChecked)
-        }
-        
-        folderAdapter.updateItems(folderItems)
-        
-        if (filteredFolderNames.isEmpty()) {
-            showEmptyState()
-        } else {
-            hideEmptyState()
         }
     }
     
@@ -219,11 +207,13 @@ class ManageFoldersActivity : AppCompatActivity() {
             ContentFilterSettings.FilterMode.BLACKLIST
         }
         
-        val selectedFolders = folderAdapter.getSelectedItems().toSet()
+        val selectedGroups = hierarchicalAdapter.getSelectedGroups()
+        val selectedCategories = hierarchicalAdapter.getSelectedCategories()
         
-        // Save settings
+        // Save settings using hierarchical methods
         preferencesManager.setFilterMode(contentType, filterMode)
-        preferencesManager.setHiddenItems(contentType, selectedFolders)
+        preferencesManager.setHiddenGroups(contentType, selectedGroups)
+        preferencesManager.setHiddenCategories(contentType, selectedCategories)
         
         // Invalidate navigation cache to force rebuild with new filters
         lifecycleScope.launch {

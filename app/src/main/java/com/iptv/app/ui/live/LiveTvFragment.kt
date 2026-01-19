@@ -144,7 +144,8 @@ class LiveTvFragment : Fragment() {
             // Get filter settings
             val groupingEnabled = preferencesManager.isGroupingEnabled(ContentFilterSettings.ContentType.LIVE_TV)
             val separator = preferencesManager.getCustomSeparator(ContentFilterSettings.ContentType.LIVE_TV)
-            val hiddenItems = preferencesManager.getHiddenItems(ContentFilterSettings.ContentType.LIVE_TV)
+            val hiddenGroups = preferencesManager.getHiddenGroups(ContentFilterSettings.ContentType.LIVE_TV)
+            val hiddenCategories = preferencesManager.getHiddenCategories(ContentFilterSettings.ContentType.LIVE_TV)
             val filterMode = preferencesManager.getFilterMode(ContentFilterSettings.ContentType.LIVE_TV)
             
             // Try to load cached navigation tree first
@@ -155,13 +156,14 @@ class LiveTvFragment : Fragment() {
             if (categoriesResult.isSuccess) {
                 categories = categoriesResult.getOrNull() ?: emptyList()
                 
-                // Build navigation tree with filter settings if cache miss
+                // Build navigation tree with hierarchical filter settings if cache miss
                 if (navigationTree == null) {
                     navigationTree = CategoryGrouper.buildLiveNavigationTree(
                         categories,
                         groupingEnabled,
                         separator,
-                        hiddenItems,
+                        hiddenGroups,
+                        hiddenCategories,
                         filterMode
                     )
                 }

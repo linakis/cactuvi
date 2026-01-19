@@ -144,7 +144,8 @@ class MoviesFragment : Fragment() {
             // Get filter settings
             val groupingEnabled = preferencesManager.isGroupingEnabled(ContentFilterSettings.ContentType.MOVIES)
             val separator = preferencesManager.getCustomSeparator(ContentFilterSettings.ContentType.MOVIES)
-            val hiddenItems = preferencesManager.getHiddenItems(ContentFilterSettings.ContentType.MOVIES)
+            val hiddenGroups = preferencesManager.getHiddenGroups(ContentFilterSettings.ContentType.MOVIES)
+            val hiddenCategories = preferencesManager.getHiddenCategories(ContentFilterSettings.ContentType.MOVIES)
             val filterMode = preferencesManager.getFilterMode(ContentFilterSettings.ContentType.MOVIES)
             
             // Try to load cached navigation tree first
@@ -155,13 +156,14 @@ class MoviesFragment : Fragment() {
             if (categoriesResult.isSuccess) {
                 categories = categoriesResult.getOrNull() ?: emptyList()
                 
-                // Build navigation tree with filter settings if cache miss
+                // Build navigation tree with hierarchical filter settings if cache miss
                 if (navigationTree == null) {
                     navigationTree = CategoryGrouper.buildVodNavigationTree(
                         categories,
                         groupingEnabled,
                         separator,
-                        hiddenItems,
+                        hiddenGroups,
+                        hiddenCategories,
                         filterMode
                     )
                 }

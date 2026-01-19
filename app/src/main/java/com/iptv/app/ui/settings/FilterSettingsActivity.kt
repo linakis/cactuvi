@@ -125,17 +125,37 @@ abstract class FilterSettingsActivity : AppCompatActivity() {
     
     private fun updateFolderFilterStatus() {
         val filterMode = preferencesManager.getFilterMode(getContentType())
-        val hiddenItems = preferencesManager.getHiddenItems(getContentType())
+        val hiddenGroups = preferencesManager.getHiddenGroups(getContentType())
+        val hiddenCategories = preferencesManager.getHiddenCategories(getContentType())
         
         val statusText = when {
-            hiddenItems.isEmpty() -> "All folders visible"
-            filterMode == ContentFilterSettings.FilterMode.BLACKLIST -> 
-                "${hiddenItems.size} folder${if (hiddenItems.size == 1) "" else "s"} hidden"
-            else -> 
-                "${hiddenItems.size} folder${if (hiddenItems.size == 1) "" else "s"} shown"
+            hiddenGroups.isEmpty() && hiddenCategories.isEmpty() -> "All content visible"
+            filterMode == ContentFilterSettings.FilterMode.BLACKLIST -> {
+                buildFilterStatusText(hiddenGroups.size, hiddenCategories.size, "hidden")
+            }
+            else -> {
+                buildFilterStatusText(hiddenGroups.size, hiddenCategories.size, "shown")
+            }
         }
         
         folderFilterStatus.text = statusText
+    }
+    
+    private fun buildFilterStatusText(groupCount: Int, categoryCount: Int, action: String): String {
+        return when {
+            groupCount > 0 && categoryCount > 0 -> {
+                val groupText = "$groupCount group${if (groupCount == 1) "" else "s"}"
+                val categoryText = "$categoryCount categor${if (categoryCount == 1) "y" else "ies"}"
+                "$groupText and $categoryText $action"
+            }
+            groupCount > 0 -> {
+                "$groupCount group${if (groupCount == 1) "" else "s"} $action"
+            }
+            categoryCount > 0 -> {
+                "$categoryCount categor${if (categoryCount == 1) "y" else "ies"} $action"
+            }
+            else -> "All content visible"
+        }
     }
     
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {

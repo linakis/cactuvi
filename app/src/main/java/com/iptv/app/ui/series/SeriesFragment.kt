@@ -152,7 +152,8 @@ class SeriesFragment : Fragment() {
             // Get filter settings
             val groupingEnabled = preferencesManager.isGroupingEnabled(ContentFilterSettings.ContentType.SERIES)
             val separator = preferencesManager.getCustomSeparator(ContentFilterSettings.ContentType.SERIES)
-            val hiddenItems = preferencesManager.getHiddenItems(ContentFilterSettings.ContentType.SERIES)
+            val hiddenGroups = preferencesManager.getHiddenGroups(ContentFilterSettings.ContentType.SERIES)
+            val hiddenCategories = preferencesManager.getHiddenCategories(ContentFilterSettings.ContentType.SERIES)
             val filterMode = preferencesManager.getFilterMode(ContentFilterSettings.ContentType.SERIES)
             
             // Try to load cached navigation tree first
@@ -163,13 +164,14 @@ class SeriesFragment : Fragment() {
             if (categoriesResult.isSuccess) {
                 categories = categoriesResult.getOrNull() ?: emptyList()
                 
-                // Build navigation tree with filter settings if cache miss
+                // Build navigation tree with hierarchical filter settings if cache miss
                 if (navigationTree == null) {
                     navigationTree = CategoryGrouper.buildSeriesNavigationTree(
                         categories,
                         groupingEnabled,
                         separator,
-                        hiddenItems,
+                        hiddenGroups,
+                        hiddenCategories,
                         filterMode
                     )
                 }
