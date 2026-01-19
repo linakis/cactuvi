@@ -37,6 +37,20 @@
 
         </com.google.android.material.card.MaterialCardView>
 
+        <ImageButton
+            android:id="@+id/deleteButton"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_marginTop="@dimen/spacing_m"
+            android:layout_marginEnd="@dimen/spacing_m"
+            android:src="@android:drawable/ic_menu_close_clear_cancel"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Remove from continue watching"
+            android:clickable="true"
+            android:focusable="true"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+        
         <TextView
             android:id="@+id/title"
             android:layout_width="0dp"
@@ -47,7 +61,7 @@
             android:textColor="@color/text_primary"
             android:textSize="16sp"
             android:fontFamily="sans-serif-medium"
-            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/deleteButton"
             app:layout_constraintStart_toEndOf="@id/posterCard"
             app:layout_constraintTop_toTopOf="parent"
             tools:text="Movie Title Goes Here" />

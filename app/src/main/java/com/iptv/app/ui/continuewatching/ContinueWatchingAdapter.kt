@@ -16,7 +16,8 @@ import java.util.concurrent.TimeUnit
 
 class ContinueWatchingAdapter(
     private var items: List<WatchHistoryEntity>,
-    private val onItemClick: (WatchHistoryEntity) -> Unit
+    private val onItemClick: (WatchHistoryEntity) -> Unit,
+    private val onDeleteClick: (WatchHistoryEntity) -> Unit
 ) : RecyclerView.Adapter<ContinueWatchingAdapter.ViewHolder>() {
     
     inner class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
@@ -25,6 +26,7 @@ class ContinueWatchingAdapter(
         val progressText: TextView = view.findViewById(R.id.progressText)
         val progressBar: ProgressBar = view.findViewById(R.id.progressBar)
         val lastWatched: TextView = view.findViewById(R.id.lastWatched)
+        val deleteButton: ImageView = view.findViewById(R.id.deleteButton)
         
         fun bind(item: WatchHistoryEntity) {
             title.text = item.contentName
@@ -55,6 +57,10 @@ class ContinueWatchingAdapter(
             
             itemView.setOnClickListener {
                 onItemClick(item)
+            }
+            
+            deleteButton.setOnClickListener {
+                onDeleteClick(item)
             }
         }
         

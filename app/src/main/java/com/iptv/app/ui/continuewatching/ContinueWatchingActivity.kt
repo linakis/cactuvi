@@ -52,9 +52,11 @@ class ContinueWatchingActivity : AppCompatActivity() {
         
         recyclerView.layoutManager = LinearLayoutManager(this)
         
-        adapter = ContinueWatchingAdapter(emptyList()) { item ->
-            resumePlayback(item)
-        }
+        adapter = ContinueWatchingAdapter(
+            items = emptyList(),
+            onItemClick = { item -> resumePlayback(item) },
+            onDeleteClick = { item -> showDeleteConfirmation(item) }
+        )
         recyclerView.adapter = adapter
     }
     
@@ -165,5 +167,39 @@ class ContinueWatchingActivity : AppCompatActivity() {
     private fun showEmptyState() {
         emptyState.visibility = View.VISIBLE
         recyclerView.visibility = View.GONE
+    }
+    
+    private fun showDeleteConfirmation(item: com.iptv.app.data.db.entities.WatchHistoryEntity) {
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("Remove from Continue Watching")
+            .setMessage("Are you sure you want to remove \"${item.contentName}\" from your continue watching list?")
+            .setPositiveButton("Remove") { _, _ ->
+                deleteWatchHistoryItem(item)
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+    
+    private fun deleteWatchHistoryItem(item: com.iptv.app.data.db.entities.WatchHistoryEntity) {
+        lifecycleScope.launch {
+            val result = repository.deleteWatchHistoryItem(item.contentId)
+            
+            if (result.isSuccess) {
+                Toast.makeText(
+                    this@ContinueWatchingActivity,
+                    "Removed from continue watching",
+                    Toast.LENGTH_SHORT
+                ).show()
+                
+                // Reload the list
+                loadWatchHistory()
+            } else {
+                Toast.makeText(
+                    this@ContinueWatchingActivity,
+                    "Failed to remove item",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
     }
 }

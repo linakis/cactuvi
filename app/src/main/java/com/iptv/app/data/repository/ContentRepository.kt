@@ -433,6 +433,22 @@ class ContentRepository(
         }
     }
     
+    suspend fun deleteWatchHistoryItem(contentId: String): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val item = database.watchHistoryDao().getByContentId(contentId, "movie") 
+                ?: database.watchHistoryDao().getByContentId(contentId, "series")
+                ?: database.watchHistoryDao().getByContentId(contentId, "live_channel")
+            
+            item?.let {
+                database.watchHistoryDao().delete(it)
+            }
+            
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+    
     // ========== PAGING METHODS ==========
     
     fun getLiveStreamsPaged(categoryId: String? = null): Flow<PagingData<LiveChannel>> {
