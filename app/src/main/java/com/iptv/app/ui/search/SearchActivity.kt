@@ -27,6 +27,14 @@ import kotlinx.coroutines.launch
 
 class SearchActivity : AppCompatActivity() {
     
+    companion object {
+        const val EXTRA_CONTENT_TYPE = "content_type"
+        const val TYPE_ALL = "all"
+        const val TYPE_MOVIES = "movies"
+        const val TYPE_SERIES = "series"
+        const val TYPE_LIVE = "live"
+    }
+    
     private lateinit var repository: ContentRepository
     
     private lateinit var modernToolbar: ModernToolbar
@@ -39,10 +47,13 @@ class SearchActivity : AppCompatActivity() {
     private var searchJob: Job? = null
     private var allMovies: List<Movie> = emptyList()
     private var allSeries: List<Series> = emptyList()
+    private var contentTypeFilter: String = TYPE_ALL
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_search)
+        
+        contentTypeFilter = intent.getStringExtra(EXTRA_CONTENT_TYPE) ?: TYPE_ALL
         
         repository = ContentRepository(
             CredentialsManager.getInstance(this),
@@ -93,44 +104,79 @@ class SearchActivity : AppCompatActivity() {
     
     private fun loadAllContent() {
         lifecycleScope.launch {
-            // Load movies
-            val moviesResult = repository.getMovies(forceRefresh = false)
-            if (moviesResult.isSuccess) {
-                allMovies = moviesResult.getOrNull() ?: emptyList()
+            // Load content based on filter
+            when (contentTypeFilter) {
+                TYPE_MOVIES, TYPE_ALL -> {
+                    val moviesResult = repository.getMovies(forceRefresh = false)
+                    if (moviesResult.isSuccess) {
+                        allMovies = moviesResult.getOrNull() ?: emptyList()
+                    }
+                }
             }
             
-            // Load series
-            val seriesResult = repository.getSeries(forceRefresh = false)
-            if (seriesResult.isSuccess) {
-                allSeries = seriesResult.getOrNull() ?: emptyList()
+            when (contentTypeFilter) {
+                TYPE_SERIES, TYPE_ALL -> {
+                    val seriesResult = repository.getSeries(forceRefresh = false)
+                    if (seriesResult.isSuccess) {
+                        allSeries = seriesResult.getOrNull() ?: emptyList()
+                    }
+                }
             }
+            
+            // TODO: Add live channels support when needed
         }
     }
     
     private fun performSearch(query: String) {
         val lowerQuery = query.lowercase()
         
-        // Search in movies
-        val matchedMovies = allMovies.filter { 
-            it.name.lowercase().contains(lowerQuery)
-        }
-        
-        // Search in series
-        val matchedSeries = allSeries.filter {
-            it.name.lowercase().contains(lowerQuery)
-        }
-        
-        // For simplicity, show movies if found, otherwise show series
-        when {
-            matchedMovies.isNotEmpty() -> {
-                displayMovies(matchedMovies)
+        // Search based on content type filter
+        when (contentTypeFilter) {
+            TYPE_MOVIES -> {
+                val matchedMovies = allMovies.filter { 
+                    it.name.lowercase().contains(lowerQuery)
+                }
+                if (matchedMovies.isNotEmpty()) {
+                    displayMovies(matchedMovies)
+                } else {
+                    showEmptyState(getString(R.string.no_results))
+                }
             }
-            matchedSeries.isNotEmpty() -> {
-                displaySeries(matchedSeries)
+            TYPE_SERIES -> {
+                val matchedSeries = allSeries.filter {
+                    it.name.lowercase().contains(lowerQuery)
+                }
+                if (matchedSeries.isNotEmpty()) {
+                    displaySeries(matchedSeries)
+                } else {
+                    showEmptyState(getString(R.string.no_results))
+                }
             }
-            else -> {
-                showEmptyState(getString(R.string.no_results))
+            TYPE_ALL -> {
+                // Search in movies
+                val matchedMovies = allMovies.filter { 
+                    it.name.lowercase().contains(lowerQuery)
+                }
+                
+                // Search in series
+                val matchedSeries = allSeries.filter {
+                    it.name.lowercase().contains(lowerQuery)
+                }
+                
+                // Show movies if found, otherwise show series
+                when {
+                    matchedMovies.isNotEmpty() -> {
+                        displayMovies(matchedMovies)
+                    }
+                    matchedSeries.isNotEmpty() -> {
+                        displaySeries(matchedSeries)
+                    }
+                    else -> {
+                        showEmptyState(getString(R.string.no_results))
+                    }
+                }
             }
+            else -> showEmptyState(getString(R.string.no_results))
         }
     }
     

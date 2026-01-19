@@ -107,8 +107,11 @@ class LiveTvFragment : Fragment() {
             }
         }
         modernToolbar.onActionClick = {
-            // TODO: Open search activity
-            // For now, search is disabled until we create SearchActivity
+            val intent = Intent(requireContext(), com.iptv.app.ui.search.SearchActivity::class.java).apply {
+                putExtra(com.iptv.app.ui.search.SearchActivity.EXTRA_CONTENT_TYPE, 
+                         com.iptv.app.ui.search.SearchActivity.TYPE_LIVE)
+            }
+            startActivity(intent)
         }
     }
     
