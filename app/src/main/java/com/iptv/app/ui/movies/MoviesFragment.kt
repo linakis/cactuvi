@@ -128,13 +128,18 @@ class MoviesFragment : Fragment() {
         showLoading(true)
         
         lifecycleScope.launch {
+            // Try to load cached navigation tree first
+            navigationTree = repository.getCachedVodNavigationTree()
+            
             // Load categories
             val categoriesResult = repository.getMovieCategories()
             if (categoriesResult.isSuccess) {
                 categories = categoriesResult.getOrNull() ?: emptyList()
                 
-                // Build navigation tree
-                navigationTree = CategoryGrouper.buildVodNavigationTree(categories)
+                // Build navigation tree if cache miss
+                if (navigationTree == null) {
+                    navigationTree = CategoryGrouper.buildVodNavigationTree(categories)
+                }
             }
             
             // Load movies

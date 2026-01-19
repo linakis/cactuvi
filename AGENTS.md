@@ -2,11 +2,13 @@
 
 This file contains essential information for AI coding agents working on this codebase.
 
-## Communication Style
+## ⚠️ CRITICAL: Communication Style
 
-- **No summaries:** Do not produce summary sections after completing tasks
-- **Be concise:** Brief confirmations are sufficient (e.g., "Done" or "Fixed")
-- **Action-oriented:** Focus on doing the work, not explaining what was done
+**NO SUMMARIES** - Do not produce summary sections after completing tasks. This is non-negotiable.
+**NO IMPLEMENTATION DOCUMENTS** - Do not create detailed implementation plans or design documents. BD tasks should contain all necessary information.
+
+- **Be concise:** Brief confirmations only (e.g., "Done" or "Fixed")
+- **Action-oriented:** Do the work, don't explain what was done
 - **Ask when unclear:** If requirements are ambiguous, ask before implementing
 
 ## Project Overview
@@ -16,6 +18,13 @@ This file contains essential information for AI coding agents working on this co
 **Min SDK:** 26 | **Compile SDK:** 35 | **Target SDK:** 34  
 **Architecture:** Repository pattern with ViewModels, Fragment-based navigation  
 **Key Libraries:** Room, Retrofit, Paging 3, ExoPlayer (Media3), Glide, Material 3
+
+**⚠️ TV Navigation Requirements:**  
+This app is designed for TV screens and MUST support D-pad navigation. All UI elements must be:
+- Focusable and navigable using D-pad (up/down/left/right)
+- Properly handle focus states with clear visual indicators
+- Support back button navigation through the app hierarchy
+- Test all screens with D-pad input, not just touch
 
 ## Build & Test Commands
 

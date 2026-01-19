@@ -8,9 +8,12 @@ import androidx.paging.map
 import com.iptv.app.data.api.ApiClient
 import com.iptv.app.data.api.XtreamApiService
 import com.iptv.app.data.db.AppDatabase
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import com.iptv.app.data.db.entities.*
 import com.iptv.app.data.db.mappers.*
 import com.iptv.app.data.models.*
+import com.iptv.app.utils.CategoryGrouper
 import com.iptv.app.utils.CredentialsManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -24,6 +27,7 @@ class ContentRepository(
     
     private var apiService: XtreamApiService? = null
     private val database = AppDatabase.getInstance(context)
+    private val gson = Gson()
     
     companion object {
         // Cache Time-To-Live (TTL) in milliseconds
@@ -117,6 +121,9 @@ class ContentRepository(
                 val entities = categories.map { it.toEntity("live") }
                 database.categoryDao().insertAll(entities)
                 
+                // Cache navigation tree
+                cacheLiveNavigationTree(categories)
+                
                 Result.success(categories)
             } catch (e: Exception) {
                 val cached = database.categoryDao().getAllByType("live")
@@ -181,6 +188,9 @@ class ContentRepository(
                 
                 val entities = categories.map { it.toEntity("vod") }
                 database.categoryDao().insertAll(entities)
+                
+                // Cache navigation tree
+                cacheVodNavigationTree(categories)
                 
                 Result.success(categories)
             } catch (e: Exception) {
@@ -257,6 +267,9 @@ class ContentRepository(
                 
                 val entities = categories.map { it.toEntity("series") }
                 database.categoryDao().insertAll(entities)
+                
+                // Cache navigation tree
+                cacheSeriesNavigationTree(categories)
                 
                 Result.success(categories)
             } catch (e: Exception) {
@@ -485,6 +498,156 @@ class ContentRepository(
         }
     }
     
+    // ========== NAVIGATION TREE CACHING ==========
+    
+    private suspend fun cacheVodNavigationTree(categories: List<Category>, separator: String = "-") {
+        val tree = CategoryGrouper.buildVodNavigationTree(categories)
+        
+        val entities = tree.groups.map { group ->
+            NavigationGroupEntity(
+                type = "vod",
+                groupName = group.name,
+                categoryIdsJson = gson.toJson(group.categories.map { it.categoryId }),
+                separator = separator
+            )
+        }
+        
+        database.navigationGroupDao().deleteByType("vod")
+        database.navigationGroupDao().insertAll(entities)
+    }
+    
+    private suspend fun cacheSeriesNavigationTree(categories: List<Category>, separator: String = "FIRST_WORD") {
+        val tree = CategoryGrouper.buildSeriesNavigationTree(categories)
+        
+        val entities = tree.groups.map { group ->
+            NavigationGroupEntity(
+                type = "series",
+                groupName = group.name,
+                categoryIdsJson = gson.toJson(group.categories.map { it.categoryId }),
+                separator = separator
+            )
+        }
+        
+        database.navigationGroupDao().deleteByType("series")
+        database.navigationGroupDao().insertAll(entities)
+    }
+    
+    private suspend fun cacheLiveNavigationTree(categories: List<Category>, separator: String = "|") {
+        val tree = CategoryGrouper.buildLiveNavigationTree(categories)
+        
+        val entities = tree.groups.map { group ->
+            NavigationGroupEntity(
+                type = "live",
+                groupName = group.name,
+                categoryIdsJson = gson.toJson(group.categories.map { it.categoryId }),
+                separator = separator
+            )
+        }
+        
+        database.navigationGroupDao().deleteByType("live")
+        database.navigationGroupDao().insertAll(entities)
+    }
+    
+    suspend fun getCachedVodNavigationTree(): CategoryGrouper.NavigationTree? = withContext(Dispatchers.IO) {
+        try {
+            val entities = database.navigationGroupDao().getByType("vod")
+            if (entities.isEmpty()) return@withContext null
+            
+            // Check TTL
+            val firstEntity = entities.first()
+            if (!isCacheValid(firstEntity.lastUpdated, CACHE_TTL_CATEGORIES)) {
+                return@withContext null
+            }
+            
+            // Get all VOD categories
+            val allCategories = database.categoryDao().getAllByType("vod").map { it.toModel() }
+            
+            // Reconstruct navigation tree from cached groups
+            val groups = entities.map { entity ->
+                val type = object : TypeToken<List<String>>() {}.type
+                val categoryIds: List<String> = gson.fromJson(entity.categoryIdsJson, type)
+                val groupCategories = allCategories.filter { it.categoryId in categoryIds }
+                CategoryGrouper.GroupNode(entity.groupName, groupCategories)
+            }
+            
+            CategoryGrouper.NavigationTree(groups)
+        } catch (e: Exception) {
+            null
+        }
+    }
+    
+    suspend fun getCachedSeriesNavigationTree(): CategoryGrouper.NavigationTree? = withContext(Dispatchers.IO) {
+        try {
+            val entities = database.navigationGroupDao().getByType("series")
+            if (entities.isEmpty()) return@withContext null
+            
+            // Check TTL
+            val firstEntity = entities.first()
+            if (!isCacheValid(firstEntity.lastUpdated, CACHE_TTL_CATEGORIES)) {
+                return@withContext null
+            }
+            
+            // Get all series categories
+            val allCategories = database.categoryDao().getAllByType("series").map { it.toModel() }
+            
+            // Reconstruct navigation tree from cached groups
+            val groups = entities.map { entity ->
+                val type = object : TypeToken<List<String>>() {}.type
+                val categoryIds: List<String> = gson.fromJson(entity.categoryIdsJson, type)
+                val groupCategories = allCategories.filter { it.categoryId in categoryIds }
+                CategoryGrouper.GroupNode(entity.groupName, groupCategories)
+            }
+            
+            CategoryGrouper.NavigationTree(groups)
+        } catch (e: Exception) {
+            null
+        }
+    }
+    
+    suspend fun getCachedLiveNavigationTree(): CategoryGrouper.NavigationTree? = withContext(Dispatchers.IO) {
+        try {
+            val entities = database.navigationGroupDao().getByType("live")
+            if (entities.isEmpty()) return@withContext null
+            
+            // Check TTL
+            val firstEntity = entities.first()
+            if (!isCacheValid(firstEntity.lastUpdated, CACHE_TTL_CATEGORIES)) {
+                return@withContext null
+            }
+            
+            // Get all live categories
+            val allCategories = database.categoryDao().getAllByType("live").map { it.toModel() }
+            
+            // Reconstruct navigation tree from cached groups
+            val groups = entities.map { entity ->
+                val type = object : TypeToken<List<String>>() {}.type
+                val categoryIds: List<String> = gson.fromJson(entity.categoryIdsJson, type)
+                val groupCategories = allCategories.filter { it.categoryId in categoryIds }
+                CategoryGrouper.GroupNode(entity.groupName, groupCategories)
+            }
+            
+            CategoryGrouper.NavigationTree(groups)
+        } catch (e: Exception) {
+            null
+        }
+    }
+    
+    suspend fun invalidateVodNavigationTree() = withContext(Dispatchers.IO) {
+        database.navigationGroupDao().deleteByType("vod")
+    }
+    
+    suspend fun invalidateSeriesNavigationTree() = withContext(Dispatchers.IO) {
+        database.navigationGroupDao().deleteByType("series")
+    }
+    
+    suspend fun invalidateLiveNavigationTree() = withContext(Dispatchers.IO) {
+        database.navigationGroupDao().deleteByType("live")
+    }
+    
+    suspend fun invalidateAllNavigationTrees() = withContext(Dispatchers.IO) {
+        database.navigationGroupDao().clear()
+    }
+    
     // ========== CACHE MANAGEMENT ==========
     
     suspend fun clearAllCache(): Result<Unit> = withContext(Dispatchers.IO) {
@@ -493,6 +656,7 @@ class ContentRepository(
             database.movieDao().clearAll()
             database.seriesDao().clearAll()
             database.categoryDao().clearAll()
+            invalidateAllNavigationTrees()
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)

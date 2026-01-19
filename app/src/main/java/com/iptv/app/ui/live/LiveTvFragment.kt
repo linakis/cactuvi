@@ -128,13 +128,18 @@ class LiveTvFragment : Fragment() {
         showLoading(true)
         
         lifecycleScope.launch {
+            // Try to load cached navigation tree first
+            navigationTree = repository.getCachedLiveNavigationTree()
+            
             // Load categories
             val categoriesResult = repository.getLiveCategories()
             if (categoriesResult.isSuccess) {
                 categories = categoriesResult.getOrNull() ?: emptyList()
                 
-                // Build navigation tree
-                navigationTree = CategoryGrouper.buildLiveNavigationTree(categories)
+                // Build navigation tree if cache miss
+                if (navigationTree == null) {
+                    navigationTree = CategoryGrouper.buildLiveNavigationTree(categories)
+                }
             }
             
             // Load channels

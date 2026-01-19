@@ -136,13 +136,18 @@ class SeriesFragment : Fragment() {
         showLoading(true)
         
         lifecycleScope.launch {
+            // Try to load cached navigation tree first
+            navigationTree = repository.getCachedSeriesNavigationTree()
+            
             // Load categories
             val categoriesResult = repository.getSeriesCategories()
             if (categoriesResult.isSuccess) {
                 categories = categoriesResult.getOrNull() ?: emptyList()
                 
-                // Build navigation tree
-                navigationTree = CategoryGrouper.buildSeriesNavigationTree(categories)
+                // Build navigation tree if cache miss
+                if (navigationTree == null) {
+                    navigationTree = CategoryGrouper.buildSeriesNavigationTree(categories)
+                }
             }
             
             // Load series
