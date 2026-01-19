@@ -1,6 +1,7 @@
 package com.iptv.app.utils
 
 import com.iptv.app.data.models.Category
+import com.iptv.app.data.models.FilterMode
 
 /**
  * Utility class for building tree-based navigation from categories
@@ -26,74 +27,152 @@ object CategoryGrouper {
     }
     
     /**
-     * Build navigation tree for live TV categories
-     * Pattern: "UK| SPORT", "US| NEWS" -> Groups: UK, US
+     * Build navigation tree for live TV categories with custom separator and filtering
      */
-    fun buildLiveNavigationTree(categories: List<Category>): NavigationTree {
+    fun buildLiveNavigationTree(
+        categories: List<Category>,
+        groupingEnabled: Boolean = true,
+        separator: String = "|",
+        hiddenItems: Set<String> = emptySet(),
+        filterMode: FilterMode = FilterMode.BLACKLIST
+    ): NavigationTree {
+        if (!groupingEnabled) {
+            // No grouping - return all categories in single group
+            val filteredCategories = filterCategories(categories, hiddenItems, filterMode)
+            return NavigationTree(listOf(GroupNode("All Categories", filteredCategories)))
+        }
+        
         val grouped = categories
-            .groupBy { category ->
-                // Extract prefix before pipe
-                val parts = category.categoryName.split("|")
+            .groupBy { category -> extractGroupName(category.categoryName, separator) }
+            .map { (groupName, cats) ->
+                GroupNode(groupName, cats.sortedBy { it.categoryName })
+            }
+            .sortedBy { it.name }
+        
+        return filterNavigationTree(NavigationTree(grouped), hiddenItems, filterMode)
+    }
+    
+    /**
+     * Build navigation tree for VOD categories with custom separator and filtering
+     */
+    fun buildVodNavigationTree(
+        categories: List<Category>,
+        groupingEnabled: Boolean = true,
+        separator: String = "-",
+        hiddenItems: Set<String> = emptySet(),
+        filterMode: FilterMode = FilterMode.BLACKLIST
+    ): NavigationTree {
+        if (!groupingEnabled) {
+            // No grouping - return all categories in single group
+            val filteredCategories = filterCategories(categories, hiddenItems, filterMode)
+            return NavigationTree(listOf(GroupNode("All Categories", filteredCategories)))
+        }
+        
+        val grouped = categories
+            .groupBy { category -> extractGroupName(category.categoryName, separator) }
+            .map { (groupName, cats) ->
+                GroupNode(groupName, cats.sortedBy { it.categoryName })
+            }
+            .sortedBy { it.name }
+        
+        return filterNavigationTree(NavigationTree(grouped), hiddenItems, filterMode)
+    }
+    
+    /**
+     * Build navigation tree for series categories with custom separator and filtering
+     */
+    fun buildSeriesNavigationTree(
+        categories: List<Category>,
+        groupingEnabled: Boolean = true,
+        separator: String = "FIRST_WORD",
+        hiddenItems: Set<String> = emptySet(),
+        filterMode: FilterMode = FilterMode.BLACKLIST
+    ): NavigationTree {
+        if (!groupingEnabled) {
+            // No grouping - return all categories in single group
+            val filteredCategories = filterCategories(categories, hiddenItems, filterMode)
+            return NavigationTree(listOf(GroupNode("All Categories", filteredCategories)))
+        }
+        
+        val grouped = categories
+            .groupBy { category -> extractGroupName(category.categoryName, separator) }
+            .map { (groupName, cats) ->
+                GroupNode(groupName, cats.sortedBy { it.categoryName })
+            }
+            .sortedBy { it.name }
+        
+        return filterNavigationTree(NavigationTree(grouped), hiddenItems, filterMode)
+    }
+    
+    /**
+     * Extract group name from category name using specified separator
+     */
+    private fun extractGroupName(categoryName: String, separator: String): String {
+        return when (separator) {
+            "FIRST_WORD" -> {
+                // Extract first word
+                categoryName.split(" ").firstOrNull()?.trim() ?: "Other"
+            }
+            "|", "-", "/" -> {
+                // Extract prefix before separator
+                val parts = categoryName.split(separator)
                 if (parts.size > 1) {
                     parts[0].trim()
                 } else {
                     // Fallback: extract first word
-                    category.categoryName.split(" ").firstOrNull()?.trim() ?: "Other"
+                    categoryName.split(" ").firstOrNull()?.trim() ?: "Other"
                 }
             }
-            .map { (groupName, cats) ->
-                GroupNode(groupName, cats.sortedBy { it.categoryName })
+            else -> {
+                // Unknown separator, extract first word as fallback
+                categoryName.split(" ").firstOrNull()?.trim() ?: "Other"
             }
-            .sortedBy { it.name }
-        
-        return NavigationTree(grouped)
+        }
     }
     
     /**
-     * Build navigation tree for VOD categories
-     * Pattern: "EN - ACTION", "FR - COMEDIE" -> Groups: EN, FR
+     * Filter categories based on filter mode and hidden items
      */
-    fun buildVodNavigationTree(categories: List<Category>): NavigationTree {
-        val grouped = categories
-            .groupBy { category ->
-                // Extract prefix before dash
-                val dashParts = category.categoryName.split("-")
-                if (dashParts.size > 1) {
-                    dashParts[0].trim()
-                } else {
-                    // Check for slash pattern (PT/BR)
-                    val slashParts = category.categoryName.split("/")
-                    if (slashParts.size > 1) {
-                        slashParts[0].trim()
-                    } else {
-                        // Extract first word
-                        category.categoryName.split(" ").firstOrNull()?.trim() ?: "Other"
-                    }
-                }
-            }
-            .map { (groupName, cats) ->
-                GroupNode(groupName, cats.sortedBy { it.categoryName })
-            }
-            .sortedBy { it.name }
+    private fun filterCategories(
+        categories: List<Category>,
+        hiddenItems: Set<String>,
+        filterMode: FilterMode
+    ): List<Category> {
+        if (hiddenItems.isEmpty()) return categories
         
-        return NavigationTree(grouped)
+        return when (filterMode) {
+            FilterMode.BLACKLIST -> {
+                // Hide selected items
+                categories.filter { it.categoryName !in hiddenItems }
+            }
+            FilterMode.WHITELIST -> {
+                // Show only selected items
+                categories.filter { it.categoryName in hiddenItems }
+            }
+        }
     }
     
     /**
-     * Build navigation tree for series categories
-     * Pattern: "NETFLIX SERIES", "FRANCE SÉRIES" -> Groups: NETFLIX, FRANCE
+     * Filter navigation tree based on filter mode and hidden items
      */
-    fun buildSeriesNavigationTree(categories: List<Category>): NavigationTree {
-        val grouped = categories
-            .groupBy { category ->
-                // Extract first word (platform or region)
-                category.categoryName.split(" ").firstOrNull()?.trim() ?: "Other"
-            }
-            .map { (groupName, cats) ->
-                GroupNode(groupName, cats.sortedBy { it.categoryName })
-            }
-            .sortedBy { it.name }
+    private fun filterNavigationTree(
+        tree: NavigationTree,
+        hiddenItems: Set<String>,
+        filterMode: FilterMode
+    ): NavigationTree {
+        if (hiddenItems.isEmpty()) return tree
         
-        return NavigationTree(grouped)
+        val filteredGroups = when (filterMode) {
+            FilterMode.BLACKLIST -> {
+                // Hide selected groups
+                tree.groups.filter { it.name !in hiddenItems }
+            }
+            FilterMode.WHITELIST -> {
+                // Show only selected groups
+                tree.groups.filter { it.name in hiddenItems }
+            }
+        }.filter { it.categories.isNotEmpty() } // Remove empty groups
+        
+        return NavigationTree(filteredGroups)
     }
 }
