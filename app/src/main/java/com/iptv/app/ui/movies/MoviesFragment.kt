@@ -100,7 +100,13 @@ class MoviesFragment : Fragment() {
     
     private fun setupToolbar() {
         modernToolbar.title = "Movies"
-        modernToolbar.onBackClick = { handleBackPress() }
+        modernToolbar.onBackClick = {
+            val handled = handleBackPress()
+            if (!handled) {
+                // At top level, finish activity
+                requireActivity().finish()
+            }
+        }
         modernToolbar.onActionClick = {
             // TODO: Open search activity
             // For now, search is disabled until we create SearchActivity
