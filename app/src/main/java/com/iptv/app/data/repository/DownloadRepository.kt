@@ -76,10 +76,7 @@ class DownloadRepository(private val context: Context) {
             .setData(contentName.toByteArray())
             .build()
         
-        // Add to Media3 DownloadManager
-        downloadManager.addDownload(downloadRequest)
-        
-        // Start the download service
+        // Start the download service - it will handle adding to DownloadManager
         Media3DownloadService.sendAddDownload(
             context,
             DownloadService::class.java,
