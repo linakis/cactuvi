@@ -6,6 +6,7 @@ import android.view.ViewGroup
 import android.widget.CheckBox
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.appcompat.content.res.AppCompatResources
 import androidx.recyclerview.widget.RecyclerView
 import com.iptv.app.R
 
@@ -24,23 +25,29 @@ class HierarchicalFolderAdapter(
     }
     
     inner class GroupViewHolder(view: View) : RecyclerView.ViewHolder(view) {
-        val expandArrow: ImageView = view.findViewById(R.id.expandArrow)
         val checkbox: CheckBox = view.findViewById(R.id.checkbox)
         val groupName: TextView = view.findViewById(R.id.groupName)
         val groupCount: TextView = view.findViewById(R.id.groupCount)
         
         fun bind(item: HierarchicalItem.GroupItem) {
             groupName.text = item.name
-            groupCount.text = "${item.getChildCount()} categories"
+            val expandedText = if (item.isExpanded) "▼" else "▶"
+            groupCount.text = "$expandedText ${item.getChildCount()} categories"
             
             // Set checkbox state (tri-state support)
-            checkbox.isChecked = item.isChecked
-            // Note: Material3 CheckBox doesn't natively support indeterminate on Android
-            // We'll use alpha to indicate indeterminate state
-            checkbox.alpha = if (item.isIndeterminate) 0.5f else 1.0f
-            
-            // Set expand arrow rotation
-            expandArrow.rotation = if (item.isExpanded) 180f else 0f
+            when {
+                item.isIndeterminate -> {
+                    checkbox.isChecked = false
+                    checkbox.buttonDrawable = AppCompatResources.getDrawable(
+                        itemView.context,
+                        R.drawable.ic_checkbox_indeterminate_24
+                    )
+                }
+                else -> {
+                    checkbox.isChecked = item.isChecked
+                    checkbox.buttonDrawable = null // Use default checkbox drawable
+                }
+            }
             
             // Click on entire row expands/collapses
             itemView.setOnClickListener {
@@ -48,10 +55,15 @@ class HierarchicalFolderAdapter(
                 notifyDataSetChanged()
             }
             
-            // Click on checkbox toggles selection
+            // Click on checkbox toggles selection of group and all children
             checkbox.setOnClickListener {
-                item.isChecked = !item.isChecked
+                val newState = !item.isChecked
+                item.isChecked = newState
                 item.isIndeterminate = false
+                
+                // Update all children in the display list to match parent
+                HierarchicalItemHelper.updateGroupChildren(displayList, item.name, newState)
+                
                 onGroupToggled(item)
                 notifyDataSetChanged()
             }

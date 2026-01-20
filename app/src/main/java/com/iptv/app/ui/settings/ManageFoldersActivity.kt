@@ -170,12 +170,13 @@ class ManageFoldersActivity : AppCompatActivity() {
                 hierarchicalAdapter = HierarchicalFolderAdapter(
                     groups = groups,
                     onGroupToggled = { group ->
-                        // When group checkbox is toggled, update all children
-                        val displayList = hierarchicalAdapter.getSelectedCategories() // triggers update
+                        // When group checkbox is toggled, update all children to match
+                        // This happens in the adapter automatically via updateGroupChildren
+                        // We just need to rebuild the display list
                         hierarchicalAdapter.updateDisplayList()
                     },
                     onCategoryToggled = { category ->
-                        // When category is toggled, update parent state
+                        // When category is toggled, update parent state to reflect partial selection
                         val displayList = HierarchicalItemHelper.buildDisplayList(groups)
                         HierarchicalItemHelper.updateParentState(groups, displayList, category.groupName)
                         hierarchicalAdapter.updateDisplayList()
