@@ -30,6 +30,7 @@ import com.iptv.app.utils.CategoryGrouper
 import com.iptv.app.utils.CategoryGrouper.GroupNode
 import com.iptv.app.utils.CategoryGrouper.NavigationTree
 import com.iptv.app.utils.CredentialsManager
+import com.iptv.app.utils.PerformanceLogger
 import com.iptv.app.utils.PreferencesManager
 import com.iptv.app.utils.StreamUrlBuilder
 import kotlinx.coroutines.flow.collectLatest
@@ -139,25 +140,46 @@ class MoviesFragment : Fragment() {
         showLoading(true)
         
         lifecycleScope.launch {
+            // Start total timer
+            val totalStartTime = PerformanceLogger.start("MoviesFragment.loadData")
+            
             val preferencesManager = PreferencesManager.getInstance(requireContext())
             
             // Get filter settings
+            PerformanceLogger.logPhase("MoviesFragment.loadData", "Loading filter settings")
+            val filterStartTime = PerformanceLogger.start("Filter settings load")
             val groupingEnabled = preferencesManager.isGroupingEnabled(ContentFilterSettings.ContentType.MOVIES)
             val separator = preferencesManager.getCustomSeparator(ContentFilterSettings.ContentType.MOVIES)
             val hiddenGroups = preferencesManager.getHiddenGroups(ContentFilterSettings.ContentType.MOVIES)
             val hiddenCategories = preferencesManager.getHiddenCategories(ContentFilterSettings.ContentType.MOVIES)
             val filterMode = preferencesManager.getFilterMode(ContentFilterSettings.ContentType.MOVIES)
+            PerformanceLogger.end("Filter settings load", filterStartTime, 
+                "grouping=$groupingEnabled, hiddenGroups=${hiddenGroups.size}, hiddenCategories=${hiddenCategories.size}")
             
             // Try to load cached navigation tree first
+            PerformanceLogger.logPhase("MoviesFragment.loadData", "Checking navigation tree cache")
+            val navTreeStartTime = PerformanceLogger.start("Navigation tree cache lookup")
             navigationTree = repository.getCachedVodNavigationTree()
+            if (navigationTree != null) {
+                PerformanceLogger.logCacheHit("movies", "navigationTree", navigationTree?.groups?.size ?: 0)
+                PerformanceLogger.end("Navigation tree cache lookup", navTreeStartTime, "HIT")
+            } else {
+                PerformanceLogger.logCacheMiss("movies", "navigationTree", "not cached")
+                PerformanceLogger.end("Navigation tree cache lookup", navTreeStartTime, "MISS")
+            }
             
             // Load categories
+            PerformanceLogger.logPhase("MoviesFragment.loadData", "Loading categories")
+            val categoriesStartTime = PerformanceLogger.start("Categories load")
             val categoriesResult = repository.getMovieCategories()
             if (categoriesResult.isSuccess) {
                 categories = categoriesResult.getOrNull() ?: emptyList()
+                PerformanceLogger.end("Categories load", categoriesStartTime, "count=${categories.size}")
                 
                 // Build navigation tree with hierarchical filter settings if cache miss
                 if (navigationTree == null) {
+                    PerformanceLogger.logPhase("MoviesFragment.loadData", "Building navigation tree")
+                    val treeStartTime = PerformanceLogger.start("Build navigation tree")
                     navigationTree = CategoryGrouper.buildVodNavigationTree(
                         categories,
                         groupingEnabled,
@@ -166,24 +188,43 @@ class MoviesFragment : Fragment() {
                         hiddenCategories,
                         filterMode
                     )
+                    val groupCount = navigationTree?.groups?.size ?: 0
+                    PerformanceLogger.end("Build navigation tree", treeStartTime, "groups=$groupCount")
                 }
+            } else {
+                PerformanceLogger.end("Categories load", categoriesStartTime, "FAILED")
             }
             
             // Load movies
+            PerformanceLogger.logPhase("MoviesFragment.loadData", "Loading movies")
+            val moviesStartTime = PerformanceLogger.start("Movies load")
             val moviesResult = repository.getMovies()
             if (moviesResult.isSuccess) {
                 allMovies = moviesResult.getOrNull() ?: emptyList()
+                PerformanceLogger.end("Movies load", moviesStartTime, "count=${allMovies.size}")
                 
                 // Set category names
+                PerformanceLogger.logPhase("MoviesFragment.loadData", "Setting category names")
+                val categoryNameStartTime = PerformanceLogger.start("Set category names")
                 allMovies.forEach { movie ->
                     val category = categories.find { it.categoryId == movie.categoryId }
                     movie.categoryName = category?.categoryName ?: ""
                 }
+                PerformanceLogger.end("Set category names", categoryNameStartTime, "processed=${allMovies.size}")
                 
                 // Show groups
+                PerformanceLogger.logPhase("MoviesFragment.loadData", "Updating UI")
+                val uiStartTime = PerformanceLogger.start("Show groups UI update")
                 showGroups()
+                PerformanceLogger.end("Show groups UI update", uiStartTime)
+                
                 showLoading(false)
+                
+                // End total timer
+                PerformanceLogger.end("MoviesFragment.loadData", totalStartTime, "SUCCESS")
             } else {
+                PerformanceLogger.end("Movies load", moviesStartTime, "FAILED")
+                PerformanceLogger.end("MoviesFragment.loadData", totalStartTime, "FAILED")
                 showError()
             }
         }
