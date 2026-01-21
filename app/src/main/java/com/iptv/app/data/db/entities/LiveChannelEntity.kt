@@ -1,9 +1,13 @@
 package com.iptv.app.data.db.entities
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "live_channels")
+@Entity(
+    tableName = "live_channels",
+    indices = [Index(value = ["categoryId"])]
+)
 data class LiveChannelEntity(
     @PrimaryKey val streamId: Int,
     val num: Int,

@@ -1,9 +1,13 @@
 package com.iptv.app.data.db.entities
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "navigation_groups")
+@Entity(
+    tableName = "navigation_groups",
+    indices = [Index(value = ["type"])]
+)
 data class NavigationGroupEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Int = 0,

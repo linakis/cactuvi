@@ -1,11 +1,15 @@
 package com.iptv.app.data.db.entities
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import androidx.room.TypeConverters
 import com.iptv.app.data.db.Converters
 
-@Entity(tableName = "series")
+@Entity(
+    tableName = "series",
+    indices = [Index(value = ["categoryId"])]
+)
 @TypeConverters(Converters::class)
 data class SeriesEntity(
     @PrimaryKey val seriesId: Int,
