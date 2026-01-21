@@ -15,6 +15,7 @@ import com.iptv.app.data.db.mappers.*
 import com.iptv.app.data.models.*
 import com.iptv.app.utils.CategoryGrouper
 import com.iptv.app.utils.CredentialsManager
+import com.iptv.app.utils.PerformanceLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map as flowMap
@@ -139,34 +140,59 @@ class ContentRepository(
     
     suspend fun getMovies(forceRefresh: Boolean = false): Result<List<Movie>> = 
         withContext(Dispatchers.IO) {
+            val startTime = PerformanceLogger.start("Repository.getMovies")
+            
             try {
+                // Check cache
+                PerformanceLogger.logPhase("getMovies", "Checking cache")
+                val cacheCheckStart = PerformanceLogger.start("Cache check")
                 val cached = database.movieDao().getAll()
+                PerformanceLogger.end("Cache check", cacheCheckStart, "cached=${cached.size}")
                 
                 if (!forceRefresh && cached.isNotEmpty() &&
                     isCacheValid(cached.first().lastUpdated, CACHE_TTL_VOD)) {
+                    PerformanceLogger.logCacheHit("movies", "getMovies", cached.size)
+                    PerformanceLogger.end("Repository.getMovies", startTime, "HIT - count=${cached.size}")
                     return@withContext Result.success(cached.map { it.toModel() })
                 }
                 
+                // Cache miss - fetch from API
+                PerformanceLogger.logCacheMiss("movies", "getMovies", if (forceRefresh) "forceRefresh" else "expired/empty")
+                PerformanceLogger.logPhase("getMovies", "Fetching from API")
+                val apiStart = PerformanceLogger.start("API fetch")
                 val username = credentialsManager.getUsername()
                 val password = credentialsManager.getPassword()
                 val movies = getApiService().getVodStreams(username, password)
+                PerformanceLogger.end("API fetch", apiStart, "count=${movies.size}")
                 
                 val categories = getMovieCategories().getOrNull() ?: emptyList()
                 val categoryMap = categories.associateBy { it.categoryId }
                 
+                // Insert into database
+                PerformanceLogger.logPhase("getMovies", "Inserting into DB")
+                val dbInsertStart = PerformanceLogger.start("DB insert")
                 val entities = movies.map { movie ->
                     val categoryName = categoryMap[movie.categoryId]?.categoryName ?: ""
                     movie.categoryName = categoryName
                     movie.toEntity(categoryName)
                 }
                 database.movieDao().insertAll(entities)
+                PerformanceLogger.end("DB insert", dbInsertStart, "inserted=${entities.size}")
                 
+                PerformanceLogger.end("Repository.getMovies", startTime, "SUCCESS - count=${movies.size}")
                 Result.success(movies)
             } catch (e: Exception) {
+                PerformanceLogger.log("getMovies API failed: ${e.message}")
+                
+                // Fallback to cache
+                PerformanceLogger.logPhase("getMovies", "API failed, trying cache fallback")
                 val cached = database.movieDao().getAll()
                 if (cached.isNotEmpty()) {
+                    PerformanceLogger.logCacheHit("movies", "getMovies_fallback", cached.size)
+                    PerformanceLogger.end("Repository.getMovies", startTime, "FALLBACK - count=${cached.size}")
                     Result.success(cached.map { it.toModel() })
                 } else {
+                    PerformanceLogger.end("Repository.getMovies", startTime, "FAILED - no fallback")
                     Result.failure(e)
                 }
             }
@@ -174,30 +200,58 @@ class ContentRepository(
     
     suspend fun getMovieCategories(forceRefresh: Boolean = false): Result<List<Category>> = 
         withContext(Dispatchers.IO) {
+            val startTime = PerformanceLogger.start("Repository.getMovieCategories")
+            
             try {
+                // Check cache
+                PerformanceLogger.logPhase("getMovieCategories", "Checking cache")
+                val cacheCheckStart = PerformanceLogger.start("Cache check")
                 val cached = database.categoryDao().getAllByType("vod")
+                PerformanceLogger.end("Cache check", cacheCheckStart, "cached=${cached.size}")
                 
                 if (!forceRefresh && cached.isNotEmpty() &&
                     isCacheValid(cached.first().lastUpdated, CACHE_TTL_CATEGORIES)) {
+                    PerformanceLogger.logCacheHit("movies", "categories", cached.size)
+                    PerformanceLogger.end("Repository.getMovieCategories", startTime, "HIT - count=${cached.size}")
                     return@withContext Result.success(cached.map { it.toModel() })
                 }
                 
+                // Cache miss - fetch from API
+                PerformanceLogger.logCacheMiss("movies", "categories", if (forceRefresh) "forceRefresh" else "expired/empty")
+                PerformanceLogger.logPhase("getMovieCategories", "Fetching from API")
+                val apiStart = PerformanceLogger.start("API fetch")
                 val username = credentialsManager.getUsername()
                 val password = credentialsManager.getPassword()
                 val categories = getApiService().getVodCategories(username, password)
+                PerformanceLogger.end("API fetch", apiStart, "count=${categories.size}")
                 
+                // Insert into database
+                PerformanceLogger.logPhase("getMovieCategories", "Inserting into DB")
+                val dbInsertStart = PerformanceLogger.start("DB insert")
                 val entities = categories.map { it.toEntity("vod") }
                 database.categoryDao().insertAll(entities)
+                PerformanceLogger.end("DB insert", dbInsertStart, "inserted=${entities.size}")
                 
                 // Cache navigation tree
+                PerformanceLogger.logPhase("getMovieCategories", "Caching navigation tree")
+                val treeCacheStart = PerformanceLogger.start("Cache navigation tree")
                 cacheVodNavigationTree(categories)
+                PerformanceLogger.end("Cache navigation tree", treeCacheStart)
                 
+                PerformanceLogger.end("Repository.getMovieCategories", startTime, "SUCCESS - count=${categories.size}")
                 Result.success(categories)
             } catch (e: Exception) {
+                PerformanceLogger.log("getMovieCategories API failed: ${e.message}")
+                
+                // Fallback to cache
+                PerformanceLogger.logPhase("getMovieCategories", "API failed, trying cache fallback")
                 val cached = database.categoryDao().getAllByType("vod")
                 if (cached.isNotEmpty()) {
+                    PerformanceLogger.logCacheHit("movies", "categories_fallback", cached.size)
+                    PerformanceLogger.end("Repository.getMovieCategories", startTime, "FALLBACK - count=${cached.size}")
                     Result.success(cached.map { it.toModel() })
                 } else {
+                    PerformanceLogger.end("Repository.getMovieCategories", startTime, "FAILED - no fallback")
                     Result.failure(e)
                 }
             }
@@ -565,29 +619,53 @@ class ContentRepository(
     }
     
     suspend fun getCachedVodNavigationTree(): CategoryGrouper.NavigationTree? = withContext(Dispatchers.IO) {
+        val startTime = PerformanceLogger.start("Repository.getCachedVodNavigationTree")
+        
         try {
+            // Load navigation group entities
+            PerformanceLogger.logPhase("getCachedVodNavigationTree", "Loading navigation groups")
+            val entityLoadStart = PerformanceLogger.start("Load navigation entities")
             val entities = database.navigationGroupDao().getByType("vod")
-            if (entities.isEmpty()) return@withContext null
+            PerformanceLogger.end("Load navigation entities", entityLoadStart, "count=${entities.size}")
+            
+            if (entities.isEmpty()) {
+                PerformanceLogger.logCacheMiss("movies", "navigationTree", "no entities")
+                PerformanceLogger.end("Repository.getCachedVodNavigationTree", startTime, "MISS - empty")
+                return@withContext null
+            }
             
             // Check TTL
             val firstEntity = entities.first()
             if (!isCacheValid(firstEntity.lastUpdated, CACHE_TTL_CATEGORIES)) {
+                PerformanceLogger.logCacheMiss("movies", "navigationTree", "expired TTL")
+                PerformanceLogger.end("Repository.getCachedVodNavigationTree", startTime, "MISS - expired")
                 return@withContext null
             }
             
             // Get all VOD categories
+            PerformanceLogger.logPhase("getCachedVodNavigationTree", "Loading categories")
+            val categoryLoadStart = PerformanceLogger.start("Load categories")
             val allCategories = database.categoryDao().getAllByType("vod").map { it.toModel() }
+            PerformanceLogger.end("Load categories", categoryLoadStart, "count=${allCategories.size}")
             
             // Reconstruct navigation tree from cached groups
+            PerformanceLogger.logPhase("getCachedVodNavigationTree", "Deserializing JSON and building tree")
+            val deserializeStart = PerformanceLogger.start("Deserialize and build tree")
             val groups = entities.map { entity ->
                 val type = object : TypeToken<List<String>>() {}.type
                 val categoryIds: List<String> = gson.fromJson(entity.categoryIdsJson, type)
                 val groupCategories = allCategories.filter { it.categoryId in categoryIds }
                 CategoryGrouper.GroupNode(entity.groupName, groupCategories)
             }
+            PerformanceLogger.end("Deserialize and build tree", deserializeStart, "groups=${groups.size}")
             
-            CategoryGrouper.NavigationTree(groups)
+            val tree = CategoryGrouper.NavigationTree(groups)
+            PerformanceLogger.logCacheHit("movies", "navigationTree", groups.size)
+            PerformanceLogger.end("Repository.getCachedVodNavigationTree", startTime, "HIT - groups=${groups.size}")
+            tree
         } catch (e: Exception) {
+            PerformanceLogger.log("getCachedVodNavigationTree failed: ${e.message}")
+            PerformanceLogger.end("Repository.getCachedVodNavigationTree", startTime, "ERROR")
             null
         }
     }
