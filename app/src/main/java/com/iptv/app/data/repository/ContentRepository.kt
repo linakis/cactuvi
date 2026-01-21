@@ -143,14 +143,24 @@ class ContentRepository(
             val startTime = PerformanceLogger.start("Repository.getMovies")
             
             try {
-                // Check cache
-                PerformanceLogger.logPhase("getMovies", "Checking cache")
-                val cacheCheckStart = PerformanceLogger.start("Cache check")
-                val cached = database.movieDao().getAll()
-                PerformanceLogger.end("Cache check", cacheCheckStart, "cached=${cached.size}")
+                // Fast metadata-based cache validation
+                PerformanceLogger.logPhase("getMovies", "Checking cache metadata")
+                val metadataCheckStart = PerformanceLogger.start("Metadata cache check")
+                val metadata = database.cacheMetadataDao().get("movies")
+                PerformanceLogger.end("Metadata cache check", metadataCheckStart, 
+                    "exists=${metadata != null}, count=${metadata?.itemCount ?: 0}")
                 
-                if (!forceRefresh && cached.isNotEmpty() &&
-                    isCacheValid(cached.first().lastUpdated, CACHE_TTL_VOD)) {
+                // Check if cache is valid based on metadata
+                val isCacheValidMetadata = !forceRefresh && metadata != null && 
+                    isCacheValid(metadata.lastUpdated, CACHE_TTL_VOD)
+                
+                if (isCacheValidMetadata) {
+                    // Cache is valid - now load the actual data
+                    PerformanceLogger.logPhase("getMovies", "Loading cached data (metadata valid)")
+                    val dataLoadStart = PerformanceLogger.start("Load cached movies")
+                    val cached = database.movieDao().getAll()
+                    PerformanceLogger.end("Load cached movies", dataLoadStart, "count=${cached.size}")
+                    
                     PerformanceLogger.logCacheHit("movies", "getMovies", cached.size)
                     PerformanceLogger.end("Repository.getMovies", startTime, "HIT - count=${cached.size}")
                     return@withContext Result.success(cached.map { it.toModel() })
@@ -178,6 +188,18 @@ class ContentRepository(
                 }
                 database.movieDao().insertAll(entities)
                 PerformanceLogger.end("DB insert", dbInsertStart, "inserted=${entities.size}")
+                
+                // Update cache metadata
+                PerformanceLogger.logPhase("getMovies", "Updating cache metadata")
+                val metadataUpdateStart = PerformanceLogger.start("Update metadata")
+                val newMetadata = CacheMetadataEntity(
+                    contentType = "movies",
+                    lastUpdated = System.currentTimeMillis(),
+                    itemCount = movies.size,
+                    categoryCount = categories.size
+                )
+                database.cacheMetadataDao().insert(newMetadata)
+                PerformanceLogger.end("Update metadata", metadataUpdateStart)
                 
                 PerformanceLogger.end("Repository.getMovies", startTime, "SUCCESS - count=${movies.size}")
                 Result.success(movies)
