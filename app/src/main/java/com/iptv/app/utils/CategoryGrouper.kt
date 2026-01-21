@@ -90,20 +90,38 @@ object CategoryGrouper {
         hiddenCategories: Set<String> = emptySet(),
         filterMode: ContentFilterSettings.FilterMode = ContentFilterSettings.FilterMode.BLACKLIST
     ): NavigationTree {
+        val startTime = PerformanceLogger.start("CategoryGrouper.buildVodNavigationTree")
+        PerformanceLogger.log("Input: ${categories.size} categories, grouping=$groupingEnabled, hiddenGroups=${hiddenGroups.size}, hiddenCategories=${hiddenCategories.size}")
+        
         if (!groupingEnabled) {
             // No grouping - filter only by categories
             val filteredCategories = filterCategoriesByName(categories, hiddenCategories, filterMode)
+            PerformanceLogger.end("CategoryGrouper.buildVodNavigationTree", startTime, 
+                "NO_GROUPING - 1 group, ${filteredCategories.size} categories")
             return NavigationTree(listOf(GroupNode("All Categories", filteredCategories)))
         }
         
+        // Group by separator
+        PerformanceLogger.logPhase("buildVodNavigationTree", "Grouping by separator '$separator'")
+        val groupByStart = PerformanceLogger.start("Group by separator")
         val grouped = categories
             .groupBy { category -> extractGroupName(category.categoryName, separator) }
             .map { (groupName, cats) ->
                 GroupNode(groupName, cats.sortedBy { it.categoryName })
             }
             .sortedBy { it.name }
+        PerformanceLogger.end("Group by separator", groupByStart, "groups=${grouped.size}")
         
-        return filterNavigationTreeHierarchical(NavigationTree(grouped), hiddenGroups, hiddenCategories, filterMode)
+        // Apply hierarchical filtering
+        PerformanceLogger.logPhase("buildVodNavigationTree", "Applying hierarchical filtering")
+        val filterStart = PerformanceLogger.start("Hierarchical filtering")
+        val tree = filterNavigationTreeHierarchical(NavigationTree(grouped), hiddenGroups, hiddenCategories, filterMode)
+        PerformanceLogger.end("Hierarchical filtering", filterStart, 
+            "groups=${tree.groups.size}, totalCategories=${tree.groups.sumOf { it.count }}")
+        
+        PerformanceLogger.end("CategoryGrouper.buildVodNavigationTree", startTime, 
+            "SUCCESS - ${tree.groups.size} groups, ${tree.groups.sumOf { it.count }} categories")
+        return tree
     }
     
     /**
@@ -289,10 +307,16 @@ object CategoryGrouper {
         hiddenCategories: Set<String>,
         filterMode: ContentFilterSettings.FilterMode
     ): NavigationTree {
+        PerformanceLogger.log("[filterNavigationTreeHierarchical] Input: ${tree.groups.size} groups, mode=$filterMode")
+        
         // If both are empty, no filtering needed
-        if (hiddenGroups.isEmpty() && hiddenCategories.isEmpty()) return tree
+        if (hiddenGroups.isEmpty() && hiddenCategories.isEmpty()) {
+            PerformanceLogger.log("[filterNavigationTreeHierarchical] No filtering - both sets empty")
+            return tree
+        }
         
         // Step 1: Filter groups
+        val groupFilterStart = PerformanceLogger.start("Filter groups")
         val groupFilteredGroups = when {
             hiddenGroups.isEmpty() -> tree.groups
             filterMode == ContentFilterSettings.FilterMode.BLACKLIST -> {
@@ -304,8 +328,11 @@ object CategoryGrouper {
                 tree.groups.filter { it.name in hiddenGroups }
             }
         }
+        PerformanceLogger.end("Filter groups", groupFilterStart, 
+            "input=${tree.groups.size}, output=${groupFilteredGroups.size}")
         
         // Step 2: Filter categories within remaining groups
+        val categoryFilterStart = PerformanceLogger.start("Filter categories within groups")
         val fullyFilteredGroups = if (hiddenCategories.isEmpty()) {
             groupFilteredGroups
         } else {
@@ -323,7 +350,11 @@ object CategoryGrouper {
                 GroupNode(group.name, filteredCategories)
             }.filter { it.categories.isNotEmpty() } // Remove empty groups after category filtering
         }
+        val totalCategoriesFiltered = fullyFilteredGroups.sumOf { it.count }
+        PerformanceLogger.end("Filter categories within groups", categoryFilterStart, 
+            "groups=${fullyFilteredGroups.size}, categories=$totalCategoriesFiltered")
         
+        PerformanceLogger.log("[filterNavigationTreeHierarchical] Output: ${fullyFilteredGroups.size} groups, $totalCategoriesFiltered categories")
         return NavigationTree(fullyFilteredGroups)
     }
 }
