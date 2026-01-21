@@ -55,4 +55,11 @@ interface SeriesDao {
      */
     @Query("SELECT lastUpdated FROM series LIMIT 1")
     suspend fun getFirstUpdatedTime(): Long?
+    
+    /**
+     * Get count of series in a specific category.
+     * Used for displaying category counts without loading all series.
+     */
+    @Query("SELECT COUNT(*) FROM series WHERE categoryId = :categoryId")
+    suspend fun getCountByCategory(categoryId: String): Int
 }

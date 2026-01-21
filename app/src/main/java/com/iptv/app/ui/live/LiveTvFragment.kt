@@ -54,8 +54,8 @@ class LiveTvFragment : Fragment() {
     
     // Data
     private lateinit var repository: ContentRepository
+    private lateinit var database: com.iptv.app.data.db.AppDatabase
     private var navigationTree: NavigationTree? = null
-    private var allChannels: List<LiveChannel> = emptyList()
     private var categories: List<Category> = emptyList()
     
     // Navigation State
@@ -93,6 +93,8 @@ class LiveTvFragment : Fragment() {
             CredentialsManager.getInstance(requireContext()),
             requireContext()
         )
+        
+        database = com.iptv.app.data.db.AppDatabase.getInstance(requireContext())
         
         setupToolbar()
         setupRecyclerView()
@@ -169,23 +171,9 @@ class LiveTvFragment : Fragment() {
                 }
             }
             
-            // Load channels
-            val channelsResult = repository.getLiveStreams()
-            if (channelsResult.isSuccess) {
-                allChannels = channelsResult.getOrNull() ?: emptyList()
-                
-                // Set category names
-                allChannels.forEach { channel ->
-                    val category = categories.find { it.categoryId == channel.categoryId }
-                    channel.categoryName = category?.categoryName ?: ""
-                }
-                
-                // Show groups
-                showGroups()
-                showLoading(false)
-            } else {
-                showError()
-            }
+            // Show groups (no need to load all channels)
+            showGroups()
+            showLoading(false)
         }
     }
     
@@ -216,12 +204,14 @@ class LiveTvFragment : Fragment() {
         updateBreadcrumb()
         recyclerView.adapter = categoryAdapter
         
-        // Update adapter data - convert categories to pairs with counts
-        val categoriesWithCounts = group.categories.map { category ->
-            val count = allChannels.count { it.categoryId == category.categoryId }
-            Pair(category, count)
+        // Update adapter data - get counts from DB instead of loading all channels
+        lifecycleScope.launch {
+            val categoriesWithCounts = group.categories.map { category ->
+                val count = database.liveChannelDao().getCountByCategory(category.categoryId)
+                Pair(category, count)
+            }
+            categoryAdapter.updateCategories(categoriesWithCounts)
         }
-        categoryAdapter.updateCategories(categoriesWithCounts)
         
         // Update visibility
         emptyText.visibility = View.GONE

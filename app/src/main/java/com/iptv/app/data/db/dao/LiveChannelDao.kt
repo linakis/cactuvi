@@ -49,4 +49,11 @@ interface LiveChannelDao {
      */
     @Query("SELECT lastUpdated FROM live_channels LIMIT 1")
     suspend fun getFirstUpdatedTime(): Long?
+    
+    /**
+     * Get count of live channels in a specific category.
+     * Used for displaying category counts without loading all channels.
+     */
+    @Query("SELECT COUNT(*) FROM live_channels WHERE categoryId = :categoryId")
+    suspend fun getCountByCategory(categoryId: String): Int
 }

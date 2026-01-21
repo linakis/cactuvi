@@ -53,8 +53,8 @@ class SeriesFragment : Fragment() {
     
     // Data
     private lateinit var repository: ContentRepository
+    private lateinit var database: com.iptv.app.data.db.AppDatabase
     private var navigationTree: NavigationTree? = null
-    private var allSeries: List<Series> = emptyList()
     private var categories: List<Category> = emptyList()
     
     // Navigation State
@@ -92,6 +92,8 @@ class SeriesFragment : Fragment() {
             CredentialsManager.getInstance(requireContext()),
             requireContext()
         )
+        
+        database = com.iptv.app.data.db.AppDatabase.getInstance(requireContext())
         
         setupToolbar()
         setupRecyclerView()
@@ -177,23 +179,9 @@ class SeriesFragment : Fragment() {
                 }
             }
             
-            // Load series
-            val seriesResult = repository.getSeries()
-            if (seriesResult.isSuccess) {
-                allSeries = seriesResult.getOrNull() ?: emptyList()
-                
-                // Set category names
-                allSeries.forEach { series ->
-                    val category = categories.find { it.categoryId == series.categoryId }
-                    series.categoryName = category?.categoryName ?: ""
-                }
-                
-                // Show groups
-                showGroups()
-                showLoading(false)
-            } else {
-                showError()
-            }
+            // Show groups (no need to load all series)
+            showGroups()
+            showLoading(false)
         }
     }
     
@@ -226,12 +214,14 @@ class SeriesFragment : Fragment() {
         recyclerView.layoutManager = LinearLayoutManager(requireContext())
         recyclerView.adapter = categoryAdapter
         
-        // Update adapter data - convert categories to pairs with counts
-        val categoriesWithCounts = group.categories.map { category ->
-            val count = allSeries.count { it.categoryId == category.categoryId }
-            Pair(category, count)
+        // Update adapter data - get counts from DB instead of loading all series
+        lifecycleScope.launch {
+            val categoriesWithCounts = group.categories.map { category ->
+                val count = database.seriesDao().getCountByCategory(category.categoryId)
+                Pair(category, count)
+            }
+            categoryAdapter.updateCategories(categoriesWithCounts)
         }
-        categoryAdapter.updateCategories(categoriesWithCounts)
         
         // Update visibility
         emptyText.visibility = View.GONE
