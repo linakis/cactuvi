@@ -17,9 +17,10 @@ import com.iptv.app.data.db.entities.*
         WatchHistoryEntity::class,
         FavoriteEntity::class,
         DownloadEntity::class,
-        NavigationGroupEntity::class
+        NavigationGroupEntity::class,
+        CacheMetadataEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -33,6 +34,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun favoriteDao(): FavoriteDao
     abstract fun downloadDao(): DownloadDao
     abstract fun navigationGroupDao(): NavigationGroupDao
+    abstract fun cacheMetadataDao(): CacheMetadataDao
     
     companion object {
         @Volatile
