@@ -33,4 +33,20 @@ interface LiveChannelDao {
     
     @Query("DELETE FROM live_channels")
     suspend fun clearAll()
+    
+    // ========== CACHE VALIDATION QUERIES ==========
+    
+    /**
+     * Get count of live channels in cache for fast validation.
+     * Used as fallback when metadata table not available.
+     */
+    @Query("SELECT COUNT(*) FROM live_channels")
+    suspend fun getCount(): Int
+    
+    /**
+     * Get first row's lastUpdated timestamp for cache validity check.
+     * Fast alternative to loading all data just to check timestamp.
+     */
+    @Query("SELECT lastUpdated FROM live_channels LIMIT 1")
+    suspend fun getFirstUpdatedTime(): Long?
 }

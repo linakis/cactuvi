@@ -39,4 +39,20 @@ interface SeriesDao {
     
     @Query("DELETE FROM series")
     suspend fun clearAll()
+    
+    // ========== CACHE VALIDATION QUERIES ==========
+    
+    /**
+     * Get count of series in cache for fast validation.
+     * Used as fallback when metadata table not available.
+     */
+    @Query("SELECT COUNT(*) FROM series")
+    suspend fun getCount(): Int
+    
+    /**
+     * Get first row's lastUpdated timestamp for cache validity check.
+     * Fast alternative to loading all data just to check timestamp.
+     */
+    @Query("SELECT lastUpdated FROM series LIMIT 1")
+    suspend fun getFirstUpdatedTime(): Long?
 }
