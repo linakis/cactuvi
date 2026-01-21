@@ -56,8 +56,8 @@ class MoviesFragment : Fragment() {
     
     // Data
     private lateinit var repository: ContentRepository
+    private lateinit var database: com.iptv.app.data.db.AppDatabase
     private var navigationTree: NavigationTree? = null
-    private var allMovies: List<Movie> = emptyList()
     private var categories: List<Category> = emptyList()
     
     // Navigation State
@@ -95,6 +95,8 @@ class MoviesFragment : Fragment() {
             CredentialsManager.getInstance(requireContext()),
             requireContext()
         )
+        
+        database = com.iptv.app.data.db.AppDatabase.getInstance(requireContext())
         
         setupToolbar()
         setupRecyclerView()
@@ -195,30 +197,17 @@ class MoviesFragment : Fragment() {
                 PerformanceLogger.end("Categories load", categoriesStartTime, "FAILED")
             }
             
-            // Load movies
-            PerformanceLogger.logPhase("MoviesFragment.loadData", "Loading movies")
-            val moviesStartTime = PerformanceLogger.start("Movies load")
-            val moviesResult = repository.getMovies()
-            if (moviesResult.isSuccess) {
-                allMovies = moviesResult.getOrNull() ?: emptyList()
-                PerformanceLogger.end("Movies load", moviesStartTime, "count=${allMovies.size}")
-                PerformanceLogger.log("Category names already set in DB - skipping redundant assignment loop")
-                
-                // Show groups
-                PerformanceLogger.logPhase("MoviesFragment.loadData", "Updating UI")
-                val uiStartTime = PerformanceLogger.start("Show groups UI update")
-                showGroups()
-                PerformanceLogger.end("Show groups UI update", uiStartTime)
-                
-                showLoading(false)
-                
-                // End total timer
-                PerformanceLogger.end("MoviesFragment.loadData", totalStartTime, "SUCCESS")
-            } else {
-                PerformanceLogger.end("Movies load", moviesStartTime, "FAILED")
-                PerformanceLogger.end("MoviesFragment.loadData", totalStartTime, "FAILED")
-                showError()
-            }
+            // Show groups (no need to load all movies)
+            PerformanceLogger.logPhase("MoviesFragment.loadData", "Updating UI")
+            PerformanceLogger.log("Skipping allMovies load - using DB counts and Paging3 for categories")
+            val uiStartTime = PerformanceLogger.start("Show groups UI update")
+            showGroups()
+            PerformanceLogger.end("Show groups UI update", uiStartTime)
+            
+            showLoading(false)
+            
+            // End total timer
+            PerformanceLogger.end("MoviesFragment.loadData", totalStartTime, "SUCCESS")
         }
     }
     
@@ -251,12 +240,16 @@ class MoviesFragment : Fragment() {
         recyclerView.layoutManager = LinearLayoutManager(requireContext())
         recyclerView.adapter = categoryAdapter
         
-        // Update adapter data - convert categories to pairs with counts
-        val categoriesWithCounts = group.categories.map { category ->
-            val count = allMovies.count { it.categoryId == category.categoryId }
-            Pair(category, count)
+        // Update adapter data - get counts from DB instead of loading all movies
+        lifecycleScope.launch {
+            val countsStart = PerformanceLogger.start("Get category counts")
+            val categoriesWithCounts = group.categories.map { category ->
+                val count = database.movieDao().getCountByCategory(category.categoryId)
+                Pair(category, count)
+            }
+            PerformanceLogger.end("Get category counts", countsStart, "categories=${categoriesWithCounts.size}")
+            categoryAdapter.updateCategories(categoriesWithCounts)
         }
-        categoryAdapter.updateCategories(categoriesWithCounts)
         
         // Update visibility
         emptyText.visibility = View.GONE

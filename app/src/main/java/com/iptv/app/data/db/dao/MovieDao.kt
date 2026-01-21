@@ -58,4 +58,11 @@ interface MovieDao {
      */
     @Query("SELECT lastUpdated FROM movies LIMIT 1")
     suspend fun getFirstUpdatedTime(): Long?
+    
+    /**
+     * Get count of movies in a specific category.
+     * Used for displaying category counts without loading all movies.
+     */
+    @Query("SELECT COUNT(*) FROM movies WHERE categoryId = :categoryId")
+    suspend fun getCountByCategory(categoryId: String): Int
 }
