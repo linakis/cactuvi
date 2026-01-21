@@ -202,15 +202,7 @@ class MoviesFragment : Fragment() {
             if (moviesResult.isSuccess) {
                 allMovies = moviesResult.getOrNull() ?: emptyList()
                 PerformanceLogger.end("Movies load", moviesStartTime, "count=${allMovies.size}")
-                
-                // Set category names
-                PerformanceLogger.logPhase("MoviesFragment.loadData", "Setting category names")
-                val categoryNameStartTime = PerformanceLogger.start("Set category names")
-                allMovies.forEach { movie ->
-                    val category = categories.find { it.categoryId == movie.categoryId }
-                    movie.categoryName = category?.categoryName ?: ""
-                }
-                PerformanceLogger.end("Set category names", categoryNameStartTime, "processed=${allMovies.size}")
+                PerformanceLogger.log("Category names already set in DB - skipping redundant assignment loop")
                 
                 // Show groups
                 PerformanceLogger.logPhase("MoviesFragment.loadData", "Updating UI")
