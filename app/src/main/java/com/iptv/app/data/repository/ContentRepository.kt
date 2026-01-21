@@ -32,9 +32,8 @@ class ContentRepository(
     
     companion object {
         // Cache Time-To-Live (TTL) in milliseconds
-        private const val CACHE_TTL_LIVE = 6 * 60 * 60 * 1000L       // 6 hours
-        private const val CACHE_TTL_VOD = 24 * 60 * 60 * 1000L       // 24 hours
-        private const val CACHE_TTL_SERIES = 24 * 60 * 60 * 1000L    // 24 hours
+        // NOTE: TTL only used for fallback safety check (7 days) - background sync handles freshness
+        private const val CACHE_TTL_FALLBACK = 7 * 24 * 60 * 60 * 1000L  // 7 days
         private const val CACHE_TTL_CATEGORIES = 7 * 24 * 60 * 60 * 1000L  // 7 days
     }
     
@@ -68,14 +67,19 @@ class ContentRepository(
     suspend fun getLiveStreams(forceRefresh: Boolean = false): Result<List<LiveChannel>> = 
         withContext(Dispatchers.IO) {
             try {
-                // Fast metadata-based cache validation
+                // Check cache metadata
                 val metadata = database.cacheMetadataDao().get("live")
-                val isCacheValidMetadata = !forceRefresh && metadata != null && 
-                    isCacheValid(metadata.lastUpdated, CACHE_TTL_LIVE)
                 
-                if (isCacheValidMetadata) {
-                    val cachedChannels = database.liveChannelDao().getAll()
-                    return@withContext Result.success(cachedChannels.map { it.toModel() })
+                // Return cache immediately if exists and not forcing refresh
+                // Unless extremely stale (7+ days) - then force refresh for safety
+                if (!forceRefresh && metadata != null) {
+                    val isExtremelyStale = !isCacheValid(metadata.lastUpdated, CACHE_TTL_FALLBACK)
+                    if (!isExtremelyStale) {
+                        val cachedChannels = database.liveChannelDao().getAll()
+                        if (cachedChannels.isNotEmpty()) {
+                            return@withContext Result.success(cachedChannels.map { it.toModel() })
+                        }
+                    }
                 }
                 
                 // Fetch from API
@@ -154,27 +158,29 @@ class ContentRepository(
             val startTime = PerformanceLogger.start("Repository.getMovies")
             
             try {
-                // Fast metadata-based cache validation
+                // Check cache metadata
                 PerformanceLogger.logPhase("getMovies", "Checking cache metadata")
                 val metadataCheckStart = PerformanceLogger.start("Metadata cache check")
                 val metadata = database.cacheMetadataDao().get("movies")
                 PerformanceLogger.end("Metadata cache check", metadataCheckStart, 
                     "exists=${metadata != null}, count=${metadata?.itemCount ?: 0}")
                 
-                // Check if cache is valid based on metadata
-                val isCacheValidMetadata = !forceRefresh && metadata != null && 
-                    isCacheValid(metadata.lastUpdated, CACHE_TTL_VOD)
-                
-                if (isCacheValidMetadata) {
-                    // Cache is valid - now load the actual data
-                    PerformanceLogger.logPhase("getMovies", "Loading cached data (metadata valid)")
-                    val dataLoadStart = PerformanceLogger.start("Load cached movies")
-                    val cached = database.movieDao().getAll()
-                    PerformanceLogger.end("Load cached movies", dataLoadStart, "count=${cached.size}")
-                    
-                    PerformanceLogger.logCacheHit("movies", "getMovies", cached.size)
-                    PerformanceLogger.end("Repository.getMovies", startTime, "HIT - count=${cached.size}")
-                    return@withContext Result.success(cached.map { it.toModel() })
+                // Return cache immediately if exists and not forcing refresh
+                // Unless extremely stale (7+ days) - then force refresh for safety
+                if (!forceRefresh && metadata != null) {
+                    val isExtremelyStale = !isCacheValid(metadata.lastUpdated, CACHE_TTL_FALLBACK)
+                    if (!isExtremelyStale) {
+                        PerformanceLogger.logPhase("getMovies", "Loading cached data")
+                        val dataLoadStart = PerformanceLogger.start("Load cached movies")
+                        val cached = database.movieDao().getAll()
+                        PerformanceLogger.end("Load cached movies", dataLoadStart, "count=${cached.size}")
+                        
+                        if (cached.isNotEmpty()) {
+                            PerformanceLogger.logCacheHit("movies", "getMovies", cached.size)
+                            PerformanceLogger.end("Repository.getMovies", startTime, "HIT - count=${cached.size}")
+                            return@withContext Result.success(cached.map { it.toModel() })
+                        }
+                    }
                 }
                 
                 // Cache miss - fetch from API
@@ -306,14 +312,19 @@ class ContentRepository(
     suspend fun getSeries(forceRefresh: Boolean = false): Result<List<Series>> = 
         withContext(Dispatchers.IO) {
             try {
-                // Fast metadata-based cache validation
+                // Check cache metadata
                 val metadata = database.cacheMetadataDao().get("series")
-                val isCacheValidMetadata = !forceRefresh && metadata != null && 
-                    isCacheValid(metadata.lastUpdated, CACHE_TTL_SERIES)
                 
-                if (isCacheValidMetadata) {
-                    val cached = database.seriesDao().getAll()
-                    return@withContext Result.success(cached.map { it.toModel() })
+                // Return cache immediately if exists and not forcing refresh
+                // Unless extremely stale (7+ days) - then force refresh for safety
+                if (!forceRefresh && metadata != null) {
+                    val isExtremelyStale = !isCacheValid(metadata.lastUpdated, CACHE_TTL_FALLBACK)
+                    if (!isExtremelyStale) {
+                        val cached = database.seriesDao().getAll()
+                        if (cached.isNotEmpty()) {
+                            return@withContext Result.success(cached.map { it.toModel() })
+                        }
+                    }
                 }
                 
                 val username = credentialsManager.getUsername()

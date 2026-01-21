@@ -20,7 +20,7 @@ import com.iptv.app.data.db.entities.*
         NavigationGroupEntity::class,
         CacheMetadataEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -47,7 +47,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "iptv_database"
                 )
-                    .fallbackToDestructiveMigration()  // Only for development
+                    .fallbackToDestructiveMigration()
                     .build()
                 
                 INSTANCE = instance
