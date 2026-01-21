@@ -599,7 +599,7 @@ class ContentRepository(
             NavigationGroupEntity(
                 type = "vod",
                 groupName = group.name,
-                categoryIdsJson = gson.toJson(group.categories.map { it.categoryId }),
+                categoryIdsCsv = group.categories.joinToString(",") { it.categoryId },
                 separator = separator
             )
         }
@@ -615,7 +615,7 @@ class ContentRepository(
             NavigationGroupEntity(
                 type = "series",
                 groupName = group.name,
-                categoryIdsJson = gson.toJson(group.categories.map { it.categoryId }),
+                categoryIdsCsv = group.categories.joinToString(",") { it.categoryId },
                 separator = separator
             )
         }
@@ -631,7 +631,7 @@ class ContentRepository(
             NavigationGroupEntity(
                 type = "live",
                 groupName = group.name,
-                categoryIdsJson = gson.toJson(group.categories.map { it.categoryId }),
+                categoryIdsCsv = group.categories.joinToString(",") { it.categoryId },
                 separator = separator
             )
         }
@@ -671,15 +671,14 @@ class ContentRepository(
             PerformanceLogger.end("Load categories", categoryLoadStart, "count=${allCategories.size}")
             
             // Reconstruct navigation tree from cached groups
-            PerformanceLogger.logPhase("getCachedVodNavigationTree", "Deserializing JSON and building tree")
-            val deserializeStart = PerformanceLogger.start("Deserialize and build tree")
+            PerformanceLogger.logPhase("getCachedVodNavigationTree", "Parsing CSV and building tree")
+            val deserializeStart = PerformanceLogger.start("Parse CSV and build tree")
             val groups = entities.map { entity ->
-                val type = object : TypeToken<List<String>>() {}.type
-                val categoryIds: List<String> = gson.fromJson(entity.categoryIdsJson, type)
+                val categoryIds: List<String> = entity.categoryIdsCsv.split(",")
                 val groupCategories = allCategories.filter { it.categoryId in categoryIds }
                 CategoryGrouper.GroupNode(entity.groupName, groupCategories)
             }
-            PerformanceLogger.end("Deserialize and build tree", deserializeStart, "groups=${groups.size}")
+            PerformanceLogger.end("Parse CSV and build tree", deserializeStart, "groups=${groups.size}")
             
             val tree = CategoryGrouper.NavigationTree(groups)
             PerformanceLogger.logCacheHit("movies", "navigationTree", groups.size)
@@ -706,10 +705,9 @@ class ContentRepository(
             // Get all series categories
             val allCategories = database.categoryDao().getAllByType("series").map { it.toModel() }
             
-            // Reconstruct navigation tree from cached groups
+            // Reconstruct navigation tree from cached groups (CSV parsing)
             val groups = entities.map { entity ->
-                val type = object : TypeToken<List<String>>() {}.type
-                val categoryIds: List<String> = gson.fromJson(entity.categoryIdsJson, type)
+                val categoryIds: List<String> = entity.categoryIdsCsv.split(",")
                 val groupCategories = allCategories.filter { it.categoryId in categoryIds }
                 CategoryGrouper.GroupNode(entity.groupName, groupCategories)
             }
@@ -734,10 +732,9 @@ class ContentRepository(
             // Get all live categories
             val allCategories = database.categoryDao().getAllByType("live").map { it.toModel() }
             
-            // Reconstruct navigation tree from cached groups
+            // Reconstruct navigation tree from cached groups (CSV parsing)
             val groups = entities.map { entity ->
-                val type = object : TypeToken<List<String>>() {}.type
-                val categoryIds: List<String> = gson.fromJson(entity.categoryIdsJson, type)
+                val categoryIds: List<String> = entity.categoryIdsCsv.split(",")
                 val groupCategories = allCategories.filter { it.categoryId in categoryIds }
                 CategoryGrouper.GroupNode(entity.groupName, groupCategories)
             }
