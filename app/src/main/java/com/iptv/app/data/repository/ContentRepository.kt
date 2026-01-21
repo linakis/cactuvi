@@ -68,11 +68,13 @@ class ContentRepository(
     suspend fun getLiveStreams(forceRefresh: Boolean = false): Result<List<LiveChannel>> = 
         withContext(Dispatchers.IO) {
             try {
-                // Check cache first
-                val cachedChannels = database.liveChannelDao().getAll()
+                // Fast metadata-based cache validation
+                val metadata = database.cacheMetadataDao().get("live")
+                val isCacheValidMetadata = !forceRefresh && metadata != null && 
+                    isCacheValid(metadata.lastUpdated, CACHE_TTL_LIVE)
                 
-                if (!forceRefresh && cachedChannels.isNotEmpty() && 
-                    isCacheValid(cachedChannels.first().lastUpdated, CACHE_TTL_LIVE)) {
+                if (isCacheValidMetadata) {
+                    val cachedChannels = database.liveChannelDao().getAll()
                     return@withContext Result.success(cachedChannels.map { it.toModel() })
                 }
                 
@@ -92,6 +94,15 @@ class ContentRepository(
                     channel.toEntity(categoryName)
                 }
                 database.liveChannelDao().insertAll(entities)
+                
+                // Update cache metadata
+                val newMetadata = CacheMetadataEntity(
+                    contentType = "live",
+                    lastUpdated = System.currentTimeMillis(),
+                    itemCount = channels.size,
+                    categoryCount = categories.size
+                )
+                database.cacheMetadataDao().insert(newMetadata)
                 
                 Result.success(channels)
             } catch (e: Exception) {
@@ -295,10 +306,13 @@ class ContentRepository(
     suspend fun getSeries(forceRefresh: Boolean = false): Result<List<Series>> = 
         withContext(Dispatchers.IO) {
             try {
-                val cached = database.seriesDao().getAll()
+                // Fast metadata-based cache validation
+                val metadata = database.cacheMetadataDao().get("series")
+                val isCacheValidMetadata = !forceRefresh && metadata != null && 
+                    isCacheValid(metadata.lastUpdated, CACHE_TTL_SERIES)
                 
-                if (!forceRefresh && cached.isNotEmpty() &&
-                    isCacheValid(cached.first().lastUpdated, CACHE_TTL_SERIES)) {
+                if (isCacheValidMetadata) {
+                    val cached = database.seriesDao().getAll()
                     return@withContext Result.success(cached.map { it.toModel() })
                 }
                 
@@ -315,6 +329,15 @@ class ContentRepository(
                     s.toEntity(categoryName)
                 }
                 database.seriesDao().insertAll(entities)
+                
+                // Update cache metadata
+                val newMetadata = CacheMetadataEntity(
+                    contentType = "series",
+                    lastUpdated = System.currentTimeMillis(),
+                    itemCount = series.size,
+                    categoryCount = categories.size
+                )
+                database.cacheMetadataDao().insert(newMetadata)
                 
                 Result.success(series)
             } catch (e: Exception) {
