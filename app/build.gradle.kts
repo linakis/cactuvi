@@ -92,6 +92,9 @@ dependencies {
     // Paging 3 for efficient data loading
     implementation("androidx.paging:paging-runtime-ktx:3.2.1")
     
+    // WorkManager for background sync
+    implementation("androidx.work:work-runtime-ktx:2.9.0")
+    
     // Android TV Leanback
     implementation("androidx.leanback:leanback:1.0.0")
     
