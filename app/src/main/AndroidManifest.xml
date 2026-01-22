@@ -33,8 +33,9 @@
         android:usesCleartextTraffic="true"
         tools:targetApi="31">
 
+        <!-- LoadingActivity - First launch handler -->
         <activity
-            android:name=".MainActivity"
+            android:name=".ui.LoadingActivity"
             android:exported="true"
             android:theme="@style/Theme.IPTVPlayer">
             <intent-filter>
@@ -42,6 +43,12 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- MainActivity - Routing activity -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="false"
+            android:theme="@style/Theme.IPTVPlayer" />
 
         <activity
             android:name=".ui.playlist.AddPlaylistActivity"

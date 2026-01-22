@@ -1,7 +1,9 @@
 package com.iptv.app
 
 import android.app.Application
+import com.iptv.app.data.db.AppDatabase
 import com.iptv.app.data.repository.ContentRepository
+import com.iptv.app.services.BackgroundSyncWorker
 import com.iptv.app.utils.CredentialsManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -15,44 +17,34 @@ class IPTVApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         
-        // Warm up navigation tree caches in background
+        // Schedule background sync (periodic work)
+        BackgroundSyncWorker.schedule(this)
+        
+        // Trigger immediate sync if cache exists (stale-while-revalidate pattern)
         applicationScope.launch {
-            warmupCaches()
+            triggerInitialSync()
         }
     }
     
-    private suspend fun warmupCaches() {
+    /**
+     * Trigger immediate background sync if cache exists.
+     * For first launch (no cache), LoadingActivity handles initial data fetch.
+     */
+    private suspend fun triggerInitialSync() {
         try {
-            val repository = ContentRepository(
-                CredentialsManager.getInstance(this),
-                this
-            )
+            val database = AppDatabase.getInstance(this)
             
-            // Check each content type
-            listOf("live", "vod", "series").forEach { type ->
-                try {
-                    val cachedTree = when (type) {
-                        "live" -> repository.getCachedLiveNavigationTree()
-                        "vod" -> repository.getCachedVodNavigationTree()
-                        "series" -> repository.getCachedSeriesNavigationTree()
-                        else -> null
-                    }
-                    
-                    // If cache empty or expired, refresh categories
-                    // This will auto-cache the navigation tree
-                    if (cachedTree == null) {
-                        when (type) {
-                            "live" -> repository.getLiveCategories(forceRefresh = true)
-                            "vod" -> repository.getMovieCategories(forceRefresh = true)
-                            "series" -> repository.getSeriesCategories(forceRefresh = true)
-                        }
-                    }
-                } catch (e: Exception) {
-                    // Silently fail - user will load on demand
-                }
+            // Check if any cache exists
+            val hasMovies = database.cacheMetadataDao().get("movies")?.itemCount ?: 0 > 0
+            val hasSeries = database.cacheMetadataDao().get("series")?.itemCount ?: 0 > 0
+            val hasLive = database.cacheMetadataDao().get("live")?.itemCount ?: 0 > 0
+            
+            // If cache exists, trigger immediate one-time sync (background refresh)
+            if (hasMovies || hasSeries || hasLive) {
+                BackgroundSyncWorker.syncNow(this)
             }
         } catch (e: Exception) {
-            // Silently fail - user will load on demand
+            // Silently fail - periodic sync will retry
         }
     }
 }
