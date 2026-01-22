@@ -369,6 +369,191 @@ fun shouldReturnCachedMoviesWhenCacheIsValid() { ... }
 - **Glide:** 4.16.0
 - **Coroutines:** 1.7.3
 
+## Mobile Testing with Mobile-MCP
+
+This project uses Mobile-MCP for automated mobile app testing via OpenCode.
+
+### Prerequisites
+- **Android Emulator:** `Medium_Phone` (available via `emulator -list-avds`)
+- **Node.js:** v20+ (already installed)
+- **Android SDK:** With Platform Tools at `/Users/nlinakis/Library/Android/sdk`
+- **Package Name:** `com.iptv.app`
+
+### Emulator Management
+
+**Option 1: Auto-start via Mobile-MCP (Recommended)**
+```
+Start the Medium_Phone emulator
+```
+Mobile-MCP will start the emulator automatically.
+
+**Option 2: Manual start**
+```bash
+emulator -avd Medium_Phone &
+adb wait-for-device
+adb devices  # Verify connection
+```
+
+### Available Mobile-MCP Tools (20+ Tools)
+
+#### Device Management
+- `mobile_list_available_devices` - List all iOS/Android devices
+- `mobile_get_screen_size` - Get device dimensions
+- `mobile_get_orientation` - Get portrait/landscape state
+- `mobile_set_orientation` - Change orientation
+
+#### App Management
+- `mobile_list_apps` - List installed apps
+- `mobile_launch_app` - Launch app by package name
+- `mobile_terminate_app` - Stop running app
+- `mobile_install_app` - Install APK/IPA
+- `mobile_uninstall_app` - Remove app
+
+#### Screen Interaction
+- `mobile_take_screenshot` - Capture screen
+- `mobile_save_screenshot` - Save screenshot to file
+- `mobile_list_elements_on_screen` - Get accessibility tree
+- `mobile_click_on_screen_at_coordinates` - Tap coordinates
+- `mobile_double_tap_on_screen` - Double-tap
+- `mobile_long_press_on_screen_at_coordinates` - Long press
+- `mobile_swipe_on_screen` - Swipe gestures
+
+#### Input & Navigation
+- `mobile_type_keys` - Type text with optional submit
+- `mobile_press_button` - Hardware keys (BACK, HOME, VOLUME, DPAD, etc.)
+- `mobile_open_url` - Open URLs in browser
+
+### Common Testing Patterns
+
+#### Basic Navigation Flow
+```
+Test Movies navigation:
+1. Launch com.iptv.app
+2. Wait 2 seconds for home screen
+3. List all elements on screen
+4. Click on Movies section
+5. Verify Movies screen loaded
+```
+
+#### D-Pad Navigation (Critical for TV)
+```
+Test D-pad navigation in Movies:
+1. Launch com.iptv.app
+2. Navigate to Movies section
+3. Press DPAD_DOWN 3 times
+4. Take screenshot to verify focus moved
+5. Press DPAD_RIGHT
+6. Press DPAD_CENTER to select
+7. Verify detail screen opened
+8. Press BACK to return
+```
+
+#### Fragment Back-Stack Testing
+```
+Test navigation back-stack:
+1. Navigate: Movies → Group → Category → Content
+2. Take screenshot at each level
+3. Press BACK button
+4. Verify at Category level
+5. Press BACK again
+6. Verify at Group level
+```
+
+#### Player Integration Test
+```
+Test video player:
+1. Launch app
+2. Navigate to Live TV
+3. Click first channel
+4. Wait 3 seconds for player initialization
+5. Take screenshot to verify player controls
+6. Press BACK to exit
+7. Verify app didn't crash
+```
+
+#### Accessibility Tree Analysis
+```
+Analyze accessibility for Movies screen:
+1. Launch com.iptv.app
+2. Navigate to Movies
+3. List all elements with accessibility properties
+4. Verify all interactive elements are focusable
+5. Check content descriptions exist for images
+6. Verify logical focus order
+```
+
+### Installation & Build Commands
+
+**Build Debug APK:**
+```bash
+cd /Users/nlinakis/Development/iptv/iptv-app
+./gradlew assembleDebug
+```
+
+**Install via ADB:**
+```bash
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+```
+
+**Install via Mobile-MCP:**
+```
+Install the APK at app/build/outputs/apk/debug/app-debug.apk
+```
+
+### TV D-Pad Button References
+
+Hardware keys for D-pad testing:
+- `DPAD_UP`, `DPAD_DOWN`, `DPAD_LEFT`, `DPAD_RIGHT` - Navigation
+- `DPAD_CENTER` or `ENTER` - Select/confirm
+- `BACK` - Navigate back
+- `HOME` - Go to Android home
+- `MENU` - Open menu
+- `VOLUME_UP`, `VOLUME_DOWN` - Volume control
+
+### Navigation Tree Structure
+The app uses a hierarchical navigation pattern:
+```
+Home → Movies → Groups → Categories → Content → Movie Detail
+     → Series → Groups → Categories → Content → Series Detail → Episodes
+     → Live TV → Categories → Channels → Player
+     → My List → Content
+```
+
+Always verify back-stack works correctly at each level.
+
+### Troubleshooting
+
+**Emulator not starting:**
+```bash
+# Check available emulators
+emulator -list-avds
+
+# Start manually
+emulator -avd Medium_Phone &
+```
+
+**ADB connection issues:**
+```bash
+# Restart ADB server
+adb kill-server
+adb start-server
+adb devices
+```
+
+**App not launching:**
+```bash
+# Verify app is installed
+adb shell pm list packages | grep com.iptv.app
+
+# Check logcat for errors
+adb logcat | grep "com.iptv.app"
+```
+
+**Mobile-MCP not responding:**
+- Restart OpenCode
+- Check `~/.opencode` logs
+- Verify `npx @mobilenext/mobile-mcp@latest` works standalone
+
 ## Landing the Plane (Session Completion)
 
 **When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.
