@@ -42,6 +42,9 @@ class PreferencesManager private constructor(context: Context) {
         private const val KEY_LIVE_HIDDEN_GROUPS = "live_hidden_groups"
         private const val KEY_LIVE_HIDDEN_CATEGORIES = "live_hidden_categories"
         
+        // VPN warning key
+        private const val KEY_VPN_WARNING_ENABLED = "vpn_warning_enabled"
+        
         @Volatile
         private var instance: PreferencesManager? = null
         
@@ -401,6 +404,23 @@ class PreferencesManager private constructor(context: Context) {
             ContentFilterSettings.ContentType.SERIES -> setSeriesHiddenCategories(categories)
             ContentFilterSettings.ContentType.LIVE_TV -> setLiveHiddenCategories(categories)
         }
+    }
+    
+    // ========== VPN WARNING ==========
+    
+    /**
+     * Check if VPN warning is enabled (default: true).
+     * When enabled, app will warn user if VPN is not connected.
+     */
+    fun isVpnWarningEnabled(): Boolean {
+        return prefs.getBoolean(KEY_VPN_WARNING_ENABLED, true)
+    }
+    
+    /**
+     * Enable or disable VPN warning.
+     */
+    fun setVpnWarningEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_VPN_WARNING_ENABLED, enabled).apply()
     }
 }
 
