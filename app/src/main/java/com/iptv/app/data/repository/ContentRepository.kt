@@ -14,16 +14,23 @@ import com.iptv.app.data.db.entities.*
 import com.iptv.app.data.db.mappers.*
 import com.iptv.app.data.models.*
 import com.iptv.app.utils.CategoryGrouper
+import com.iptv.app.utils.PreferencesManager
 import com.iptv.app.utils.SourceManager
 import com.iptv.app.utils.PerformanceLogger
+import com.iptv.app.utils.VPNDetector
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map as flowMap
 import kotlinx.coroutines.withContext
 
+/**
+ * Exception thrown when VPN is required but not active.
+ */
+class VpnRequiredException : Exception("VPN connection required but not active")
+
 class ContentRepository(
     private val sourceManager: SourceManager,
-    context: Context
+    private val context: Context
 ) {
     
     private var apiService: XtreamApiService? = null
@@ -68,10 +75,22 @@ class ContentRepository(
         return (System.currentTimeMillis() - lastUpdated) < ttl
     }
     
+    /**
+     * Check if VPN is required and active. Throws VpnRequiredException if required but not active.
+     * This blocks all API calls when VPN warning is enabled and VPN is not connected.
+     */
+    private suspend fun checkVpnRequirement() {
+        val prefsManager = PreferencesManager.getInstance(context)
+        if (prefsManager.isVpnWarningEnabled() && !VPNDetector.isVpnActive(context)) {
+            throw VpnRequiredException()
+        }
+    }
+    
     // ========== AUTHENTICATION ==========
     
     suspend fun authenticate(): Result<LoginResponse> = withContext(Dispatchers.IO) {
         try {
+            checkVpnRequirement()
             val (username, password, _) = getCredentials()
             val response = getApiService().authenticate(username, password)
             Result.success(response)
@@ -99,6 +118,9 @@ class ContentRepository(
                         }
                     }
                 }
+                
+                // Check VPN requirement before API call
+                checkVpnRequirement()
                 
                 // Fetch from API
                 val (username, password, sourceId) = getCredentials()
@@ -146,6 +168,9 @@ class ContentRepository(
                     isCacheValid(cached.first().lastUpdated, CACHE_TTL_CATEGORIES)) {
                     return@withContext Result.success(cached.map { it.toModel() })
                 }
+                
+                // Check VPN requirement before API call
+                checkVpnRequirement()
                 
                 val (username, password, sourceId) = getCredentials()
                 val categories = getApiService().getLiveCategories(username, password)
@@ -202,6 +227,10 @@ class ContentRepository(
                 // Cache miss - fetch from API
                 PerformanceLogger.logCacheMiss("movies", "getMovies", if (forceRefresh) "forceRefresh" else "expired/empty")
                 PerformanceLogger.logPhase("getMovies", "Fetching from API")
+                
+                // Check VPN requirement before API call
+                checkVpnRequirement()
+                
                 val apiStart = PerformanceLogger.start("API fetch")
                 val (username, password, sourceId) = getCredentials()
                 val movies = getApiService().getVodStreams(username, password)
@@ -273,6 +302,10 @@ class ContentRepository(
                 // Cache miss - fetch from API
                 PerformanceLogger.logCacheMiss("movies", "categories", if (forceRefresh) "forceRefresh" else "expired/empty")
                 PerformanceLogger.logPhase("getMovieCategories", "Fetching from API")
+                
+                // Check VPN requirement before API call
+                checkVpnRequirement()
+                
                 val apiStart = PerformanceLogger.start("API fetch")
                 val (username, password, sourceId) = getCredentials()
                 val categories = getApiService().getVodCategories(username, password)
@@ -312,6 +345,7 @@ class ContentRepository(
     
     suspend fun getMovieInfo(vodId: Int): Result<MovieInfo> = withContext(Dispatchers.IO) {
         try {
+            checkVpnRequirement()
             val (username, password, _) = getCredentials()
             val info = getApiService().getVodInfo(username, password, vodId = vodId)
             Result.success(info)
@@ -339,6 +373,9 @@ class ContentRepository(
                         }
                     }
                 }
+                
+                // Check VPN requirement before API call
+                checkVpnRequirement()
                 
                 val (username, password, sourceId) = getCredentials()
                 val series = getApiService().getSeries(username, password)
@@ -383,6 +420,9 @@ class ContentRepository(
                     return@withContext Result.success(cached.map { it.toModel() })
                 }
                 
+                // Check VPN requirement before API call
+                checkVpnRequirement()
+                
                 val (username, password, sourceId) = getCredentials()
                 val categories = getApiService().getSeriesCategories(username, password)
                 
@@ -405,6 +445,7 @@ class ContentRepository(
     
     suspend fun getSeriesInfo(seriesId: Int): Result<SeriesInfo> = withContext(Dispatchers.IO) {
         try {
+            checkVpnRequirement()
             val (username, password, _) = getCredentials()
             val info = getApiService().getSeriesInfo(username, password, seriesId = seriesId)
             Result.success(info)
