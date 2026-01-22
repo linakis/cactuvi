@@ -15,6 +15,7 @@ import com.iptv.app.data.repository.ContentRepository
 import com.iptv.app.services.BackgroundSyncWorker
 import com.iptv.app.ui.common.ModernToolbar
 import com.iptv.app.utils.CredentialsManager
+import com.iptv.app.utils.PreferencesManager
 import com.iptv.app.utils.SourceManager
 import com.iptv.app.utils.SyncPreferencesManager
 import kotlinx.coroutines.launch
@@ -25,11 +26,13 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var modernToolbar: ModernToolbar
     private lateinit var repository: ContentRepository
     private lateinit var syncPrefs: SyncPreferencesManager
+    private lateinit var prefsManager: PreferencesManager
     
     private lateinit var lastSyncText: TextView
     private lateinit var syncEnabledSwitch: SwitchMaterial
     private lateinit var wifiOnlySwitch: SwitchMaterial
     private lateinit var syncIntervalGroup: RadioGroup
+    private lateinit var vpnWarningSwitch: SwitchMaterial
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -40,8 +43,10 @@ class SettingsActivity : AppCompatActivity() {
             this
         )
         syncPrefs = SyncPreferencesManager.getInstance(this)
+        prefsManager = PreferencesManager.getInstance(this)
         
         setupToolbar()
+        setupVpnSettings()
         setupSyncSettings()
         setupClickListeners()
     }
@@ -49,6 +54,23 @@ class SettingsActivity : AppCompatActivity() {
     private fun setupToolbar() {
         modernToolbar = findViewById(R.id.modernToolbar)
         modernToolbar.onBackClick = { finish() }
+    }
+    
+    private fun setupVpnSettings() {
+        vpnWarningSwitch = findViewById(R.id.vpnWarningSwitch)
+        
+        // Load current setting
+        vpnWarningSwitch.isChecked = prefsManager.isVpnWarningEnabled()
+        
+        // Setup listener
+        vpnWarningSwitch.setOnCheckedChangeListener { _, isChecked ->
+            prefsManager.setVpnWarningEnabled(isChecked)
+            Toast.makeText(
+                this,
+                if (isChecked) "VPN warning enabled" else "VPN warning disabled",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
     }
     
     private fun setupClickListeners() {
