@@ -21,10 +21,10 @@ class IPTVApplication : Application() {
         /**
          * Flag indicating whether VPN warning needs to be shown.
          * Activities can check this flag and show VPNWarningDialog.
+         * Activities should reset this to false after showing the dialog.
          */
         @Volatile
         var needsVpnWarning: Boolean = false
-            private set
     }
     
     override fun onCreate() {
