@@ -5,6 +5,7 @@ import com.iptv.app.data.db.AppDatabase
 import com.iptv.app.data.repository.ContentRepository
 import com.iptv.app.utils.CategoryGrouper.NavigationTree
 import com.iptv.app.utils.CredentialsManager
+import com.iptv.app.utils.SourceManager
 import com.iptv.app.utils.SyncPreferencesManager
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -25,7 +26,7 @@ import kotlinx.coroutines.coroutineScope
 class SyncCoordinator(context: Context) {
     
     private val repository = ContentRepository(
-        CredentialsManager.getInstance(context),
+        SourceManager.getInstance(context),
         context
     )
     private val database = AppDatabase.getInstance(context)

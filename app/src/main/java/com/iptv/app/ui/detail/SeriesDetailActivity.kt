@@ -25,6 +25,7 @@ import com.iptv.app.data.repository.ContentRepository
 import com.iptv.app.data.repository.DownloadRepository
 import com.iptv.app.ui.player.PlayerActivity
 import com.iptv.app.utils.CredentialsManager
+import com.iptv.app.utils.SourceManager
 import com.iptv.app.utils.StreamUrlBuilder
 import kotlinx.coroutines.launch
 
@@ -62,7 +63,7 @@ class SeriesDetailActivity : AppCompatActivity() {
         
         // Initialize repositories
         credentialsManager = CredentialsManager.getInstance(this)
-        repository = ContentRepository(credentialsManager, this)
+        repository = ContentRepository(SourceManager.getInstance(this), this)
         downloadRepository = DownloadRepository(this)
         
         // Get data from intent

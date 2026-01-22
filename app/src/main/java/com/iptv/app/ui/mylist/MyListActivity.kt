@@ -13,6 +13,7 @@ import com.iptv.app.R
 import com.iptv.app.data.repository.ContentRepository
 import com.iptv.app.ui.common.ModernToolbar
 import com.iptv.app.utils.CredentialsManager
+import com.iptv.app.utils.SourceManager
 import kotlinx.coroutines.launch
 
 class MyListActivity : AppCompatActivity() {
@@ -29,7 +30,7 @@ class MyListActivity : AppCompatActivity() {
         setContentView(R.layout.activity_my_list)
         
         repository = ContentRepository(
-            CredentialsManager.getInstance(this),
+            SourceManager.getInstance(this),
             this
         )
         

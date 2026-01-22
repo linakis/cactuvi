@@ -33,6 +33,7 @@ import com.iptv.app.utils.CategoryGrouper
 import com.iptv.app.utils.CategoryGrouper.GroupNode
 import com.iptv.app.utils.CategoryGrouper.NavigationTree
 import com.iptv.app.utils.CredentialsManager
+import com.iptv.app.utils.SourceManager
 import com.iptv.app.utils.IdleDetectionHelper
 import com.iptv.app.utils.PreferencesManager
 import com.iptv.app.utils.StreamUrlBuilder
@@ -95,7 +96,7 @@ class LiveTvFragment : Fragment() {
         breadcrumbChips = view.findViewById(R.id.breadcrumbChips)
         
         repository = ContentRepository(
-            CredentialsManager.getInstance(requireContext()),
+            SourceManager.getInstance(requireContext()),
             requireContext()
         )
         
@@ -372,12 +373,12 @@ class LiveTvFragment : Fragment() {
     }
     
     private fun playChannel(channel: LiveChannel) {
-        val credentials = CredentialsManager.getInstance(requireContext()).getCredentials() ?: return
+        val credentials = CredentialsManager.getInstance(requireContext()) ?: return
         
         val streamUrl = StreamUrlBuilder.buildLiveUrl(
-            server = credentials.server,
-            username = credentials.username,
-            password = credentials.password,
+            server = credentials.getServer(),
+            username = credentials.getUsername(),
+            password = credentials.getPassword(),
             streamId = channel.streamId
         )
         

@@ -13,6 +13,7 @@ import com.iptv.app.R
 import com.iptv.app.data.db.AppDatabase
 import com.iptv.app.data.repository.ContentRepository
 import com.iptv.app.utils.CredentialsManager
+import com.iptv.app.utils.SourceManager
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 
@@ -79,7 +80,7 @@ class LoadingActivity : AppCompatActivity() {
     private suspend fun fetchInitialData() {
         try {
             val repository = ContentRepository(
-                CredentialsManager.getInstance(this),
+                SourceManager.getInstance(this),
                 this
             )
             

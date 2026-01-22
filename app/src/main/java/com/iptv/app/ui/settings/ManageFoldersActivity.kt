@@ -23,6 +23,7 @@ import com.iptv.app.ui.common.HierarchicalItemHelper
 import com.iptv.app.ui.common.ModernToolbar
 import com.iptv.app.utils.CategoryGrouper
 import com.iptv.app.utils.CredentialsManager
+import com.iptv.app.utils.SourceManager
 import com.iptv.app.utils.PreferencesManager
 import kotlinx.coroutines.launch
 
@@ -56,7 +57,7 @@ class ManageFoldersActivity : AppCompatActivity() {
         contentType = ContentFilterSettings.ContentType.valueOf(contentTypeString)
         
         repository = ContentRepository(
-            CredentialsManager.getInstance(this),
+            SourceManager.getInstance(this),
             this
         )
         preferencesManager = PreferencesManager.getInstance(this)

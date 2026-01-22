@@ -24,6 +24,7 @@ import com.iptv.app.ui.detail.MovieDetailActivity
 import com.iptv.app.ui.detail.SeriesDetailActivity
 import com.iptv.app.ui.player.PlayerActivity
 import com.iptv.app.utils.CredentialsManager
+import com.iptv.app.utils.SourceManager
 import com.iptv.app.utils.StreamUrlBuilder
 import kotlinx.coroutines.launch
 
@@ -51,7 +52,7 @@ class MyListFragment : Fragment() {
         super.onCreate(savedInstanceState)
         contentType = arguments?.getString(ARG_CONTENT_TYPE)
         repository = ContentRepository(
-            CredentialsManager.getInstance(requireContext()),
+            SourceManager.getInstance(requireContext()),
             requireContext()
         )
     }
@@ -212,16 +213,16 @@ class MyListFragment : Fragment() {
     }
     
     private fun playLiveChannel(channel: LiveChannel) {
-        val credentials = CredentialsManager.getInstance(requireContext()).getCredentials()
+        val credentials = CredentialsManager.getInstance(requireContext())
         if (credentials == null) {
             Toast.makeText(requireContext(), "No credentials found", Toast.LENGTH_SHORT).show()
             return
         }
         
         val streamUrl = StreamUrlBuilder.buildLiveUrl(
-            server = credentials.server,
-            username = credentials.username,
-            password = credentials.password,
+            server = credentials.getServer(),
+            username = credentials.getUsername(),
+            password = credentials.getPassword(),
             streamId = channel.streamId,
             extension = "ts"
         )

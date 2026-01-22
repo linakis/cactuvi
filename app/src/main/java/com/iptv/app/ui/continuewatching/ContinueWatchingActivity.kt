@@ -14,6 +14,7 @@ import com.iptv.app.data.repository.ContentRepository
 import com.iptv.app.ui.common.ModernToolbar
 import com.iptv.app.ui.player.PlayerActivity
 import com.iptv.app.utils.CredentialsManager
+import com.iptv.app.utils.SourceManager
 import com.iptv.app.utils.StreamUrlBuilder
 import kotlinx.coroutines.launch
 
@@ -31,7 +32,7 @@ class ContinueWatchingActivity : AppCompatActivity() {
         setContentView(R.layout.activity_continue_watching)
         
         repository = ContentRepository(
-            CredentialsManager.getInstance(this),
+            SourceManager.getInstance(this),
             this
         )
         
@@ -90,7 +91,7 @@ class ContinueWatchingActivity : AppCompatActivity() {
     }
     
     private fun resumePlayback(item: com.iptv.app.data.db.entities.WatchHistoryEntity) {
-        val credentials = CredentialsManager.getInstance(this).getCredentials()
+        val credentials = CredentialsManager.getInstance(this)
         if (credentials == null) {
             Toast.makeText(this, "No credentials found", Toast.LENGTH_SHORT).show()
             return
@@ -102,9 +103,9 @@ class ContinueWatchingActivity : AppCompatActivity() {
                 // Try to parse from contentId or default to mp4
                 val streamId = item.contentId.toIntOrNull() ?: return
                 StreamUrlBuilder.buildMovieUrl(
-                    server = credentials.server,
-                    username = credentials.username,
-                    password = credentials.password,
+                    server = credentials.getServer(),
+                    username = credentials.getUsername(),
+                    password = credentials.getPassword(),
                     streamId = streamId,
                     extension = "mp4" // Default extension
                 )
@@ -112,9 +113,9 @@ class ContinueWatchingActivity : AppCompatActivity() {
             "series" -> {
                 // For series episodes, the contentId is the episode ID
                 StreamUrlBuilder.buildSeriesUrl(
-                    server = credentials.server,
-                    username = credentials.username,
-                    password = credentials.password,
+                    server = credentials.getServer(),
+                    username = credentials.getUsername(),
+                    password = credentials.getPassword(),
                     episodeId = item.contentId,
                     extension = "mp4" // Default extension
                 )
@@ -122,9 +123,9 @@ class ContinueWatchingActivity : AppCompatActivity() {
             "live_channel" -> {
                 val streamId = item.contentId.toIntOrNull() ?: return
                 StreamUrlBuilder.buildLiveUrl(
-                    server = credentials.server,
-                    username = credentials.username,
-                    password = credentials.password,
+                    server = credentials.getServer(),
+                    username = credentials.getUsername(),
+                    password = credentials.getPassword(),
                     streamId = streamId,
                     extension = "ts"
                 )

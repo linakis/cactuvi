@@ -14,7 +14,7 @@ import com.iptv.app.data.db.entities.*
 import com.iptv.app.data.db.mappers.*
 import com.iptv.app.data.models.*
 import com.iptv.app.utils.CategoryGrouper
-import com.iptv.app.utils.CredentialsManager
+import com.iptv.app.utils.SourceManager
 import com.iptv.app.utils.PerformanceLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -22,13 +22,14 @@ import kotlinx.coroutines.flow.map as flowMap
 import kotlinx.coroutines.withContext
 
 class ContentRepository(
-    private val credentialsManager: CredentialsManager,
+    private val sourceManager: SourceManager,
     context: Context
 ) {
     
     private var apiService: XtreamApiService? = null
     private val database = AppDatabase.getInstance(context)
     private val gson = Gson()
+    private var currentSourceId: String? = null
     
     companion object {
         // Cache Time-To-Live (TTL) in milliseconds
@@ -37,12 +38,30 @@ class ContentRepository(
         private const val CACHE_TTL_CATEGORIES = 7 * 24 * 60 * 60 * 1000L  // 7 days
     }
     
-    private fun getApiService(): XtreamApiService {
-        if (apiService == null) {
-            val server = credentialsManager.getServer()
-            apiService = ApiClient.createService(server)
+    private suspend fun getApiService(): XtreamApiService {
+        val activeSource = sourceManager.getActiveSource()
+        
+        // Recreate service if source changed or doesn't exist
+        if (apiService == null || currentSourceId != activeSource?.id) {
+            if (activeSource != null) {
+                apiService = ApiClient.createService(activeSource.server)
+                currentSourceId = activeSource.id
+            } else {
+                throw IllegalStateException("No active source configured")
+            }
         }
         return apiService!!
+    }
+    
+    private suspend fun getActiveSourceId(): String {
+        return sourceManager.getActiveSource()?.id 
+            ?: throw IllegalStateException("No active source configured")
+    }
+    
+    private suspend fun getCredentials(): Triple<String, String, String> {
+        val source = sourceManager.getActiveSource()
+            ?: throw IllegalStateException("No active source configured")
+        return Triple(source.username, source.password, source.id)
     }
     
     private fun isCacheValid(lastUpdated: Long, ttl: Long): Boolean {
@@ -53,8 +72,7 @@ class ContentRepository(
     
     suspend fun authenticate(): Result<LoginResponse> = withContext(Dispatchers.IO) {
         try {
-            val username = credentialsManager.getUsername()
-            val password = credentialsManager.getPassword()
+            val (username, password, _) = getCredentials()
             val response = getApiService().authenticate(username, password)
             Result.success(response)
         } catch (e: Exception) {
@@ -83,8 +101,7 @@ class ContentRepository(
                 }
                 
                 // Fetch from API
-                val username = credentialsManager.getUsername()
-                val password = credentialsManager.getPassword()
+                val (username, password, sourceId) = getCredentials()
                 val channels = getApiService().getLiveStreams(username, password)
                 
                 // Get categories for names
@@ -95,7 +112,7 @@ class ContentRepository(
                 val entities = channels.map { channel ->
                     val categoryName = categoryMap[channel.categoryId]?.categoryName ?: ""
                     channel.categoryName = categoryName
-                    channel.toEntity("default", categoryName) // TODO: Replace with active source ID
+                    channel.toEntity(sourceId, categoryName)
                 }
                 database.liveChannelDao().insertAll(entities)
                 
@@ -130,11 +147,10 @@ class ContentRepository(
                     return@withContext Result.success(cached.map { it.toModel() })
                 }
                 
-                val username = credentialsManager.getUsername()
-                val password = credentialsManager.getPassword()
+                val (username, password, sourceId) = getCredentials()
                 val categories = getApiService().getLiveCategories(username, password)
                 
-                val entities = categories.map { it.toEntity("default", "live") } // TODO: Replace with active source ID
+                val entities = categories.map { it.toEntity(sourceId, "live") }
                 database.categoryDao().insertAll(entities)
                 
                 // Cache navigation tree
@@ -187,8 +203,7 @@ class ContentRepository(
                 PerformanceLogger.logCacheMiss("movies", "getMovies", if (forceRefresh) "forceRefresh" else "expired/empty")
                 PerformanceLogger.logPhase("getMovies", "Fetching from API")
                 val apiStart = PerformanceLogger.start("API fetch")
-                val username = credentialsManager.getUsername()
-                val password = credentialsManager.getPassword()
+                val (username, password, sourceId) = getCredentials()
                 val movies = getApiService().getVodStreams(username, password)
                 PerformanceLogger.end("API fetch", apiStart, "count=${movies.size}")
                 
@@ -201,7 +216,7 @@ class ContentRepository(
                 val entities = movies.map { movie ->
                     val categoryName = categoryMap[movie.categoryId]?.categoryName ?: ""
                     movie.categoryName = categoryName
-                    movie.toEntity("default", categoryName) // TODO: Replace with active source ID
+                    movie.toEntity(sourceId, categoryName)
                 }
                 database.movieDao().insertAll(entities)
                 PerformanceLogger.end("DB insert", dbInsertStart, "inserted=${entities.size}")
@@ -259,15 +274,14 @@ class ContentRepository(
                 PerformanceLogger.logCacheMiss("movies", "categories", if (forceRefresh) "forceRefresh" else "expired/empty")
                 PerformanceLogger.logPhase("getMovieCategories", "Fetching from API")
                 val apiStart = PerformanceLogger.start("API fetch")
-                val username = credentialsManager.getUsername()
-                val password = credentialsManager.getPassword()
+                val (username, password, sourceId) = getCredentials()
                 val categories = getApiService().getVodCategories(username, password)
                 PerformanceLogger.end("API fetch", apiStart, "count=${categories.size}")
                 
                 // Insert into database
                 PerformanceLogger.logPhase("getMovieCategories", "Inserting into DB")
                 val dbInsertStart = PerformanceLogger.start("DB insert")
-                val entities = categories.map { it.toEntity("default", "vod") } // TODO: Replace with active source ID
+                val entities = categories.map { it.toEntity(sourceId, "vod") }
                 database.categoryDao().insertAll(entities)
                 PerformanceLogger.end("DB insert", dbInsertStart, "inserted=${entities.size}")
                 
@@ -298,8 +312,7 @@ class ContentRepository(
     
     suspend fun getMovieInfo(vodId: Int): Result<MovieInfo> = withContext(Dispatchers.IO) {
         try {
-            val username = credentialsManager.getUsername()
-            val password = credentialsManager.getPassword()
+            val (username, password, _) = getCredentials()
             val info = getApiService().getVodInfo(username, password, vodId = vodId)
             Result.success(info)
         } catch (e: Exception) {
@@ -327,8 +340,7 @@ class ContentRepository(
                     }
                 }
                 
-                val username = credentialsManager.getUsername()
-                val password = credentialsManager.getPassword()
+                val (username, password, sourceId) = getCredentials()
                 val series = getApiService().getSeries(username, password)
                 
                 val categories = getSeriesCategories().getOrNull() ?: emptyList()
@@ -337,7 +349,7 @@ class ContentRepository(
                 val entities = series.map { s ->
                     val categoryName = categoryMap[s.categoryId]?.categoryName ?: ""
                     s.categoryName = categoryName
-                    s.toEntity("default", categoryName) // TODO: Replace with active source ID
+                    s.toEntity(sourceId, categoryName)
                 }
                 database.seriesDao().insertAll(entities)
                 
@@ -371,11 +383,10 @@ class ContentRepository(
                     return@withContext Result.success(cached.map { it.toModel() })
                 }
                 
-                val username = credentialsManager.getUsername()
-                val password = credentialsManager.getPassword()
+                val (username, password, sourceId) = getCredentials()
                 val categories = getApiService().getSeriesCategories(username, password)
                 
-                val entities = categories.map { it.toEntity("default", "series") } // TODO: Replace with active source ID
+                val entities = categories.map { it.toEntity(sourceId, "series") }
                 database.categoryDao().insertAll(entities)
                 
                 // Cache navigation tree
@@ -394,8 +405,7 @@ class ContentRepository(
     
     suspend fun getSeriesInfo(seriesId: Int): Result<SeriesInfo> = withContext(Dispatchers.IO) {
         try {
-            val username = credentialsManager.getUsername()
-            val password = credentialsManager.getPassword()
+            val (username, password, _) = getCredentials()
             val info = getApiService().getSeriesInfo(username, password, seriesId = seriesId)
             Result.success(info)
         } catch (e: Exception) {
@@ -628,10 +638,11 @@ class ContentRepository(
     
     private suspend fun cacheVodNavigationTree(categories: List<Category>, separator: String = "-") {
         val tree = CategoryGrouper.buildVodNavigationTree(categories)
+        val sourceId = getActiveSourceId()
         
         val entities = tree.groups.map { group ->
             NavigationGroupEntity(
-                sourceId = "default", // TODO: Replace with active source ID
+                sourceId = sourceId,
                 type = "vod",
                 groupName = group.name,
                 categoryIdsJson = gson.toJson(group.categories.map { it.categoryId }),
@@ -645,10 +656,11 @@ class ContentRepository(
     
     private suspend fun cacheSeriesNavigationTree(categories: List<Category>, separator: String = "FIRST_WORD") {
         val tree = CategoryGrouper.buildSeriesNavigationTree(categories)
+        val sourceId = getActiveSourceId()
         
         val entities = tree.groups.map { group ->
             NavigationGroupEntity(
-                sourceId = "default", // TODO: Replace with active source ID
+                sourceId = sourceId,
                 type = "series",
                 groupName = group.name,
                 categoryIdsJson = gson.toJson(group.categories.map { it.categoryId }),
@@ -662,10 +674,11 @@ class ContentRepository(
     
     private suspend fun cacheLiveNavigationTree(categories: List<Category>, separator: String = "|") {
         val tree = CategoryGrouper.buildLiveNavigationTree(categories)
+        val sourceId = getActiveSourceId()
         
         val entities = tree.groups.map { group ->
             NavigationGroupEntity(
-                sourceId = "default", // TODO: Replace with active source ID
+                sourceId = sourceId,
                 type = "live",
                 groupName = group.name,
                 categoryIdsJson = gson.toJson(group.categories.map { it.categoryId }),
@@ -815,6 +828,30 @@ class ContentRepository(
             database.seriesDao().clearAll()
             database.categoryDao().clearAll()
             invalidateAllNavigationTrees()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+    
+    /**
+     * Clear all cached data for a specific source
+     */
+    suspend fun clearSourceCache(sourceId: String): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            // Clear all content for this source
+            // TODO: Add sourceId-specific filters to DAOs
+            database.liveChannelDao().clearAll()
+            database.movieDao().clearAll()
+            database.seriesDao().clearAll()
+            database.categoryDao().clearAll()
+            database.navigationGroupDao().clear()
+            database.cacheMetadataDao().deleteAll()
+            
+            // Force recreate API service for new source
+            apiService = null
+            currentSourceId = null
+            
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)

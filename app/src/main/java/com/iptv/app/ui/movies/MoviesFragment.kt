@@ -34,6 +34,7 @@ import com.iptv.app.utils.CategoryGrouper
 import com.iptv.app.utils.CategoryGrouper.GroupNode
 import com.iptv.app.utils.CategoryGrouper.NavigationTree
 import com.iptv.app.utils.CredentialsManager
+import com.iptv.app.utils.SourceManager
 import com.iptv.app.utils.IdleDetectionHelper
 import com.iptv.app.utils.PerformanceLogger
 import com.iptv.app.utils.PreferencesManager
@@ -97,7 +98,7 @@ class MoviesFragment : Fragment() {
         breadcrumbChips = view.findViewById(R.id.breadcrumbChips)
         
         repository = ContentRepository(
-            CredentialsManager.getInstance(requireContext()),
+            SourceManager.getInstance(requireContext()),
             requireContext()
         )
         

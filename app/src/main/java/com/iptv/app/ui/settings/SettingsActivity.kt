@@ -15,6 +15,7 @@ import com.iptv.app.data.repository.ContentRepository
 import com.iptv.app.services.BackgroundSyncWorker
 import com.iptv.app.ui.common.ModernToolbar
 import com.iptv.app.utils.CredentialsManager
+import com.iptv.app.utils.SourceManager
 import com.iptv.app.utils.SyncPreferencesManager
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -35,7 +36,7 @@ class SettingsActivity : AppCompatActivity() {
         setContentView(R.layout.activity_settings)
         
         repository = ContentRepository(
-            CredentialsManager.getInstance(this),
+            SourceManager.getInstance(this),
             this
         )
         syncPrefs = SyncPreferencesManager.getInstance(this)

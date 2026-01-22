@@ -21,6 +21,7 @@ import com.iptv.app.ui.common.SeriesAdapter
 import com.iptv.app.ui.detail.MovieDetailActivity
 import com.iptv.app.ui.detail.SeriesDetailActivity
 import com.iptv.app.utils.CredentialsManager
+import com.iptv.app.utils.SourceManager
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -56,7 +57,7 @@ class SearchActivity : AppCompatActivity() {
         contentTypeFilter = intent.getStringExtra(EXTRA_CONTENT_TYPE) ?: TYPE_ALL
         
         repository = ContentRepository(
-            CredentialsManager.getInstance(this),
+            SourceManager.getInstance(this),
             this
         )
         
