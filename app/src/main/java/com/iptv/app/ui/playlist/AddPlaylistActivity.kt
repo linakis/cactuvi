@@ -10,10 +10,14 @@ import com.google.android.material.button.MaterialButton
 import com.google.android.material.textfield.TextInputEditText
 import com.iptv.app.R
 import com.iptv.app.data.api.ApiClient
+import com.iptv.app.data.models.StreamSource
 import com.iptv.app.ui.home.HomeActivity
 import com.iptv.app.utils.CredentialsManager
 import com.iptv.app.utils.SourceManager
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.util.UUID
 
 class AddPlaylistActivity : AppCompatActivity() {
     
@@ -26,14 +30,14 @@ class AddPlaylistActivity : AppCompatActivity() {
     private lateinit var progressBar: View
     private lateinit var statusText: android.widget.TextView
     
-    private lateinit var credentialsManager: CredentialsManager
+    private lateinit var sourceManager: SourceManager
     private var testSuccessful = false
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_add_playlist)
         
-        credentialsManager = CredentialsManager.getInstance(this)
+        sourceManager = SourceManager.getInstance(this)
         
         initViews()
         setupListeners()
@@ -66,10 +70,16 @@ class AddPlaylistActivity : AppCompatActivity() {
     }
     
     private fun loadExistingCredentials() {
-        if (credentialsManager.isConfigured()) {
-            serverInput.setText(credentialsManager.getServer())
-            usernameInput.setText(credentialsManager.getUsername())
-            passwordInput.setText(credentialsManager.getPassword())
+        lifecycleScope.launch {
+            val activeSource = withContext(Dispatchers.IO) {
+                sourceManager.getActiveSource()
+            }
+            
+            if (activeSource != null) {
+                serverInput.setText(activeSource.server)
+                usernameInput.setText(activeSource.username)
+                passwordInput.setText(activeSource.password)
+            }
         }
     }
     
@@ -140,15 +150,50 @@ class AddPlaylistActivity : AppCompatActivity() {
             server
         }.trimEnd('/')
         
-        credentialsManager.saveCredentials(formattedServer, username, password)
-        
-        Toast.makeText(this, "Credentials saved!", Toast.LENGTH_SHORT).show()
-        
-        // Navigate to home screen
-        val intent = Intent(this, HomeActivity::class.java)
-        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-        startActivity(intent)
-        finish()
+        lifecycleScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    // Check if any sources exist
+                    val existingSources = sourceManager.getAllSources()
+                    val isFirstSource = existingSources.isEmpty()
+                    
+                    // Create new source
+                    val newSource = StreamSource(
+                        id = UUID.randomUUID().toString(),
+                        nickname = "My IPTV",
+                        server = formattedServer,
+                        username = username,
+                        password = password,
+                        isActive = isFirstSource, // Auto-activate if first source
+                        isPrimary = isFirstSource,
+                        createdAt = System.currentTimeMillis(),
+                        lastUsed = if (isFirstSource) System.currentTimeMillis() else 0L
+                    )
+                    
+                    sourceManager.addSource(newSource)
+                    
+                    // Set as active if first source
+                    if (isFirstSource) {
+                        sourceManager.setActiveSource(newSource.id)
+                    }
+                }
+                
+                Toast.makeText(this@AddPlaylistActivity, "Credentials saved!", Toast.LENGTH_SHORT).show()
+                
+                // Navigate to LoadingActivity to fetch initial data
+                val intent = Intent(this@AddPlaylistActivity, com.iptv.app.ui.LoadingActivity::class.java)
+                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                startActivity(intent)
+                finish()
+                
+            } catch (e: Exception) {
+                Toast.makeText(
+                    this@AddPlaylistActivity,
+                    "Failed to save: ${e.message}",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
     }
     
     private fun showLoading(show: Boolean) {
