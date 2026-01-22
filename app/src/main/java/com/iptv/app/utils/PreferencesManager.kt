@@ -409,11 +409,11 @@ class PreferencesManager private constructor(context: Context) {
     // ========== VPN WARNING ==========
     
     /**
-     * Check if VPN warning is enabled (default: true).
+     * Check if VPN warning is enabled (default: false).
      * When enabled, app will warn user if VPN is not connected.
      */
     fun isVpnWarningEnabled(): Boolean {
-        return prefs.getBoolean(KEY_VPN_WARNING_ENABLED, true)
+        return prefs.getBoolean(KEY_VPN_WARNING_ENABLED, false)
     }
     
     /**
