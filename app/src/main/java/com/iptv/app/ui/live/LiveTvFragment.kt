@@ -124,6 +124,16 @@ class LiveTvFragment : Fragment() {
             }
             startActivity(intent)
         }
+        
+        // Observe active source and update title
+        lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                SourceManager.getInstance(requireContext()).getActiveSourceFlow().collectLatest { source ->
+                    val sourceName = source?.nickname ?: "No Source"
+                    modernToolbar.title = "Live TV • $sourceName"
+                }
+            }
+        }
     }
     
     private fun setupRecyclerView() {
@@ -316,18 +326,18 @@ class LiveTvFragment : Fragment() {
     private fun updateBreadcrumb() {
         when (currentLevel) {
             NavigationLevel.GROUPS -> {
-                modernToolbar.title = "Live TV"
+                // Title updated by active source flow observer
                 breadcrumbScroll.visibility = View.GONE
                 breadcrumbChips.removeAllViews()
             }
             NavigationLevel.CATEGORIES -> {
-                modernToolbar.title = "Live TV"
+                // Title updated by active source flow observer
                 breadcrumbScroll.visibility = View.VISIBLE
                 breadcrumbChips.removeAllViews()
                 addBreadcrumbChip(selectedGroup?.name ?: "")
             }
             NavigationLevel.CONTENT -> {
-                modernToolbar.title = "Live TV"
+                // Title updated by active source flow observer
                 breadcrumbScroll.visibility = View.VISIBLE
                 breadcrumbChips.removeAllViews()
                 addBreadcrumbChip(selectedGroup?.name ?: "")
