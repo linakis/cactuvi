@@ -424,7 +424,9 @@ class ContentRepository(
         categoryName: String
     ): Result<Unit> = withContext(Dispatchers.IO) {
         try {
+            val sourceId = getActiveSourceId()
             val favorite = FavoriteEntity(
+                sourceId = sourceId,
                 id = "${contentType}_${contentId}",
                 contentId = contentId,
                 contentType = contentType,
@@ -451,8 +453,9 @@ class ContentRepository(
     suspend fun removeFromFavorites(contentId: String, contentType: String): Result<Unit> = 
         withContext(Dispatchers.IO) {
             try {
+                val sourceId = getActiveSourceId()
                 val id = "${contentType}_${contentId}"
-                database.favoriteDao().deleteById(id)
+                database.favoriteDao().deleteById(sourceId, id)
                 
                 // Update entity favorite status
                 when (contentType) {
@@ -470,10 +473,11 @@ class ContentRepository(
     suspend fun getFavorites(contentType: String? = null): Result<List<FavoriteEntity>> = 
         withContext(Dispatchers.IO) {
             try {
+                val sourceId = getActiveSourceId()
                 val favorites = if (contentType != null) {
-                    database.favoriteDao().getByType(contentType)
+                    database.favoriteDao().getByType(sourceId, contentType)
                 } else {
-                    database.favoriteDao().getAll()
+                    database.favoriteDao().getAll(sourceId)
                 }
                 Result.success(favorites)
             } catch (e: Exception) {
@@ -484,8 +488,9 @@ class ContentRepository(
     suspend fun isFavorite(contentId: String, contentType: String): Result<Boolean> = 
         withContext(Dispatchers.IO) {
             try {
+                val sourceId = getActiveSourceId()
                 val id = "${contentType}_${contentId}"
-                Result.success(database.favoriteDao().isFavorite(id))
+                Result.success(database.favoriteDao().isFavorite(sourceId, id))
             } catch (e: Exception) {
                 Result.failure(e)
             }
@@ -505,9 +510,11 @@ class ContentRepository(
         episodeNumber: Int? = null
     ): Result<Unit> = withContext(Dispatchers.IO) {
         try {
+            val sourceId = getActiveSourceId()
             val isCompleted = (resumePosition.toDouble() / duration) > 0.9
             
             val history = WatchHistoryEntity(
+                sourceId = sourceId,
                 contentId = contentId,
                 contentType = contentType,
                 contentName = contentName,
@@ -537,7 +544,8 @@ class ContentRepository(
     suspend fun getWatchHistory(limit: Int = 20): Result<List<WatchHistoryEntity>> = 
         withContext(Dispatchers.IO) {
             try {
-                val history = database.watchHistoryDao().getIncomplete(limit)
+                val sourceId = getActiveSourceId()
+                val history = database.watchHistoryDao().getIncomplete(sourceId, limit)
                 Result.success(history)
             } catch (e: Exception) {
                 Result.failure(e)
@@ -555,9 +563,10 @@ class ContentRepository(
     
     suspend fun deleteWatchHistoryItem(contentId: String): Result<Unit> = withContext(Dispatchers.IO) {
         try {
-            val item = database.watchHistoryDao().getByContentId(contentId, "movie") 
-                ?: database.watchHistoryDao().getByContentId(contentId, "series")
-                ?: database.watchHistoryDao().getByContentId(contentId, "live_channel")
+            val sourceId = getActiveSourceId()
+            val item = database.watchHistoryDao().getByContentId(sourceId, contentId, "movie") 
+                ?: database.watchHistoryDao().getByContentId(sourceId, contentId, "series")
+                ?: database.watchHistoryDao().getByContentId(sourceId, contentId, "live_channel")
             
             item?.let {
                 database.watchHistoryDao().delete(it)
@@ -840,13 +849,17 @@ class ContentRepository(
     suspend fun clearSourceCache(sourceId: String): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             // Clear all content for this source
-            // TODO: Add sourceId-specific filters to DAOs
+            // TODO: Add sourceId-specific filters to DAOs for content
             database.liveChannelDao().clearAll()
             database.movieDao().clearAll()
             database.seriesDao().clearAll()
             database.categoryDao().clearAll()
             database.navigationGroupDao().clear()
             database.cacheMetadataDao().deleteAll()
+            
+            // Clear favorites and watch history for this source
+            database.favoriteDao().clearBySource(sourceId)
+            database.watchHistoryDao().clearBySource(sourceId)
             
             // Force recreate API service for new source
             apiService = null
