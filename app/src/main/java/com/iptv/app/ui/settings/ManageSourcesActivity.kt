@@ -109,15 +109,13 @@ class ManageSourcesActivity : AppCompatActivity() {
     }
     
     private fun addNewSource() {
-        // TODO: Launch AddEditSourceActivity
         val intent = Intent(this, AddEditSourceActivity::class.java)
         startActivityForResult(intent, REQUEST_ADD_SOURCE)
     }
     
     private fun editSource(source: StreamSource) {
-        // TODO: Launch AddEditSourceActivity with source data
         val intent = Intent(this, AddEditSourceActivity::class.java)
-        intent.putExtra("SOURCE_ID", source.id)
+        intent.putExtra(AddEditSourceActivity.EXTRA_SOURCE_ID, source.id)
         startActivityForResult(intent, REQUEST_EDIT_SOURCE)
     }
     

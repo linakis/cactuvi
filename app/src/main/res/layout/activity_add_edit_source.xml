@@ -1,15 +1,168 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout 
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:gravity="center"
     android:background="@color/background_primary">
-    
-    <TextView
-        android:layout_width="wrap_content"
+
+    <com.iptv.app.ui.common.ModernToolbar
+        android:id="@+id/modernToolbar"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Add/Edit Source - TODO"
-        android:textColor="@android:color/white"
-        android:textSize="18sp" />
-</LinearLayout>
+        app:title="Add Source"
+        app:showActionButton="false"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        app:layout_constraintTop_toBottomOf="@id/modernToolbar"
+        app:layout_constraintBottom_toBottomOf="parent">
+        
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="@dimen/spacing_l">
+            
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="@dimen/spacing_l"
+                app:cardBackgroundColor="@color/background_secondary"
+                app:cardCornerRadius="@dimen/corner_radius_medium"
+                app:cardElevation="0dp">
+                
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="@dimen/spacing_l">
+                    
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="SOURCE DETAILS"
+                        android:textColor="@color/brand_orange"
+                        android:textSize="14sp"
+                        android:textAllCaps="true"
+                        android:fontFamily="sans-serif-medium"
+                        android:layout_marginBottom="@dimen/spacing_m" />
+                    
+                    <!-- Nickname -->
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/nicknameInputLayout"
+                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="@dimen/spacing_m"
+                        android:hint="Nickname"
+                        app:boxStrokeColor="@color/brand_orange"
+                        app:hintTextColor="@color/brand_orange">
+                        
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/nicknameEditText"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="text"
+                            android:textColor="@color/text_primary"
+                            android:textColorHint="@color/text_tertiary" />
+                    </com.google.android.material.textfield.TextInputLayout>
+                    
+                    <!-- Server URL -->
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/serverInputLayout"
+                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="@dimen/spacing_m"
+                        android:hint="Server URL"
+                        app:boxStrokeColor="@color/brand_orange"
+                        app:hintTextColor="@color/brand_orange">
+                        
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/serverEditText"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="textUri"
+                            android:textColor="@color/text_primary"
+                            android:textColorHint="@color/text_tertiary" />
+                    </com.google.android.material.textfield.TextInputLayout>
+                    
+                    <!-- Username -->
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/usernameInputLayout"
+                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="@dimen/spacing_m"
+                        android:hint="Username"
+                        app:boxStrokeColor="@color/brand_orange"
+                        app:hintTextColor="@color/brand_orange">
+                        
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/usernameEditText"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="text"
+                            android:textColor="@color/text_primary"
+                            android:textColorHint="@color/text_tertiary" />
+                    </com.google.android.material.textfield.TextInputLayout>
+                    
+                    <!-- Password -->
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/passwordInputLayout"
+                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:hint="Password"
+                        app:boxStrokeColor="@color/brand_orange"
+                        app:hintTextColor="@color/brand_orange"
+                        app:endIconMode="password_toggle">
+                        
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/passwordEditText"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="textPassword"
+                            android:textColor="@color/text_primary"
+                            android:textColorHint="@color/text_tertiary" />
+                    </com.google.android.material.textfield.TextInputLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+            
+            <!-- Save Button -->
+            <Button
+                android:id="@+id/saveButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="@dimen/spacing_m"
+                android:text="Save Source"
+                android:textColor="@android:color/white"
+                android:backgroundTint="@color/brand_orange"
+                android:paddingVertical="@dimen/spacing_m" />
+            
+            <!-- Test Connection Button (Optional) -->
+            <Button
+                android:id="@+id/testConnectionButton"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Test Connection"
+                android:textColor="@color/text_primary"
+                app:strokeColor="@color/text_tertiary"
+                android:paddingVertical="@dimen/spacing_m" />
+            
+            <!-- Progress indicator -->
+            <ProgressBar
+                android:id="@+id/progressBar"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:layout_marginTop="@dimen/spacing_m"
+                android:visibility="gone"
+                android:indeterminateTint="@color/brand_orange" />
+        </LinearLayout>
+    </ScrollView>
+</androidx.constraintlayout.widget.ConstraintLayout>
