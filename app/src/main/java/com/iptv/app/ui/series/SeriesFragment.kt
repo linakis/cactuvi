@@ -126,11 +126,11 @@ class SeriesFragment : Fragment() {
     
     private fun setupRecyclerView() {
         // Initialize adapters
-        groupAdapter = GroupAdapter(emptyList()) { group ->
+        groupAdapter = GroupAdapter { group ->
             onGroupSelected(group)
         }
         
-        categoryAdapter = CategoryTreeAdapter(emptyList()) { category ->
+        categoryAdapter = CategoryTreeAdapter { category ->
             onCategorySelected(category)
         }
         

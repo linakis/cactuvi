@@ -129,11 +129,11 @@ class LiveTvFragment : Fragment() {
         recyclerView.layoutManager = LinearLayoutManager(requireContext())
         
         // Initialize adapters
-        groupAdapter = GroupAdapter(emptyList()) { group ->
+        groupAdapter = GroupAdapter { group ->
             onGroupSelected(group)
         }
         
-        categoryAdapter = CategoryTreeAdapter(emptyList()) { category ->
+        categoryAdapter = CategoryTreeAdapter { category ->
             onCategorySelected(category)
         }
         

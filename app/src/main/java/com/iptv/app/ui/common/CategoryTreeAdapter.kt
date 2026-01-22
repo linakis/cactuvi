@@ -4,14 +4,15 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
+import androidx.recyclerview.widget.DiffUtil
+import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.iptv.app.R
 import com.iptv.app.data.models.Category
 
 class CategoryTreeAdapter(
-    private var categories: List<Pair<Category, Int>>, // Category with item count
     private val onCategoryClick: (Category) -> Unit
-) : RecyclerView.Adapter<CategoryTreeAdapter.CategoryViewHolder>() {
+) : ListAdapter<Pair<Category, Int>, CategoryTreeAdapter.CategoryViewHolder>(CategoryDiffCallback()) {
     
     inner class CategoryViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         val categoryName: TextView = view.findViewById(R.id.categoryName)
@@ -35,13 +36,28 @@ class CategoryTreeAdapter(
     }
     
     override fun onBindViewHolder(holder: CategoryViewHolder, position: Int) {
-        holder.bind(categories[position])
+        holder.bind(getItem(position))
     }
     
-    override fun getItemCount() = categories.size
-    
     fun updateCategories(newCategories: List<Pair<Category, Int>>) {
-        categories = newCategories
-        notifyDataSetChanged()
+        submitList(newCategories)
+    }
+    
+    private class CategoryDiffCallback : DiffUtil.ItemCallback<Pair<Category, Int>>() {
+        override fun areItemsTheSame(
+            oldItem: Pair<Category, Int>,
+            newItem: Pair<Category, Int>
+        ): Boolean {
+            return oldItem.first.categoryId == newItem.first.categoryId
+        }
+        
+        override fun areContentsTheSame(
+            oldItem: Pair<Category, Int>,
+            newItem: Pair<Category, Int>
+        ): Boolean {
+            return oldItem.first.categoryId == newItem.first.categoryId &&
+                   oldItem.first.categoryName == newItem.first.categoryName &&
+                   oldItem.second == newItem.second
+        }
     }
 }

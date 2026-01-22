@@ -4,14 +4,15 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
+import androidx.recyclerview.widget.DiffUtil
+import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.iptv.app.R
 import com.iptv.app.utils.CategoryGrouper
 
 class GroupAdapter(
-    private var groups: List<CategoryGrouper.GroupNode>,
     private val onGroupClick: (CategoryGrouper.GroupNode) -> Unit
-) : RecyclerView.Adapter<GroupAdapter.GroupViewHolder>() {
+) : ListAdapter<CategoryGrouper.GroupNode, GroupAdapter.GroupViewHolder>(GroupDiffCallback()) {
     
     inner class GroupViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         val groupName: TextView = view.findViewById(R.id.groupName)
@@ -34,13 +35,26 @@ class GroupAdapter(
     }
     
     override fun onBindViewHolder(holder: GroupViewHolder, position: Int) {
-        holder.bind(groups[position])
+        holder.bind(getItem(position))
     }
     
-    override fun getItemCount() = groups.size
-    
     fun updateGroups(newGroups: List<CategoryGrouper.GroupNode>) {
-        groups = newGroups
-        notifyDataSetChanged()
+        submitList(newGroups)
+    }
+    
+    private class GroupDiffCallback : DiffUtil.ItemCallback<CategoryGrouper.GroupNode>() {
+        override fun areItemsTheSame(
+            oldItem: CategoryGrouper.GroupNode,
+            newItem: CategoryGrouper.GroupNode
+        ): Boolean {
+            return oldItem.name == newItem.name
+        }
+        
+        override fun areContentsTheSame(
+            oldItem: CategoryGrouper.GroupNode,
+            newItem: CategoryGrouper.GroupNode
+        ): Boolean {
+            return oldItem.name == newItem.name && oldItem.count == newItem.count
+        }
     }
 }
