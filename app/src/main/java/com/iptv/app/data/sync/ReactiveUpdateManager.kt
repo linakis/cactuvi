@@ -1,16 +1,27 @@
 package com.iptv.app.data.sync
 
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.launch
+import java.util.concurrent.CopyOnWriteArrayList
 
 /**
- * Singleton event bus for reactive UI updates.
- * SyncCoordinator emits ContentDiff events, fragments subscribe and apply granular updates.
+ * Singleton event bus for reactive UI updates with idle detection.
  * 
- * TODO: Implement idle detection and queueing (Day 3 - Task 4.1)
+ * Flow:
+ * 1. SyncCoordinator emits ContentDiff events
+ * 2. Events are queued if user is interacting with UI
+ * 3. When user becomes idle (3s no interaction) AND fragment is visible, emit queued events
+ * 4. Fragments apply granular updates without full screen reload
  */
 class ReactiveUpdateManager private constructor() {
+    
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     
     private val _contentDiffs = MutableSharedFlow<List<ContentDiff>>(
         replay = 0,
@@ -19,9 +30,15 @@ class ReactiveUpdateManager private constructor() {
     
     val contentDiffs: SharedFlow<List<ContentDiff>> = _contentDiffs.asSharedFlow()
     
+    private val pendingDiffs = CopyOnWriteArrayList<ContentDiff>()
+    private var isUserIdle = true
+    private var lastInteractionTime = 0L
+    
     companion object {
         @Volatile
         private var INSTANCE: ReactiveUpdateManager? = null
+        
+        private const val IDLE_DELAY_MS = 3000L  // 3 seconds
         
         fun getInstance(): ReactiveUpdateManager {
             return INSTANCE ?: synchronized(this) {
@@ -33,12 +50,49 @@ class ReactiveUpdateManager private constructor() {
     }
     
     /**
-     * Emit diff events to subscribers (fragments).
      * Called by SyncCoordinator after detecting changes.
+     * Queues diffs and emits when user is idle.
      */
     suspend fun emitDiffs(diffs: List<ContentDiff>) {
-        if (diffs.isNotEmpty()) {
-            _contentDiffs.emit(diffs)
+        if (diffs.isEmpty()) return
+        
+        pendingDiffs.addAll(diffs)
+        
+        // If user is already idle, emit immediately
+        if (isUserIdle) {
+            flushPendingDiffs()
         }
+    }
+    
+    /**
+     * Called by IdleDetectionHelper when user interacts with UI.
+     */
+    fun onUserInteraction() {
+        isUserIdle = false
+        lastInteractionTime = System.currentTimeMillis()
+        
+        // Start idle timer
+        scope.launch {
+            delay(IDLE_DELAY_MS)
+            
+            // Check if still idle (no new interaction in last 3s)
+            val timeSinceLastInteraction = System.currentTimeMillis() - lastInteractionTime
+            if (timeSinceLastInteraction >= IDLE_DELAY_MS) {
+                isUserIdle = true
+                flushPendingDiffs()
+            }
+        }
+    }
+    
+    /**
+     * Emit all pending diffs to subscribers.
+     */
+    private suspend fun flushPendingDiffs() {
+        if (pendingDiffs.isEmpty()) return
+        
+        val diffsToEmit = pendingDiffs.toList()
+        pendingDiffs.clear()
+        
+        _contentDiffs.emit(diffsToEmit)
     }
 }

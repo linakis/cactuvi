@@ -10,7 +10,9 @@ import android.widget.HorizontalScrollView
 import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -20,6 +22,8 @@ import com.iptv.app.R
 import com.iptv.app.data.models.Category
 import com.iptv.app.data.models.Movie
 import com.iptv.app.data.repository.ContentRepository
+import com.iptv.app.data.sync.ContentDiff
+import com.iptv.app.data.sync.ReactiveUpdateManager
 import com.iptv.app.ui.common.CategoryTreeAdapter
 import com.iptv.app.ui.common.GroupAdapter
 import com.iptv.app.ui.common.ModernToolbar
@@ -30,6 +34,7 @@ import com.iptv.app.utils.CategoryGrouper
 import com.iptv.app.utils.CategoryGrouper.GroupNode
 import com.iptv.app.utils.CategoryGrouper.NavigationTree
 import com.iptv.app.utils.CredentialsManager
+import com.iptv.app.utils.IdleDetectionHelper
 import com.iptv.app.utils.PerformanceLogger
 import com.iptv.app.utils.PreferencesManager
 import com.iptv.app.utils.StreamUrlBuilder
@@ -100,6 +105,7 @@ class MoviesFragment : Fragment() {
         
         setupToolbar()
         setupRecyclerView()
+        setupReactiveUpdates()
         loadData()
     }
     
@@ -136,6 +142,92 @@ class MoviesFragment : Fragment() {
         // Start with groups (linear layout)
         recyclerView.layoutManager = LinearLayoutManager(requireContext())
         recyclerView.adapter = groupAdapter
+        
+        // Attach idle detection
+        IdleDetectionHelper.attach(recyclerView)
+    }
+    
+    /**
+     * Subscribe to ReactiveUpdateManager for background sync updates.
+     * Apply granular updates without full screen reload.
+     */
+    private fun setupReactiveUpdates() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                ReactiveUpdateManager.getInstance().contentDiffs.collect { diffs ->
+                    handleContentDiffs(diffs)
+                }
+            }
+        }
+    }
+    
+    /**
+     * Handle diff events from background sync.
+     * Only process diffs for "movies" content type.
+     */
+    private fun handleContentDiffs(diffs: List<ContentDiff>) {
+        val movieDiffs = diffs.filter { diff ->
+            when (diff) {
+                is ContentDiff.GroupAdded -> diff.contentType == "movies"
+                is ContentDiff.GroupRemoved -> diff.contentType == "movies"
+                is ContentDiff.GroupCountChanged -> diff.contentType == "movies"
+                is ContentDiff.ItemsAddedToCategory -> diff.contentType == "movies"
+                is ContentDiff.ItemsRemovedFromCategory -> diff.contentType == "movies"
+            }
+        }
+        
+        if (movieDiffs.isEmpty()) return
+        
+        // Reload navigation tree to get updated state
+        lifecycleScope.launch {
+            val updatedTree = repository.getCachedVodNavigationTree()
+            if (updatedTree != null) {
+                navigationTree = updatedTree
+                applyDiffsToUI(movieDiffs)
+            }
+        }
+    }
+    
+    /**
+     * Apply diffs to current UI state without full reload.
+     */
+    private fun applyDiffsToUI(diffs: List<ContentDiff>) {
+        when (currentLevel) {
+            NavigationLevel.GROUPS -> {
+                // Update groups adapter with new navigation tree
+                navigationTree?.let { tree ->
+                    groupAdapter.updateGroups(tree.groups)
+                }
+            }
+            NavigationLevel.CATEGORIES -> {
+                // Update category count if current group changed
+                selectedGroup?.let { group ->
+                    val updatedGroup = navigationTree?.findGroup(group.name)
+                    if (updatedGroup != null && updatedGroup.count != group.count) {
+                        selectedGroup = updatedGroup
+                        // CategoryTreeAdapter expects List<Pair<Category, Int>> with depth
+                        val categoriesWithDepth = updatedGroup.categories.map { it to 0 }
+                        categoryAdapter.updateCategories(categoriesWithDepth)
+                    }
+                }
+            }
+            NavigationLevel.CONTENT -> {
+                // Content level - refresh paging adapter if items added/removed in current category
+                val hasRelevantChanges = diffs.any { diff ->
+                    when (diff) {
+                        is ContentDiff.ItemsAddedToCategory -> 
+                            diff.categoryId == selectedCategory?.categoryId
+                        is ContentDiff.ItemsRemovedFromCategory -> 
+                            diff.categoryId == selectedCategory?.categoryId
+                        else -> false
+                    }
+                }
+                
+                if (hasRelevantChanges) {
+                    contentAdapter.refresh()
+                }
+            }
+        }
     }
     
     private fun loadData() {
