@@ -10,7 +10,9 @@ import android.widget.HorizontalScrollView
 import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.chip.Chip
@@ -19,6 +21,8 @@ import com.iptv.app.R
 import com.iptv.app.data.models.Category
 import com.iptv.app.data.models.LiveChannel
 import com.iptv.app.data.repository.ContentRepository
+import com.iptv.app.data.sync.ContentDiff
+import com.iptv.app.data.sync.ReactiveUpdateManager
 import com.iptv.app.ui.common.CategoryTreeAdapter
 import com.iptv.app.ui.common.GroupAdapter
 import com.iptv.app.ui.common.LiveChannelPagingAdapter
@@ -29,6 +33,7 @@ import com.iptv.app.utils.CategoryGrouper
 import com.iptv.app.utils.CategoryGrouper.GroupNode
 import com.iptv.app.utils.CategoryGrouper.NavigationTree
 import com.iptv.app.utils.CredentialsManager
+import com.iptv.app.utils.IdleDetectionHelper
 import com.iptv.app.utils.PreferencesManager
 import com.iptv.app.utils.StreamUrlBuilder
 import kotlinx.coroutines.flow.collectLatest
@@ -98,6 +103,7 @@ class LiveTvFragment : Fragment() {
         
         setupToolbar()
         setupRecyclerView()
+        setupReactiveUpdates()
         loadData()
     }
     
@@ -133,8 +139,75 @@ class LiveTvFragment : Fragment() {
         
         // contentAdapter is already initialized as lazy property
         
-        // Start with groups
-        recyclerView.adapter = groupAdapter
+        // Attach idle detection
+        IdleDetectionHelper.attach(recyclerView)
+    }
+    
+    private fun setupReactiveUpdates() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                ReactiveUpdateManager.getInstance().contentDiffs.collect { diffs ->
+                    handleContentDiffs(diffs)
+                }
+            }
+        }
+    }
+    
+    private fun handleContentDiffs(diffs: List<ContentDiff>) {
+        val liveDiffs = diffs.filter { diff ->
+            when (diff) {
+                is ContentDiff.GroupAdded -> diff.contentType == "live"
+                is ContentDiff.GroupRemoved -> diff.contentType == "live"
+                is ContentDiff.GroupCountChanged -> diff.contentType == "live"
+                is ContentDiff.ItemsAddedToCategory -> diff.contentType == "live"
+                is ContentDiff.ItemsRemovedFromCategory -> diff.contentType == "live"
+            }
+        }
+        
+        if (liveDiffs.isEmpty()) return
+        
+        lifecycleScope.launch {
+            val updatedTree = repository.getCachedLiveNavigationTree()
+            if (updatedTree != null) {
+                navigationTree = updatedTree
+                applyDiffsToUI(liveDiffs)
+            }
+        }
+    }
+    
+    private fun applyDiffsToUI(diffs: List<ContentDiff>) {
+        when (currentLevel) {
+            NavigationLevel.GROUPS -> {
+                navigationTree?.let { tree ->
+                    groupAdapter.updateGroups(tree.groups)
+                }
+            }
+            NavigationLevel.CATEGORIES -> {
+                selectedGroup?.let { group ->
+                    val updatedGroup = navigationTree?.findGroup(group.name)
+                    if (updatedGroup != null && updatedGroup.count != group.count) {
+                        selectedGroup = updatedGroup
+                        val categoriesWithDepth = updatedGroup.categories.map { it to 0 }
+                        categoryAdapter.updateCategories(categoriesWithDepth)
+                    }
+                }
+            }
+            NavigationLevel.CONTENT -> {
+                val hasRelevantChanges = diffs.any { diff ->
+                    when (diff) {
+                        is ContentDiff.ItemsAddedToCategory -> 
+                            diff.categoryId == selectedCategory?.categoryId
+                        is ContentDiff.ItemsRemovedFromCategory -> 
+                            diff.categoryId == selectedCategory?.categoryId
+                        else -> false
+                    }
+                }
+                
+                if (hasRelevantChanges) {
+                    contentAdapter.refresh()
+                }
+            }
+        }
     }
     
     private fun loadData() {
