@@ -9,7 +9,9 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.WorkManager
 import com.iptv.app.data.sync.SyncCoordinator
+import com.iptv.app.utils.PreferencesManager
 import com.iptv.app.utils.SyncPreferencesManager
+import com.iptv.app.utils.VPNDetector
 import java.util.concurrent.TimeUnit
 
 /**
@@ -83,6 +85,14 @@ class BackgroundSyncWorker(
     
     override suspend fun doWork(): Result {
         return try {
+            // Check VPN requirement - silently skip if VPN required but not active
+            // This is background work so we don't warn the user
+            val prefsManager = PreferencesManager.getInstance(applicationContext)
+            if (prefsManager.isVpnWarningEnabled() && !VPNDetector.isVpnActive(applicationContext)) {
+                // Skip sync silently - will retry on next schedule when VPN may be active
+                return Result.success()
+            }
+            
             // Delegate to SyncCoordinator
             val syncCoordinator = SyncCoordinator(applicationContext)
             val syncResult = syncCoordinator.syncAll()
