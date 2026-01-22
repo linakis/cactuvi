@@ -6,10 +6,15 @@ import androidx.room.PrimaryKey
 
 @Entity(
     tableName = "movies",
-    indices = [Index(value = ["categoryId"])]
+    indices = [
+        Index(value = ["categoryId"]),
+        Index(value = ["sourceId", "streamId"], unique = true)
+    ]
 )
 data class MovieEntity(
-    @PrimaryKey val streamId: Int,
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val sourceId: String,
+    val streamId: Int,
     val num: Int,
     val name: String,
     val streamType: String?,

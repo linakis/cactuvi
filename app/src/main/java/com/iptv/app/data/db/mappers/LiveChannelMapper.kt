@@ -3,8 +3,9 @@ package com.iptv.app.data.db.mappers
 import com.iptv.app.data.db.entities.LiveChannelEntity
 import com.iptv.app.data.models.LiveChannel
 
-fun LiveChannel.toEntity(categoryName: String): LiveChannelEntity {
+fun LiveChannel.toEntity(sourceId: String, categoryName: String): LiveChannelEntity {
     return LiveChannelEntity(
+        sourceId = sourceId,
         streamId = streamId,
         num = num,
         name = name,

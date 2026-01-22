@@ -8,11 +8,16 @@ import com.iptv.app.data.db.Converters
 
 @Entity(
     tableName = "series",
-    indices = [Index(value = ["categoryId"])]
+    indices = [
+        Index(value = ["categoryId"]),
+        Index(value = ["sourceId", "seriesId"], unique = true)
+    ]
 )
 @TypeConverters(Converters::class)
 data class SeriesEntity(
-    @PrimaryKey val seriesId: Int,
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val sourceId: String,
+    val seriesId: Int,
     val num: Int,
     val name: String,
     val cover: String?,

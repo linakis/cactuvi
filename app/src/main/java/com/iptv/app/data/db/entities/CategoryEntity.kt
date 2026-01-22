@@ -4,9 +4,10 @@ import androidx.room.Entity
 
 @Entity(
     tableName = "categories",
-    primaryKeys = ["categoryId", "type"]
+    primaryKeys = ["sourceId", "categoryId", "type"]
 )
 data class CategoryEntity(
+    val sourceId: String,
     val categoryId: String,
     val categoryName: String,
     val type: String,  // "live", "vod", "series"

@@ -3,8 +3,9 @@ package com.iptv.app.data.db.mappers
 import com.iptv.app.data.db.entities.CategoryEntity
 import com.iptv.app.data.models.Category
 
-fun Category.toEntity(type: String): CategoryEntity {
+fun Category.toEntity(sourceId: String, type: String): CategoryEntity {
     return CategoryEntity(
+        sourceId = sourceId,
         categoryId = categoryId,
         categoryName = categoryName,
         type = type

@@ -3,8 +3,9 @@ package com.iptv.app.data.db.mappers
 import com.iptv.app.data.db.entities.MovieEntity
 import com.iptv.app.data.models.Movie
 
-fun Movie.toEntity(categoryName: String): MovieEntity {
+fun Movie.toEntity(sourceId: String, categoryName: String): MovieEntity {
     return MovieEntity(
+        sourceId = sourceId,
         streamId = streamId,
         num = num,
         name = name,

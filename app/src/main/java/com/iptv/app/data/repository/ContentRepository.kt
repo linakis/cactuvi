@@ -95,7 +95,7 @@ class ContentRepository(
                 val entities = channels.map { channel ->
                     val categoryName = categoryMap[channel.categoryId]?.categoryName ?: ""
                     channel.categoryName = categoryName
-                    channel.toEntity(categoryName)
+                    channel.toEntity("default", categoryName) // TODO: Replace with active source ID
                 }
                 database.liveChannelDao().insertAll(entities)
                 
@@ -134,7 +134,7 @@ class ContentRepository(
                 val password = credentialsManager.getPassword()
                 val categories = getApiService().getLiveCategories(username, password)
                 
-                val entities = categories.map { it.toEntity("live") }
+                val entities = categories.map { it.toEntity("default", "live") } // TODO: Replace with active source ID
                 database.categoryDao().insertAll(entities)
                 
                 // Cache navigation tree
@@ -201,7 +201,7 @@ class ContentRepository(
                 val entities = movies.map { movie ->
                     val categoryName = categoryMap[movie.categoryId]?.categoryName ?: ""
                     movie.categoryName = categoryName
-                    movie.toEntity(categoryName)
+                    movie.toEntity("default", categoryName) // TODO: Replace with active source ID
                 }
                 database.movieDao().insertAll(entities)
                 PerformanceLogger.end("DB insert", dbInsertStart, "inserted=${entities.size}")
@@ -267,7 +267,7 @@ class ContentRepository(
                 // Insert into database
                 PerformanceLogger.logPhase("getMovieCategories", "Inserting into DB")
                 val dbInsertStart = PerformanceLogger.start("DB insert")
-                val entities = categories.map { it.toEntity("vod") }
+                val entities = categories.map { it.toEntity("default", "vod") } // TODO: Replace with active source ID
                 database.categoryDao().insertAll(entities)
                 PerformanceLogger.end("DB insert", dbInsertStart, "inserted=${entities.size}")
                 
@@ -337,7 +337,7 @@ class ContentRepository(
                 val entities = series.map { s ->
                     val categoryName = categoryMap[s.categoryId]?.categoryName ?: ""
                     s.categoryName = categoryName
-                    s.toEntity(categoryName)
+                    s.toEntity("default", categoryName) // TODO: Replace with active source ID
                 }
                 database.seriesDao().insertAll(entities)
                 
@@ -375,7 +375,7 @@ class ContentRepository(
                 val password = credentialsManager.getPassword()
                 val categories = getApiService().getSeriesCategories(username, password)
                 
-                val entities = categories.map { it.toEntity("series") }
+                val entities = categories.map { it.toEntity("default", "series") } // TODO: Replace with active source ID
                 database.categoryDao().insertAll(entities)
                 
                 // Cache navigation tree
@@ -631,6 +631,7 @@ class ContentRepository(
         
         val entities = tree.groups.map { group ->
             NavigationGroupEntity(
+                sourceId = "default", // TODO: Replace with active source ID
                 type = "vod",
                 groupName = group.name,
                 categoryIdsJson = gson.toJson(group.categories.map { it.categoryId }),
@@ -647,6 +648,7 @@ class ContentRepository(
         
         val entities = tree.groups.map { group ->
             NavigationGroupEntity(
+                sourceId = "default", // TODO: Replace with active source ID
                 type = "series",
                 groupName = group.name,
                 categoryIdsJson = gson.toJson(group.categories.map { it.categoryId }),
@@ -663,6 +665,7 @@ class ContentRepository(
         
         val entities = tree.groups.map { group ->
             NavigationGroupEntity(
+                sourceId = "default", // TODO: Replace with active source ID
                 type = "live",
                 groupName = group.name,
                 categoryIdsJson = gson.toJson(group.categories.map { it.categoryId }),
