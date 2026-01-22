@@ -6,6 +6,7 @@ import android.view.MenuItem
 import android.view.View
 import android.widget.ProgressBar
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
@@ -15,12 +16,14 @@ import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.iptv.app.R
 import com.iptv.app.data.models.StreamSource
+import com.iptv.app.data.repository.ContentRepository
 import com.iptv.app.utils.SourceManager
 import kotlinx.coroutines.launch
 
 class ManageSourcesActivity : AppCompatActivity() {
     
     private lateinit var sourceManager: SourceManager
+    private lateinit var repository: ContentRepository
     private lateinit var recyclerView: RecyclerView
     private lateinit var adapter: SourcesAdapter
     private lateinit var progressBar: ProgressBar
@@ -32,6 +35,7 @@ class ManageSourcesActivity : AppCompatActivity() {
         setContentView(R.layout.activity_manage_sources)
         
         sourceManager = SourceManager.getInstance(this)
+        repository = ContentRepository(sourceManager, this)
         
         setupToolbar()
         setupViews()
@@ -91,14 +95,35 @@ class ManageSourcesActivity : AppCompatActivity() {
     }
     
     private fun onSourceSelected(source: StreamSource) {
+        // Show loading dialog
+        val loadingDialog = AlertDialog.Builder(this)
+            .setTitle("Switching Source")
+            .setMessage("Switching to '${source.nickname}'...")
+            .setCancelable(false)
+            .create()
+        
+        loadingDialog.show()
+        
         lifecycleScope.launch {
             try {
+                // Set active source
                 sourceManager.setActiveSource(source.id)
                 
-                // TODO: Trigger cache clear and reload
+                // Clear cache for new source
+                repository.clearAllCache()
+                
+                // Show success
+                loadingDialog.dismiss()
+                Toast.makeText(
+                    this@ManageSourcesActivity,
+                    "Switched to '${source.nickname}'",
+                    Toast.LENGTH_SHORT
+                ).show()
                 
                 loadSources() // Refresh to show new active source
+                
             } catch (e: Exception) {
+                loadingDialog.dismiss()
                 AlertDialog.Builder(this@ManageSourcesActivity)
                     .setTitle("Error")
                     .setMessage("Failed to activate source: ${e.message}")
@@ -120,21 +145,46 @@ class ManageSourcesActivity : AppCompatActivity() {
     }
     
     private fun confirmDeleteSource(source: StreamSource) {
-        AlertDialog.Builder(this)
-            .setTitle("Delete Source")
-            .setMessage("Are you sure you want to delete '${source.nickname}'? All cached data for this source will be removed.")
-            .setPositiveButton("Delete") { _, _ ->
-                deleteSource(source)
+        // Check if trying to delete active source
+        lifecycleScope.launch {
+            val activeSource = sourceManager.getActiveSource()
+            
+            if (activeSource?.id == source.id) {
+                AlertDialog.Builder(this@ManageSourcesActivity)
+                    .setTitle("Cannot Delete Active Source")
+                    .setMessage("Please switch to another source before deleting '${source.nickname}'.")
+                    .setPositiveButton("OK", null)
+                    .show()
+                return@launch
             }
-            .setNegativeButton("Cancel", null)
-            .show()
+            
+            // Show delete confirmation
+            AlertDialog.Builder(this@ManageSourcesActivity)
+                .setTitle("Delete Source")
+                .setMessage("Are you sure you want to delete '${source.nickname}'? All cached data for this source will be removed.")
+                .setPositiveButton("Delete") { _, _ ->
+                    deleteSource(source)
+                }
+                .setNegativeButton("Cancel", null)
+                .show()
+        }
     }
     
     private fun deleteSource(source: StreamSource) {
         lifecycleScope.launch {
             try {
+                // Clear cache for this source
+                repository.clearSourceCache(source.id)
+                
+                // Delete source
                 sourceManager.deleteSource(source.id)
-                // TODO: Clear cache for this source
+                
+                Toast.makeText(
+                    this@ManageSourcesActivity,
+                    "Source '${source.nickname}' deleted",
+                    Toast.LENGTH_SHORT
+                ).show()
+                
                 loadSources()
             } catch (e: Exception) {
                 AlertDialog.Builder(this@ManageSourcesActivity)
