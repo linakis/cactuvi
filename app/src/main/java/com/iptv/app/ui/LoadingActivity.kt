@@ -53,6 +53,16 @@ class LoadingActivity : AppCompatActivity() {
     private fun checkCacheAndLoad() {
         lifecycleScope.launch {
             try {
+                // Check if any sources are configured
+                val sourceManager = SourceManager.getInstance(this@LoadingActivity)
+                val sources = sourceManager.getAllSources()
+                
+                if (sources.isEmpty()) {
+                    // No sources configured - redirect to add source
+                    showNoSourcesError()
+                    return@launch
+                }
+                
                 val database = AppDatabase.getInstance(this@LoadingActivity)
                 
                 // Check if cache exists for any content type
@@ -125,9 +135,39 @@ class LoadingActivity : AppCompatActivity() {
         retryButton.requestFocus()
     }
     
+    private fun showNoSourcesError() {
+        progressBar.visibility = View.GONE
+        statusText.text = "No Sources Configured"
+        detailText.text = "Please add an IPTV source to continue"
+        retryButton.text = "Add Source"
+        retryButton.visibility = View.VISIBLE
+        retryButton.requestFocus()
+        
+        retryButton.setOnClickListener {
+            // Navigate to Add Source screen
+            val intent = Intent(this, com.iptv.app.ui.settings.AddEditSourceActivity::class.java)
+            startActivityForResult(intent, REQUEST_ADD_SOURCE)
+        }
+    }
+    
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == REQUEST_ADD_SOURCE && resultCode == RESULT_OK) {
+            // Source added, retry loading
+            retryButton.text = "Retry"
+            retryButton.visibility = View.GONE
+            progressBar.visibility = View.VISIBLE
+            checkCacheAndLoad()
+        }
+    }
+    
     private fun navigateToMain() {
         val intent = Intent(this, MainActivity::class.java)
         startActivity(intent)
         finish()
+    }
+    
+    companion object {
+        private const val REQUEST_ADD_SOURCE = 1
     }
 }
