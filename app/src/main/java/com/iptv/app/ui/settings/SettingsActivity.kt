@@ -67,6 +67,11 @@ class SettingsActivity : AppCompatActivity() {
             showClearHistoryDialog()
         }
         
+        // Manage Sources
+        findViewById<View>(R.id.manageSourcesCard).setOnClickListener {
+            startActivity(Intent(this, ManageSourcesActivity::class.java))
+        }
+        
         // Content Filters
         findViewById<View>(R.id.moviesFilterCard).setOnClickListener {
             startActivity(Intent(this, MoviesFilterSettingsActivity::class.java))
