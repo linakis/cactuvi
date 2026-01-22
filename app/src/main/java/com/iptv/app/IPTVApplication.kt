@@ -5,6 +5,7 @@ import com.iptv.app.data.db.AppDatabase
 import com.iptv.app.data.repository.ContentRepository
 import com.iptv.app.services.BackgroundSyncWorker
 import com.iptv.app.utils.CredentialsManager
+import com.iptv.app.utils.SourceManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -17,12 +18,30 @@ class IPTVApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         
+        // Migrate existing credentials to source if needed
+        applicationScope.launch {
+            migrateToMultiSource()
+        }
+        
         // Schedule background sync (periodic work)
         BackgroundSyncWorker.schedule(this)
         
         // Trigger immediate sync if cache exists (stale-while-revalidate pattern)
         applicationScope.launch {
             triggerInitialSync()
+        }
+    }
+    
+    /**
+     * Migrate existing single-source credentials to multi-source system on first run.
+     * Creates a "default" source from CredentialsManager if no sources exist.
+     */
+    private suspend fun migrateToMultiSource() {
+        try {
+            val sourceManager = SourceManager.getInstance(this)
+            sourceManager.migrateCurrentCredentialsToSource()
+        } catch (e: Exception) {
+            // Silently fail - user can manually add source later
         }
     }
     
