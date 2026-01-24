@@ -46,8 +46,18 @@ class ContentRepository(
         private const val CACHE_TTL_CATEGORIES = 7 * 24 * 60 * 60 * 1000L  // 7 days
         
         // Batch size for bulk inserts - optimized for performance
-        // Reduced from 1000 to 500 for better memory management with streaming
-        private const val BATCH_SIZE = 500
+        // Increased from 500 to 999 to reduce transaction overhead
+        // 999 chosen to stay under SQLite's SQLITE_MAX_VARIABLE_NUMBER (999) for prepared statements
+        private const val BATCH_SIZE = 999
+        
+        // TODO: Future optimization - implement parallel batch writes
+        // With WAL mode enabled, SQLite supports concurrent writes from multiple threads
+        // Could potentially achieve 2-3x speedup by processing batches in parallel queue
+        // Implementation considerations:
+        // - Use semaphore to limit concurrent writes (e.g., 3-4 concurrent batches)
+        // - Monitor for database lock contention
+        // - Test on low-end devices to ensure no memory pressure
+        // - Example approach: coroutineScope { batches.chunked(3).map { async { insert(it) } }.awaitAll() }
     }
     
     /**
