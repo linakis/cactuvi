@@ -101,6 +101,158 @@ adb shell am force-stop com.iptv.app
 adb shell am start -n com.iptv.app/.ui.LoadingActivity
 ```
 
+### Manual Testing & Verification Commands
+
+#### App Installation & Reset
+```bash
+# Build, install, and start fresh
+./gradlew assembleDebug
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+adb shell pm clear com.iptv.app  # Clear all app data
+adb shell am start -n com.iptv.app/.ui.LoadingActivity
+
+# Quick reinstall from clean state
+adb uninstall com.iptv.app
+adb install app/build/outputs/apk/debug/app-debug.apk
+```
+
+#### Log Monitoring & Analysis
+```bash
+# Monitor performance logs (streaming optimization)
+adb logcat -c && adb logcat | grep -E "IPTV_PERF|StreamingJsonParser"
+
+# Watch specific component logs
+adb logcat | grep "MoviesFragment"
+adb logcat | grep "ContentRepository"
+adb logcat | grep "LoadingActivity"
+
+# Filter by log level
+adb logcat *:E  # Errors only
+adb logcat *:W  # Warnings and above
+adb logcat *:D  # Debug and above
+
+# Save logs to file for analysis
+adb logcat -d > logs.txt
+adb logcat -d | grep "IPTV_PERF" > perf_logs.txt
+```
+
+#### UI Inspection & Screenshots
+```bash
+# Take screenshot
+adb exec-out screencap -p > screenshot.png
+
+# Take screenshot with timestamp
+adb exec-out screencap -p > "screenshot_$(date +%Y%m%d_%H%M%S).png"
+
+# View UI hierarchy (XML dump)
+adb shell uiautomator dump /sdcard/hierarchy.xml
+adb pull /sdcard/hierarchy.xml .
+cat hierarchy.xml  # Inspect element structure
+
+# View current activity
+adb shell dumpsys activity activities | grep "mResumedActivity"
+
+# View current fragment
+adb shell dumpsys activity com.iptv.app | grep "Fragment"
+```
+
+#### User Interaction Simulation
+```bash
+# Tap at coordinates (x, y)
+adb shell input tap 500 1000
+
+# Swipe gesture (x1 y1 x2 y2 duration_ms)
+adb shell input swipe 500 1500 500 500 300  # Swipe up
+adb shell input swipe 500 500 500 1500 300  # Swipe down
+adb shell input swipe 900 800 100 800 300   # Swipe left
+adb shell input swipe 100 800 900 800 300   # Swipe right
+
+# Type text
+adb shell input text "Hello"
+
+# Press hardware buttons
+adb shell input keyevent KEYCODE_BACK        # Back button
+adb shell input keyevent KEYCODE_HOME        # Home button
+adb shell input keyevent KEYCODE_MENU        # Menu button
+adb shell input keyevent KEYCODE_ENTER       # Enter/OK
+adb shell input keyevent KEYCODE_DPAD_UP     # D-pad up
+adb shell input keyevent KEYCODE_DPAD_DOWN   # D-pad down
+adb shell input keyevent KEYCODE_DPAD_LEFT   # D-pad left
+adb shell input keyevent KEYCODE_DPAD_RIGHT  # D-pad right
+adb shell input keyevent KEYCODE_DPAD_CENTER # D-pad select
+```
+
+#### Complete Verification Workflow Example
+```bash
+# 1. Build and install fresh
+./gradlew assembleDebug
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+
+# 2. Clear app data for clean test
+adb shell pm clear com.iptv.app
+
+# 3. Start performance monitoring
+adb logcat -c
+adb logcat | grep "IPTV_PERF" > perf_test.log &
+LOGCAT_PID=$!
+
+# 4. Launch app
+adb shell am start -n com.iptv.app/.ui.LoadingActivity
+
+# 5. Take screenshot at key points
+sleep 3
+adb exec-out screencap -p > step1_loading.png
+
+sleep 5
+adb exec-out screencap -p > step2_add_source.png
+
+# 6. Simulate user input (tap Save button at coordinates)
+adb shell input tap 540 1800
+
+# 7. Wait for data load and capture final state
+sleep 180  # Wait 3 minutes for full data load
+adb exec-out screencap -p > step3_home.png
+
+# 8. Stop logging and analyze
+kill $LOGCAT_PID
+grep "Repository.getMovies.*END" perf_test.log
+grep "inserted=" perf_test.log
+
+# 9. Check UI hierarchy
+adb shell uiautomator dump /sdcard/hierarchy.xml
+adb pull /sdcard/hierarchy.xml .
+
+# 10. Verify database content
+adb shell "run-as com.iptv.app sqlite3 /data/data/com.iptv.app/databases/iptv_database 'SELECT COUNT(*) FROM movies;'"
+```
+
+#### TV D-Pad Navigation Testing
+```bash
+# Navigate through app using D-pad
+adb shell input keyevent KEYCODE_DPAD_DOWN   # Move focus down
+adb shell input keyevent KEYCODE_DPAD_CENTER # Select item
+sleep 2
+adb exec-out screencap -p > navigation_test.png
+
+# Navigate back
+adb shell input keyevent KEYCODE_BACK
+```
+
+#### Performance & Memory Profiling
+```bash
+# Continuous memory monitoring
+watch -n 1 'adb shell dumpsys meminfo com.iptv.app | grep -E "TOTAL|Native Heap"'
+
+# CPU usage
+adb shell top -n 1 | grep com.iptv.app
+
+# Network traffic
+adb shell "dumpsys package com.iptv.app | grep -A 5 'Network'"
+
+# Database size
+adb shell "run-as com.iptv.app du -h /data/data/com.iptv.app/databases/"
+```
+
 ## Code Style Guidelines
 
 ### File Organization
