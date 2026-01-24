@@ -11,6 +11,103 @@ This file contains essential information for AI coding agents working on this co
 - **Action-oriented:** Do the work, don't explain what was done
 - **Ask when unclear:** If requirements are ambiguous, ask before implementing
 
+## ⚠️ CRITICAL: Task Tracking with BD
+
+**ALWAYS use BD for task management.** BD (Beads) is the single source of truth for all work.
+
+### Mandatory BD Workflow
+
+1. **Before starting work:**
+   ```bash
+   bd list              # Check existing tasks
+   bd show <task-id>    # Read task details
+   ```
+
+2. **During work:**
+   ```bash
+   bd start <task-id>   # Mark task as started
+   bd update <task-id> --description "Progress update"
+   ```
+
+3. **Creating subtasks:**
+   ```bash
+   bd create --title "Subtask name" --type task --priority P1 --parent <parent-id>
+   ```
+
+4. **After completion:**
+   ```bash
+   bd update <task-id> --description "Completed: [what was done]"
+   bd close <task-id>   # Only after verification passes
+   ```
+
+### When to Create BD Tasks
+
+- **ALWAYS** create tasks for:
+  - Features or bug fixes that take >15 minutes
+  - Any work that involves multiple files
+  - Performance optimizations
+  - Refactoring efforts
+  - Documentation updates (if substantial)
+
+- **Multi-step work** requires:
+  - Parent task describing the goal
+  - Subtasks for each major step
+  - Update parent task with progress after each subtask
+
+### BD Task Quality Standards
+
+- **Titles:** Clear, actionable (e.g., "Implement streaming JSON parser for large datasets")
+- **Descriptions:** Include:
+  - Acceptance criteria
+  - Files affected
+  - Testing requirements
+  - Expected results/measurements
+- **Priorities:**
+  - P0: Critical/blocking
+  - P1: High priority, next to work on
+  - P2: Medium priority
+  - P3: Low priority/nice-to-have
+
+### Common BD Commands
+
+```bash
+# List tasks
+bd list                          # All open tasks
+bd list --priority P1            # P1 tasks only
+bd list --json | jq '.[] | {id, title}'  # JSON output
+
+# Show task details
+bd show <task-id>                # Human-readable
+bd show <task-id> --json         # JSON format
+bd show <task-id> --refs         # Show references
+
+# Create tasks
+bd create --title "Task name" --type task --priority P1
+bd create --parent <id> --title "Subtask"
+
+# Update tasks
+bd update <task-id> --description "Updated description"
+bd update <task-id> --priority P0
+bd start <task-id>               # Mark as started
+bd close <task-id>               # Mark as completed
+
+# Search tasks
+bd list --json | jq '.[] | select(.title | test("search term"; "i"))'
+```
+
+### Integration with Git Commits
+
+Always reference BD task IDs in commit messages:
+```bash
+git commit -m "Optimize: Implement streaming parser (iptv-app-q7q.1)
+
+- Add StreamingJsonParser utility
+- Update ContentRepository to use streaming
+- 40% performance improvement
+
+Refs: iptv-app-q7q"
+```
+
 ## Project Overview
 
 **Type:** Android IPTV streaming application (Netflix-style UI)  
@@ -756,4 +853,4 @@ adb logcat | grep "com.iptv.app"
 - NEVER stop before pushing - that leaves work stranded locally
 - NEVER say "ready to push when you are" - YOU must push
 - If push fails, resolve and retry until it succeeds
-Use 'bd' for task tracking
+- ALWAYS use BD for task tracking (see "CRITICAL: Task Tracking with BD" section above)
