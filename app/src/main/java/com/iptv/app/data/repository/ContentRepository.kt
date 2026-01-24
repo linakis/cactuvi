@@ -30,6 +30,9 @@ import kotlinx.coroutines.flow.map as flowMap
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlin.time.Duration.Companion.minutes
 
 /**
  * Exception thrown when VPN is required but not active.
@@ -203,8 +206,10 @@ class ContentRepository(
     
     suspend fun getLiveStreams(forceRefresh: Boolean = false): Result<List<LiveChannel>> = 
         withContext(Dispatchers.IO) {
-            liveMutex.withLock {
-                try {
+            try {
+                withTimeout(5.minutes.inWholeMilliseconds) {
+                    liveMutex.withLock {
+                        try {
                     // Check if already loading (prevent duplicate loads)
                     if (_liveLoading.value && !forceRefresh) {
                         PerformanceLogger.log("Live channels already loading, skip duplicate request")
@@ -240,8 +245,8 @@ class ContentRepository(
                 val categories = getLiveCategories().getOrNull() ?: emptyList()
                 val categoryMap = categories.associateBy { it.categoryId }
                 
-                // Clear old data before streaming
-                database.liveChannelDao().clearAll()
+                // Clear old data for this source before streaming
+                database.liveChannelDao().deleteBySourceId(sourceId)
                 
                 // Drop indices before batch inserts
                 com.iptv.app.data.db.OptimizedBulkInsert.beginLiveChannelsInsert(database.getSqliteDatabase())
@@ -310,6 +315,12 @@ class ContentRepository(
                     // Always reset loading flag
                     _liveLoading.value = false
                 }
+                    }
+                }
+            } catch (e: TimeoutCancellationException) {
+                PerformanceLogger.log("getLiveStreams timed out after 5 minutes")
+                _liveLoading.value = false
+                Result.failure(Exception("Live channels data load timed out. Please try again.", e))
             }
         }
     
@@ -350,10 +361,12 @@ class ContentRepository(
     
     suspend fun getMovies(forceRefresh: Boolean = false): Result<List<Movie>> = 
         withContext(Dispatchers.IO) {
-            moviesMutex.withLock {
-                val startTime = PerformanceLogger.start("Repository.getMovies")
+            try {
+                withTimeout(5.minutes.inWholeMilliseconds) {
+                    moviesMutex.withLock {
+                        val startTime = PerformanceLogger.start("Repository.getMovies")
             
-                try {
+                        try {
                     // Check if already loading (prevent duplicate loads)
                     if (_moviesLoading.value && !forceRefresh) {
                         PerformanceLogger.log("Movies already loading, skip duplicate request")
@@ -404,11 +417,11 @@ class ContentRepository(
                 val categories = getMovieCategories().getOrNull() ?: emptyList()
                 val categoryMap = categories.associateBy { it.categoryId }
                 
-                // Clear old data before streaming new data to avoid conflicts
-                PerformanceLogger.logPhase("getMovies", "Clearing old data")
-                val clearStart = PerformanceLogger.start("Clear movies")
-                database.movieDao().clearAll()
-                PerformanceLogger.end("Clear movies", clearStart)
+                // Clear old data for this source before streaming new data to avoid conflicts
+                PerformanceLogger.logPhase("getMovies", "Clearing old data for source")
+                val clearStart = PerformanceLogger.start("Clear movies by sourceId")
+                database.movieDao().deleteBySourceId(sourceId)
+                PerformanceLogger.end("Clear movies by sourceId", clearStart)
                 
                 // Optimized streaming parse + insert with index management
                 PerformanceLogger.logPhase("getMovies", "Streaming parse + optimized DB insert")
@@ -500,6 +513,12 @@ class ContentRepository(
                     // Always reset loading flag
                     _moviesLoading.value = false
                 }
+                    }
+                }
+            } catch (e: TimeoutCancellationException) {
+                PerformanceLogger.log("getMovies timed out after 5 minutes")
+                _moviesLoading.value = false
+                Result.failure(Exception("Movies data load timed out. Please try again.", e))
             }
         }
     
@@ -580,8 +599,10 @@ class ContentRepository(
     
     suspend fun getSeries(forceRefresh: Boolean = false): Result<List<Series>> = 
         withContext(Dispatchers.IO) {
-            seriesMutex.withLock {
-                try {
+            try {
+                withTimeout(5.minutes.inWholeMilliseconds) {
+                    seriesMutex.withLock {
+                        try {
                     // Check if already loading (prevent duplicate loads)
                     if (_seriesLoading.value && !forceRefresh) {
                         PerformanceLogger.log("Series already loading, skip duplicate request")
@@ -624,8 +645,8 @@ class ContentRepository(
                 val categoryMap = categories.associateBy { it.categoryId }
                 PerformanceLogger.log("[DEBUG getSeries] CategoryMap size: ${categoryMap.size}")
                 
-                // Clear old data before streaming
-                database.seriesDao().clearAll()
+                // Clear old data for this source before streaming
+                database.seriesDao().deleteBySourceId(sourceId)
                 
                 // Drop indices before batch inserts
                 com.iptv.app.data.db.OptimizedBulkInsert.beginSeriesInsert(database.getSqliteDatabase())
@@ -716,6 +737,12 @@ class ContentRepository(
                     // Always reset loading flag
                     _seriesLoading.value = false
                 }
+                    }
+                }
+            } catch (e: TimeoutCancellationException) {
+                PerformanceLogger.log("getSeries timed out after 5 minutes")
+                _seriesLoading.value = false
+                Result.failure(Exception("Series data load timed out. Please try again.", e))
             }
         }
     
@@ -1208,12 +1235,11 @@ class ContentRepository(
      */
     suspend fun clearSourceCache(sourceId: String): Result<Unit> = withContext(Dispatchers.IO) {
         try {
-            // Clear all content for this source
-            // TODO: Add sourceId-specific filters to DAOs for content
-            database.liveChannelDao().clearAll()
-            database.movieDao().clearAll()
-            database.seriesDao().clearAll()
-            database.categoryDao().clearAll()
+            // Clear all content for this source using sourceId-specific deletes
+            database.liveChannelDao().deleteBySourceId(sourceId)
+            database.movieDao().deleteBySourceId(sourceId)
+            database.seriesDao().deleteBySourceId(sourceId)
+            database.categoryDao().deleteBySourceId(sourceId)
             database.navigationGroupDao().clear()
             database.cacheMetadataDao().deleteAll()
             

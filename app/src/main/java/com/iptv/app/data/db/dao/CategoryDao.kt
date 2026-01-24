@@ -15,6 +15,9 @@ interface CategoryDao {
     @Query("DELETE FROM categories WHERE type = :type")
     suspend fun clearByType(type: String)
     
+    @Query("DELETE FROM categories WHERE sourceId = :sourceId")
+    suspend fun deleteBySourceId(sourceId: String)
+    
     @Query("DELETE FROM categories")
     suspend fun clearAll()
 }

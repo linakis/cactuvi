@@ -38,6 +38,9 @@ interface LiveChannelDao {
     @Query("DELETE FROM live_channels WHERE 1")
     suspend fun clearAll()
     
+    @Query("DELETE FROM live_channels WHERE sourceId = :sourceId")
+    suspend fun deleteBySourceId(sourceId: String)
+    
     // ========== CACHE VALIDATION QUERIES ==========
     
     /**

@@ -44,6 +44,9 @@ interface SeriesDao {
     @Query("DELETE FROM series WHERE 1")
     suspend fun clearAll()
     
+    @Query("DELETE FROM series WHERE sourceId = :sourceId")
+    suspend fun deleteBySourceId(sourceId: String)
+    
     // ========== CACHE VALIDATION QUERIES ==========
     
     /**
