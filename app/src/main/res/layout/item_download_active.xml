@@ -75,7 +75,7 @@
             android:layout_marginTop="@dimen/spacing_s"
             android:max="100"
             android:progress="45"
-            android:progressTint="@color/brand_orange"
+            android:progressTint="@color/brand_green"
             android:progressBackgroundTint="@color/surface_elevated"
             app:layout_constraintTop_toBottomOf="@id/statusText"
             app:layout_constraintStart_toEndOf="@id/posterCard"

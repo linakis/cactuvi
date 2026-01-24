@@ -14,7 +14,7 @@
     app:cardCornerRadius="12dp"
     app:cardElevation="2dp"
     app:strokeWidth="0dp"
-    app:rippleColor="@color/brand_orange">
+    app:rippleColor="@color/brand_green">
     
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
@@ -43,7 +43,7 @@
             android:layout_marginStart="@dimen/spacing_s"
             android:layout_marginEnd="@dimen/spacing_s"
             android:textAppearance="?attr/textAppearanceBodyMedium"
-            android:textColor="@color/brand_orange"
+            android:textColor="@color/brand_green"
             android:fontFamily="sans-serif-medium"
             android:text="(12)"
             app:layout_constraintTop_toTopOf="parent"

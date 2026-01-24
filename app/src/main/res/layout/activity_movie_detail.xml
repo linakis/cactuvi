@@ -182,7 +182,7 @@
             android:id="@+id/progressBar"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:indeterminateTint="@color/brand_orange"
+            android:indeterminateTint="@color/brand_green"
             android:visibility="gone"
             app:layout_constraintTop_toBottomOf="@id/actionsContainer"
             app:layout_constraintStart_toStartOf="parent"
@@ -209,7 +209,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="@string/plot"
-                android:textColor="@color/brand_orange"
+                android:textColor="@color/brand_green"
                 android:textAllCaps="true"
                 android:letterSpacing="0.05" />
 
@@ -229,7 +229,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="@dimen/spacing_l"
                 android:text="@string/genre"
-                android:textColor="@color/brand_orange"
+                android:textColor="@color/brand_green"
                 android:textAllCaps="true"
                 android:letterSpacing="0.05" />
 
@@ -248,7 +248,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="@dimen/spacing_l"
                 android:text="@string/director"
-                android:textColor="@color/brand_orange"
+                android:textColor="@color/brand_green"
                 android:textAllCaps="true"
                 android:letterSpacing="0.05" />
 
@@ -267,7 +267,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="@dimen/spacing_l"
                 android:text="@string/cast"
-                android:textColor="@color/brand_orange"
+                android:textColor="@color/brand_green"
                 android:textAllCaps="true"
                 android:letterSpacing="0.05" />
 

@@ -49,7 +49,7 @@
     <!-- Empty State -->
     <dimen name="empty_state_icon_size">64dp</dimen>
     
-    <!-- Jellyfin-style Dimensions -->
+    <!-- Cactuvi-style Dimensions -->
     <!-- Toolbar -->
     <dimen name="toolbar_height">64dp</dimen>
     <dimen name="toolbar_elevation">8dp</dimen>

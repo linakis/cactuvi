@@ -88,7 +88,7 @@
             android:layout_marginStart="@dimen/spacing_m"
             android:layout_marginTop="@dimen/spacing_s"
             android:layout_marginEnd="@dimen/spacing_m"
-            android:progressTint="@color/brand_orange"
+            android:progressTint="@color/brand_green"
             android:progressBackgroundTint="@color/progress_unplayed"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toEndOf="@id/posterCard"

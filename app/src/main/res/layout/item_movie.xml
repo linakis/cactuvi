@@ -44,7 +44,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="@dimen/spacing_xxs"
-        android:textColor="@color/brand_orange"
+        android:textColor="@color/brand_green"
         android:textSize="12sp"
         android:visibility="gone"
         tools:visibility="visible"

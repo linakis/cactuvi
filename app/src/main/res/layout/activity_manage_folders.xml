@@ -140,7 +140,7 @@
         android:layout_margin="@dimen/spacing_m"
         android:text="Apply"
         android:textColor="@android:color/white"
-        app:backgroundTint="@color/brand_orange"
+        app:backgroundTint="@color/brand_green"
         app:layout_constraintBottom_toBottomOf="parent" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

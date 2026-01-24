@@ -506,7 +506,7 @@ class MoviesFragment : Fragment() {
             chipBackgroundColor = ColorStateList.valueOf(
                 requireContext().getColor(R.color.surface_elevated)
             )
-            setTextColor(requireContext().getColor(R.color.brand_orange))
+            setTextColor(requireContext().getColor(R.color.brand_green))
             setOnClickListener { handleBackPress() }
         }
         breadcrumbChips.addView(chip)

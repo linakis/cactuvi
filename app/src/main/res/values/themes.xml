@@ -2,14 +2,14 @@
 <resources>
     <style name="Base.Theme.IPTVPlayer" parent="Theme.Material3.Dark.NoActionBar">
         <!-- Primary colors (Material 3) -->
-        <item name="colorPrimary">@color/brand_orange</item>
-        <item name="colorPrimaryVariant">@color/brand_orange_dark</item>
+        <item name="colorPrimary">@color/brand_green</item>
+        <item name="colorPrimaryVariant">@color/brand_green_dark</item>
         <item name="colorOnPrimary">@color/text_primary</item>
-        <item name="colorAccent">@color/brand_orange</item>
+        <item name="colorAccent">@color/brand_green</item>
         
-        <!-- Surface colors (Jellyfin-inspired) -->
-        <item name="colorSurface">@color/surface_jellyfin</item>
-        <item name="colorSurfaceVariant">@color/surface_variant_jellyfin</item>
+        <!-- Surface colors (Cactuvi-inspired) -->
+        <item name="colorSurface">@color/surface_cactuvi</item>
+        <item name="colorSurfaceVariant">@color/surface_variant_cactuvi</item>
         <item name="colorOnSurface">@color/text_primary</item>
         <item name="colorOnSurfaceVariant">@color/text_secondary</item>
         
@@ -30,10 +30,10 @@
         <!-- Ripple -->
         <item name="colorControlHighlight">@color/overlay_light</item>
         
-        <!-- Shape appearances (Jellyfin-style rounded) -->
-        <item name="shapeAppearanceSmallComponent">@style/ShapeAppearance.Jellyfin.SmallComponent</item>
-        <item name="shapeAppearanceMediumComponent">@style/ShapeAppearance.Jellyfin.MediumComponent</item>
-        <item name="shapeAppearanceLargeComponent">@style/ShapeAppearance.Jellyfin.LargeComponent</item>
+        <!-- Shape appearances (Cactuvi-style rounded) -->
+        <item name="shapeAppearanceSmallComponent">@style/ShapeAppearance.Cactuvi.SmallComponent</item>
+        <item name="shapeAppearanceMediumComponent">@style/ShapeAppearance.Cactuvi.MediumComponent</item>
+        <item name="shapeAppearanceLargeComponent">@style/ShapeAppearance.Cactuvi.LargeComponent</item>
     </style>
 
     <style name="Theme.IPTVPlayer" parent="Base.Theme.IPTVPlayer" />
@@ -69,24 +69,24 @@
         <item name="fontFamily">sans-serif</item>
     </style>
     
-    <!-- Shape Appearances (Jellyfin-style rounded corners) -->
-    <style name="ShapeAppearance.Jellyfin.SmallComponent" parent="ShapeAppearance.Material3.Corner.Small">
+    <!-- Shape Appearances (Cactuvi-style rounded corners) -->
+    <style name="ShapeAppearance.Cactuvi.SmallComponent" parent="ShapeAppearance.Material3.Corner.Small">
         <item name="cornerFamily">rounded</item>
         <item name="cornerSize">8dp</item>
     </style>
     
-    <style name="ShapeAppearance.Jellyfin.MediumComponent" parent="ShapeAppearance.Material3.Corner.Medium">
+    <style name="ShapeAppearance.Cactuvi.MediumComponent" parent="ShapeAppearance.Material3.Corner.Medium">
         <item name="cornerFamily">rounded</item>
         <item name="cornerSize">16dp</item>
     </style>
     
-    <style name="ShapeAppearance.Jellyfin.LargeComponent" parent="ShapeAppearance.Material3.Corner.Large">
+    <style name="ShapeAppearance.Cactuvi.LargeComponent" parent="ShapeAppearance.Material3.Corner.Large">
         <item name="cornerFamily">rounded</item>
         <item name="cornerSize">20dp</item>
     </style>
     
     <!-- Toolbar Style -->
-    <style name="TextAppearance.Toolbar.Title.Jellyfin" parent="TextAppearance.Material3.TitleLarge">
+    <style name="TextAppearance.Toolbar.Title.Cactuvi" parent="TextAppearance.Material3.TitleLarge">
         <item name="android:textSize">22sp</item>
         <item name="android:textColor">@color/text_primary</item>
         <item name="fontFamily">sans-serif-medium</item>

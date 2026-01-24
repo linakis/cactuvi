@@ -44,7 +44,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="SOURCE DETAILS"
-                        android:textColor="@color/brand_orange"
+                        android:textColor="@color/brand_green"
                         android:textSize="14sp"
                         android:textAllCaps="true"
                         android:fontFamily="sans-serif-medium"
@@ -58,8 +58,8 @@
                         android:layout_height="wrap_content"
                         android:layout_marginBottom="@dimen/spacing_m"
                         android:hint="Nickname"
-                        app:boxStrokeColor="@color/brand_orange"
-                        app:hintTextColor="@color/brand_orange">
+                        app:boxStrokeColor="@color/brand_green"
+                        app:hintTextColor="@color/brand_green">
                         
                         <com.google.android.material.textfield.TextInputEditText
                             android:id="@+id/nicknameEditText"
@@ -78,8 +78,8 @@
                         android:layout_height="wrap_content"
                         android:layout_marginBottom="@dimen/spacing_m"
                         android:hint="Server URL"
-                        app:boxStrokeColor="@color/brand_orange"
-                        app:hintTextColor="@color/brand_orange">
+                        app:boxStrokeColor="@color/brand_green"
+                        app:hintTextColor="@color/brand_green">
                         
                         <com.google.android.material.textfield.TextInputEditText
                             android:id="@+id/serverEditText"
@@ -98,8 +98,8 @@
                         android:layout_height="wrap_content"
                         android:layout_marginBottom="@dimen/spacing_m"
                         android:hint="Username"
-                        app:boxStrokeColor="@color/brand_orange"
-                        app:hintTextColor="@color/brand_orange">
+                        app:boxStrokeColor="@color/brand_green"
+                        app:hintTextColor="@color/brand_green">
                         
                         <com.google.android.material.textfield.TextInputEditText
                             android:id="@+id/usernameEditText"
@@ -117,8 +117,8 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:hint="Password"
-                        app:boxStrokeColor="@color/brand_orange"
-                        app:hintTextColor="@color/brand_orange"
+                        app:boxStrokeColor="@color/brand_green"
+                        app:hintTextColor="@color/brand_green"
                         app:endIconMode="password_toggle">
                         
                         <com.google.android.material.textfield.TextInputEditText
@@ -140,7 +140,7 @@
                 android:layout_marginBottom="@dimen/spacing_m"
                 android:text="Save Source"
                 android:textColor="@android:color/white"
-                android:backgroundTint="@color/brand_orange"
+                android:backgroundTint="@color/brand_green"
                 android:paddingVertical="@dimen/spacing_m" />
             
             <!-- Test Connection Button (Optional) -->
@@ -162,7 +162,7 @@
                 android:layout_gravity="center"
                 android:layout_marginTop="@dimen/spacing_m"
                 android:visibility="gone"
-                android:indeterminateTint="@color/brand_orange" />
+                android:indeterminateTint="@color/brand_green" />
         </LinearLayout>
     </ScrollView>
 </androidx.constraintlayout.widget.ConstraintLayout>

@@ -26,7 +26,7 @@
             android:layout_height="wrap_content"
             android:layout_gravity="center"
             android:textSize="16sp"
-            android:textColor="@color/brand_orange"
+            android:textColor="@color/brand_green"
             tools:text="1" />
 
         <!-- Progress Indicator (shows if episode has watch history) -->

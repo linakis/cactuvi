@@ -23,7 +23,7 @@
         
         <TextView
             android:id="@+id/titleText"
-            style="@style/TextAppearance.Toolbar.Title.Jellyfin"
+            style="@style/TextAppearance.Toolbar.Title.Cactuvi"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginHorizontal="@dimen/spacing_l"

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<com.cactuvi.app.ui.common.JellyfinCard
+<com.cactuvi.app.ui.common.CactuviCard
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
@@ -19,7 +19,7 @@
             android:layout_width="48dp"
             android:layout_height="48dp"
             android:src="@drawable/ic_folder_24"
-            app:tint="@color/brand_orange"
+            app:tint="@color/brand_green"
             android:contentDescription="Group icon"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent"
@@ -46,7 +46,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginEnd="@dimen/spacing_s"
-            android:textColor="@color/brand_orange"
+            android:textColor="@color/brand_green"
             app:chipBackgroundColor="@color/surface_elevated"
             app:layout_constraintEnd_toStartOf="@id/chevronIcon"
             app:layout_constraintTop_toTopOf="parent"
@@ -67,4 +67,4 @@
         
     </androidx.constraintlayout.widget.ConstraintLayout>
     
-</com.cactuvi.app.ui.common.JellyfinCard>
+</com.cactuvi.app.ui.common.CactuviCard>

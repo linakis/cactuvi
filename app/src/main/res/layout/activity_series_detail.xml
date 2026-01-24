@@ -121,7 +121,7 @@
                 android:layout_height="wrap_content"
                 android:layout_gravity="center"
                 android:layout_marginTop="@dimen/spacing_xl"
-                android:indeterminateTint="@color/brand_orange"
+                android:indeterminateTint="@color/brand_green"
                 android:visibility="gone"
                 tools:visibility="visible" />
 
@@ -143,7 +143,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="@string/plot"
-                    android:textColor="@color/brand_orange"
+                    android:textColor="@color/brand_green"
                     android:textAllCaps="true"
                     android:letterSpacing="0.05" />
 
@@ -163,7 +163,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="@dimen/spacing_l"
                     android:text="@string/genre"
-                    android:textColor="@color/brand_orange"
+                    android:textColor="@color/brand_green"
                     android:textAllCaps="true"
                     android:letterSpacing="0.05" />
 
@@ -194,7 +194,7 @@
                     android:paddingStart="@dimen/spacing_l"
                     android:paddingEnd="@dimen/spacing_l"
                     android:text="@string/episodes"
-                    android:textColor="@color/brand_orange"
+                    android:textColor="@color/brand_green"
                     android:textAllCaps="true"
                     android:letterSpacing="0.05" />
 

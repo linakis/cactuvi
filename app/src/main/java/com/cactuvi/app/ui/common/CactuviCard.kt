@@ -7,16 +7,16 @@ import androidx.core.content.ContextCompat
 import com.google.android.material.card.MaterialCardView
 import com.cactuvi.app.R
 
-class JellyfinCard @JvmOverloads constructor(
+class CactuviCard @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
     defStyleAttr: Int = 0
 ) : MaterialCardView(context, attrs, defStyleAttr) {
     
     init {
-        // Jellyfin-inspired card styling
+        // Cactuvi-inspired card styling
         setCardBackgroundColor(ColorStateList.valueOf(
-            ContextCompat.getColor(context, R.color.surface_variant_jellyfin)
+            ContextCompat.getColor(context, R.color.surface_variant_cactuvi)
         ))
         radius = context.resources.getDimension(R.dimen.corner_radius_large)
         setCardElevation(context.resources.getDimension(R.dimen.elevation_card))
@@ -26,6 +26,6 @@ class JellyfinCard @JvmOverloads constructor(
         // Ripple effect
         isClickable = true
         isFocusable = true
-        foreground = ContextCompat.getDrawable(context, R.drawable.ripple_jellyfin)
+        foreground = ContextCompat.getDrawable(context, R.drawable.ripple_cactuvi)
     }
 }

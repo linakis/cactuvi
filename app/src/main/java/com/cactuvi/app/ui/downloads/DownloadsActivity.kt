@@ -73,7 +73,7 @@ class DownloadsActivity : AppCompatActivity() {
                 if (downloads.isNotEmpty()) {
                     activeTab?.orCreateBadge?.apply {
                         number = downloads.size
-                        backgroundColor = getColor(R.color.brand_orange)
+                        backgroundColor = getColor(R.color.brand_green)
                         badgeTextColor = getColor(R.color.text_primary)
                     }
                 } else {
