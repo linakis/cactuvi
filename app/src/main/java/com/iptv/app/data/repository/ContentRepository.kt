@@ -162,7 +162,9 @@ class ContentRepository(
                 // Clear old data before streaming
                 database.liveChannelDao().clearAll()
                 
-                // Stream parse and insert in batches
+                // Drop indices before batch inserts
+                com.iptv.app.data.db.OptimizedBulkInsert.beginLiveChannelsInsert(database.getSqliteDatabase())
+                
                 var totalInserted = 0
                 try {
                     totalInserted = StreamingJsonParser.parseArrayInBatches(
@@ -175,7 +177,10 @@ class ContentRepository(
                                 channel.categoryName = categoryName
                                 channel.toEntity(sourceId, categoryName)
                             }
-                            database.liveChannelDao().insertAllInTransaction(entities)
+                            com.iptv.app.data.db.OptimizedBulkInsert.insertLiveChannelBatchOptimized(
+                                database.getSqliteDatabase(),
+                                entities
+                            )
                         },
                         onProgress = { count ->
                             PerformanceLogger.log("Progress: $count live channels parsed and inserted")
@@ -183,6 +188,8 @@ class ContentRepository(
                     )
                 } catch (e: Exception) {
                     throw e
+                } finally {
+                    com.iptv.app.data.db.OptimizedBulkInsert.endLiveChannelsInsert(database.getSqliteDatabase())
                 }
                 
                 // Update cache metadata
@@ -294,9 +301,12 @@ class ContentRepository(
                 database.movieDao().clearAll()
                 PerformanceLogger.end("Clear movies", clearStart)
                 
-                // Stream parse and insert in batches to minimize memory usage
-                PerformanceLogger.logPhase("getMovies", "Streaming parse + batched DB insert")
-                val dbInsertStart = PerformanceLogger.start("Stream + DB insert")
+                // Optimized streaming parse + insert with index management
+                PerformanceLogger.logPhase("getMovies", "Streaming parse + optimized DB insert")
+                val dbInsertStart = PerformanceLogger.start("Stream + optimized insert")
+                
+                // Drop indices before batch inserts
+                com.iptv.app.data.db.OptimizedBulkInsert.beginMoviesInsert(database.getSqliteDatabase())
                 
                 var totalInserted = 0
                 try {
@@ -311,8 +321,11 @@ class ContentRepository(
                                 movie.categoryName = categoryName
                                 movie.toEntity(sourceId, categoryName)
                             }
-                            // Insert batch in single transaction
-                            database.movieDao().insertAllInTransaction(entities)
+                            // Optimized batch insert (no index overhead per batch)
+                            com.iptv.app.data.db.OptimizedBulkInsert.insertMovieBatchOptimized(
+                                database.getSqliteDatabase(),
+                                entities
+                            )
                         },
                         onProgress = { count ->
                             PerformanceLogger.log("Progress: $count movies parsed and inserted")
@@ -321,7 +334,12 @@ class ContentRepository(
                 } catch (e: Exception) {
                     PerformanceLogger.log("Streaming parse error: ${e.message}")
                     throw e
+                } finally {
+                    // Rebuild indices after all inserts
+                    com.iptv.app.data.db.OptimizedBulkInsert.endMoviesInsert(database.getSqliteDatabase())
                 }
+                
+                PerformanceLogger.end("Stream + optimized insert", dbInsertStart, "inserted=$totalInserted")
                 
                 PerformanceLogger.end("Stream + DB insert", dbInsertStart, "inserted=$totalInserted")
                 
@@ -464,7 +482,9 @@ class ContentRepository(
                 // Clear old data before streaming
                 database.seriesDao().clearAll()
                 
-                // Stream parse and insert in batches
+                // Drop indices before batch inserts
+                com.iptv.app.data.db.OptimizedBulkInsert.beginSeriesInsert(database.getSqliteDatabase())
+                
                 var totalInserted = 0
                 try {
                     totalInserted = StreamingJsonParser.parseArrayInBatches(
@@ -477,7 +497,10 @@ class ContentRepository(
                                 s.categoryName = categoryName
                                 s.toEntity(sourceId, categoryName)
                             }
-                            database.seriesDao().insertAllInTransaction(entities)
+                            com.iptv.app.data.db.OptimizedBulkInsert.insertSeriesBatchOptimized(
+                                database.getSqliteDatabase(),
+                                entities
+                            )
                         },
                         onProgress = { count ->
                             PerformanceLogger.log("Progress: $count series parsed and inserted")
@@ -485,6 +508,8 @@ class ContentRepository(
                     )
                 } catch (e: Exception) {
                     throw e
+                } finally {
+                    com.iptv.app.data.db.OptimizedBulkInsert.endSeriesInsert(database.getSqliteDatabase())
                 }
                 
                 // Update cache metadata

@@ -39,6 +39,12 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun cacheMetadataDao(): CacheMetadataDao
     abstract fun streamSourceDao(): StreamSourceDao
     
+    /**
+     * Get access to underlying SQLite database for optimized bulk operations.
+     * Used by OptimizedBulkInsert utility.
+     */
+    fun getSqliteDatabase(): SupportSQLiteDatabase = openHelper.writableDatabase
+    
     companion object {
         @Volatile
         private var INSTANCE: AppDatabase? = null
