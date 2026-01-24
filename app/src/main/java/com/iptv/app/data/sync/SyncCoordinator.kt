@@ -51,20 +51,19 @@ class SyncCoordinator(context: Context) {
             }
             
             // ========== PHASE 2: API FETCH (PARALLEL - CRITICAL!) ==========
-            val (moviesResult, seriesResult, liveResult) = coroutineScope {
-                Triple(
-                    async { repository.getMovies(forceRefresh = true) },
-                    async { repository.getSeries(forceRefresh = true) },
-                    async { repository.getLiveStreams(forceRefresh = true) }
-                )
-            }.let { (m, s, l) ->
-                Triple(m.await(), s.await(), l.await())
+            // Launch all three load operations in parallel and await completion
+            coroutineScope {
+                listOf(
+                    async { repository.loadMovies(forceRefresh = true) },
+                    async { repository.loadSeries(forceRefresh = true) },
+                    async { repository.loadLive(forceRefresh = true) }
+                ).map { it.await() }
             }
             
-            // Track success for each content type
-            val moviesSuccess = moviesResult.isSuccess
-            val seriesSuccess = seriesResult.isSuccess
-            val liveSuccess = liveResult.isSuccess
+            // Check success by examining final states
+            val moviesSuccess = repository.moviesState.value.isSuccess()
+            val seriesSuccess = repository.seriesState.value.isSuccess()
+            val liveSuccess = repository.liveState.value.isSuccess()
             
             // ========== PHASE 3: Capture new state (parallel) ==========
             val (newMoviesTree, newSeriesTree, newLiveTree) = coroutineScope {
@@ -115,21 +114,24 @@ class SyncCoordinator(context: Context) {
                 syncPrefs.updateLastSync("movies", now)
                 updateSyncStatus("movies", "SUCCESS", null)
             } else {
-                updateSyncStatus("movies", "FAILED", moviesResult.exceptionOrNull()?.message)
+                val errorMsg = (repository.moviesState.value as? com.iptv.app.data.models.DataState.Error)?.error?.message
+                updateSyncStatus("movies", "FAILED", errorMsg)
             }
             
             if (seriesSuccess) {
                 syncPrefs.updateLastSync("series", now)
                 updateSyncStatus("series", "SUCCESS", null)
             } else {
-                updateSyncStatus("series", "FAILED", seriesResult.exceptionOrNull()?.message)
+                val errorMsg = (repository.seriesState.value as? com.iptv.app.data.models.DataState.Error)?.error?.message
+                updateSyncStatus("series", "FAILED", errorMsg)
             }
             
             if (liveSuccess) {
                 syncPrefs.updateLastSync("live", now)
                 updateSyncStatus("live", "SUCCESS", null)
             } else {
-                updateSyncStatus("live", "FAILED", liveResult.exceptionOrNull()?.message)
+                val errorMsg = (repository.liveState.value as? com.iptv.app.data.models.DataState.Error)?.error?.message
+                updateSyncStatus("live", "FAILED", errorMsg)
             }
             
             // Return success if at least one content type succeeded (partial failure handling)

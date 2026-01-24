@@ -15,6 +15,7 @@ import com.iptv.app.R
 import com.iptv.app.data.models.Movie
 import com.iptv.app.data.models.Series
 import com.iptv.app.data.repository.ContentRepository
+import com.iptv.app.data.db.mappers.toModel
 import com.iptv.app.ui.common.ModernToolbar
 import com.iptv.app.ui.common.MovieAdapter
 import com.iptv.app.ui.common.SeriesAdapter
@@ -105,22 +106,27 @@ class SearchActivity : AppCompatActivity() {
     
     private fun loadAllContent() {
         lifecycleScope.launch {
-            // Load content based on filter
+            // Load content from database cache (fast, no API call)
+            // Trigger background refresh if needed
             when (contentTypeFilter) {
                 TYPE_MOVIES, TYPE_ALL -> {
-                    val moviesResult = repository.getMovies(forceRefresh = false)
-                    if (moviesResult.isSuccess) {
-                        allMovies = moviesResult.getOrNull() ?: emptyList()
-                    }
+                    // Trigger background load (if not already loaded)
+                    repository.loadMovies(forceRefresh = false)
+                    // Load from database for search
+                    val database = com.iptv.app.data.db.AppDatabase.getInstance(this@SearchActivity)
+                    val movieEntities = database.movieDao().getAll()
+                    allMovies = movieEntities.map { it.toModel() }
                 }
             }
             
             when (contentTypeFilter) {
                 TYPE_SERIES, TYPE_ALL -> {
-                    val seriesResult = repository.getSeries(forceRefresh = false)
-                    if (seriesResult.isSuccess) {
-                        allSeries = seriesResult.getOrNull() ?: emptyList()
-                    }
+                    // Trigger background load (if not already loaded)
+                    repository.loadSeries(forceRefresh = false)
+                    // Load from database for search
+                    val database = com.iptv.app.data.db.AppDatabase.getInstance(this@SearchActivity)
+                    val seriesEntities = database.seriesDao().getAll()
+                    allSeries = seriesEntities.map { it.toModel() }
                 }
             }
             
