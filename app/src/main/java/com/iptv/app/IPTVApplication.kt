@@ -89,8 +89,75 @@ class IPTVApplication : Application() {
             if (hasMovies || hasSeries || hasLive) {
                 BackgroundSyncWorker.syncNow(this)
             }
+            // If no cache exists, trigger background pre-fetch (Phase 3 optimization)
+            else {
+                triggerBackgroundPrefetch()
+            }
         } catch (e: Exception) {
             // Silently fail - periodic sync will retry
+        }
+    }
+    
+    /**
+     * Phase 3 optimization: Background pre-fetch of all content on app launch.
+     * 
+     * This provides perceived instant load times when user navigates to content screens.
+     * Runs parallel loading (Movies + Series + Live) in background after brief delay.
+     * 
+     * Prerequisites:
+     * - Source must be configured
+     * - No existing cache (cold start scenario)
+     * - VPN requirement respected (if enabled)
+     * 
+     * Expected result:
+     * - Content available in 75-90s (parallel load)
+     * - User navigation shows instant cached results
+     */
+    private suspend fun triggerBackgroundPrefetch() {
+        try {
+            // Brief delay to let app initialization complete
+            kotlinx.coroutines.delay(1000)
+            
+            val sourceManager = SourceManager.getInstance(this)
+            val activeSource = sourceManager.getActiveSource()
+            
+            // Only pre-fetch if source is configured
+            if (activeSource != null) {
+                // Check VPN requirement
+                val prefsManager = PreferencesManager.getInstance(this)
+                if (prefsManager.isVpnWarningEnabled() && !VPNDetector.isVpnActive(this)) {
+                    // Skip pre-fetch if VPN required but not active
+                    // User will see VPN warning dialog and can manually refresh
+                    return
+                }
+                
+                // Trigger parallel background load
+                val repository = ContentRepository(sourceManager, this)
+                val (moviesResult, seriesResult, liveResult) = repository.loadAllContentParallel()
+                
+                // Log results (success/failure)
+                val moviesStatus = if (moviesResult.isSuccess) {
+                    "OK (${moviesResult.getOrNull()?.size ?: 0} items)"
+                } else {
+                    "FAILED"
+                }
+                val seriesStatus = if (seriesResult.isSuccess) {
+                    "OK (${seriesResult.getOrNull()?.size ?: 0} items)"
+                } else {
+                    "FAILED"
+                }
+                val liveStatus = if (liveResult.isSuccess) {
+                    "OK (${liveResult.getOrNull()?.size ?: 0} items)"
+                } else {
+                    "FAILED"
+                }
+                
+                android.util.Log.d("IPTVApplication", 
+                    "Background pre-fetch completed - Movies: $moviesStatus, Series: $seriesStatus, Live: $liveStatus")
+            }
+        } catch (e: Exception) {
+            // Silently fail - user can trigger manual refresh
+            android.util.Log.e("IPTVApplication", "Background pre-fetch failed", e)
         }
     }
 }
