@@ -24,8 +24,11 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map as flowMap
 import kotlinx.coroutines.sync.Mutex
@@ -40,6 +43,30 @@ import kotlin.time.Duration.Companion.minutes
  */
 class VpnRequiredException : Exception("VPN connection required but not active")
 
+/**
+ * One-time effects for Series loading
+ */
+sealed class SeriesEffect {
+    data class LoadSuccess(val itemCount: Int) : SeriesEffect()
+    data class LoadError(val message: String, val hasCachedData: Boolean) : SeriesEffect()
+}
+
+/**
+ * One-time effects for Movies loading
+ */
+sealed class MoviesEffect {
+    data class LoadSuccess(val itemCount: Int) : MoviesEffect()
+    data class LoadError(val message: String, val hasCachedData: Boolean) : MoviesEffect()
+}
+
+/**
+ * One-time effects for Live channels loading
+ */
+sealed class LiveEffect {
+    data class LoadSuccess(val itemCount: Int) : LiveEffect()
+    data class LoadError(val message: String, val hasCachedData: Boolean) : LiveEffect()
+}
+
 class ContentRepository(
     private val sourceManager: SourceManager,
     private val context: Context
@@ -51,13 +78,36 @@ class ContentRepository(
     private val gson = Gson()
     private var currentSourceId: String? = null
     
-    // Loading state flags to prevent duplicate background loads
-    private val _moviesLoading = MutableStateFlow(false)
+    // ========== REACTIVE STATE MANAGEMENT ==========
+    
+    // Series: State (what to display) + Effects (one-time actions)
+    private val _seriesState = MutableStateFlow<DataState<Unit>>(DataState.Success(Unit))
+    val seriesState: StateFlow<DataState<Unit>> = _seriesState.asStateFlow()
+    private val _seriesEffects = MutableSharedFlow<SeriesEffect>()
+    val seriesEffects: SharedFlow<SeriesEffect> = _seriesEffects.asSharedFlow()
+    
+    // Movies: State (what to display) + Effects (one-time actions)
+    private val _moviesState = MutableStateFlow<DataState<Unit>>(DataState.Success(Unit))
+    val moviesState: StateFlow<DataState<Unit>> = _moviesState.asStateFlow()
+    private val _moviesEffects = MutableSharedFlow<MoviesEffect>()
+    val moviesEffects: SharedFlow<MoviesEffect> = _moviesEffects.asSharedFlow()
+    
+    // Live: State (what to display) + Effects (one-time actions)
+    private val _liveState = MutableStateFlow<DataState<Unit>>(DataState.Success(Unit))
+    val liveState: StateFlow<DataState<Unit>> = _liveState.asStateFlow()
+    private val _liveEffects = MutableSharedFlow<LiveEffect>()
+    val liveEffects: SharedFlow<LiveEffect> = _liveEffects.asSharedFlow()
+    
+    // Legacy boolean flags for deprecated getSeries/getMovies/getLiveStreams methods
     private val _seriesLoading = MutableStateFlow(false)
+    private val _moviesLoading = MutableStateFlow(false)
     private val _liveLoading = MutableStateFlow(false)
     
-    val moviesLoading: StateFlow<Boolean> = _moviesLoading.asStateFlow()
+    @Deprecated("Use seriesState instead", ReplaceWith("seriesState"))
     val seriesLoading: StateFlow<Boolean> = _seriesLoading.asStateFlow()
+    @Deprecated("Use moviesState instead", ReplaceWith("moviesState"))
+    val moviesLoading: StateFlow<Boolean> = _moviesLoading.asStateFlow()
+    @Deprecated("Use liveState instead", ReplaceWith("liveState"))
     val liveLoading: StateFlow<Boolean> = _liveLoading.asStateFlow()
     
     // Mutexes to prevent concurrent data loading and database corruption
@@ -214,19 +264,21 @@ class ContentRepository(
             val startTime = PerformanceLogger.start("Parallel content load")
             
             // Launch all 3 content types concurrently on IO dispatcher
-            val moviesDeferred = async(Dispatchers.IO) { 
-                getMovies(forceRefresh = true) 
+            // Series uses new FRP pattern (fire-and-forget, state managed via StateFlow)
+            // Movies/Live still use old Result pattern temporarily
+            async(Dispatchers.IO) { 
+                loadSeries(forceRefresh = false)  // NEW: Reactive pattern
             }
-            val seriesDeferred = async(Dispatchers.IO) { 
-                getSeries(forceRefresh = true) 
+            val moviesDeferred = async(Dispatchers.IO) { 
+                getMovies(forceRefresh = false)  // OLD: Result pattern (will convert later)
             }
             val liveDeferred = async(Dispatchers.IO) { 
-                getLiveStreams(forceRefresh = true) 
+                getLiveStreams(forceRefresh = false)  // OLD: Result pattern (will convert later)
             }
             
-            // Await all results (blocks until all complete)
+            // Await results (Series doesn't return Result, uses StateFlow instead)
             val moviesResult = moviesDeferred.await()
-            val seriesResult = seriesDeferred.await()
+            val seriesResult = Result.success(emptyList<Series>())  // Series state managed via StateFlow
             val liveResult = liveDeferred.await()
             
             PerformanceLogger.end("Parallel content load", startTime, 
@@ -640,6 +692,154 @@ class ContentRepository(
     
     // ========== SERIES ==========
     
+    /**
+     * Load series data from API with reactive state management.
+     * Emits state changes to seriesState StateFlow:
+     * - Loading: Data is being fetched
+     * - Success: Data loaded and cached
+     * - Error: Load failed (with optional cached data)
+     *
+     * UI observes seriesState reactively. This method NEVER returns Result.
+     * Thread-safe: Uses mutex to prevent concurrent loads.
+     * 
+     * @param forceRefresh If true, bypass cache and force API fetch
+     */
+    suspend fun loadSeries(forceRefresh: Boolean = false) = withContext(Dispatchers.IO) {
+        // Race condition check - BEFORE mutex acquisition
+        if (_seriesState.value.isLoading() && !forceRefresh) {
+            PerformanceLogger.log("loadSeries: Already loading, skipping duplicate call")
+            return@withContext
+        }
+        
+        try {
+            seriesMutex.withLock {
+                // Double-check inside mutex
+                if (_seriesState.value.isLoading() && !forceRefresh) {
+                    return@withLock
+                }
+                
+                // Emit Loading state
+                _seriesState.value = DataState.Loading
+                
+                // Check cache first (unless forcing refresh)
+                if (!forceRefresh) {
+                    val metadata = database.cacheMetadataDao().get("series")
+                    if (metadata != null && metadata.itemCount > 0) {
+                        val isExtremelyStale = !isCacheValid(metadata.lastUpdated, CACHE_TTL_FALLBACK)
+                        if (!isExtremelyStale) {
+                            PerformanceLogger.log("loadSeries: Cache valid, skipping API fetch")
+                            _seriesState.value = DataState.Success(Unit)
+                            return@withLock
+                        }
+                    }
+                }
+                
+                // Fetch from API
+                PerformanceLogger.log("loadSeries: Starting API fetch")
+                checkVpnRequirement()
+                
+                val (username, password, sourceId) = getCredentials()
+                
+                // Fetch from API with retry
+                val responseBody = retryWithExponentialBackoff {
+                    getApiService().getSeries(username, password)
+                }
+                
+                // Load categories for mapping
+                val categoriesResult = getSeriesCategories()
+                val categories = categoriesResult.getOrNull() ?: emptyList()
+                val categoryMap = categories.associateBy { it.categoryId }
+                
+                // Clear old data for this source
+                database.seriesDao().deleteBySourceId(sourceId)
+                
+                // Drop indices before batch inserts
+                com.iptv.app.data.db.OptimizedBulkInsert.beginSeriesInsert(database.getSqliteDatabase())
+                
+                // Accumulator for batching writes through DbWriter
+                val accumulator = mutableListOf<SeriesEntity>()
+                var totalInserted = 0
+                
+                try {
+                    totalInserted = StreamingJsonParser.parseArrayInBatches(
+                        responseBody = responseBody,
+                        itemClass = Series::class.java,
+                        batchSize = BATCH_SIZE,
+                        processBatch = { seriesBatch ->
+                            val entities = seriesBatch.map { s ->
+                                val categoryName = categoryMap[s.categoryId]?.categoryName ?: ""
+                                s.categoryName = categoryName
+                                s.toEntity(sourceId, categoryName)
+                            }
+                            
+                            // Accumulate entities
+                            accumulator.addAll(entities)
+                            
+                            // Write in 5k chunks through DbWriter
+                            if (accumulator.size >= 5000) {
+                                dbWriter.writeSeries(accumulator.toList())
+                                accumulator.clear()
+                            }
+                        },
+                        onProgress = { count ->
+                            PerformanceLogger.log("Progress: $count series parsed and inserted")
+                        }
+                    )
+                    
+                    // Flush remaining items
+                    if (accumulator.isNotEmpty()) {
+                        dbWriter.writeSeries(accumulator)
+                        accumulator.clear()
+                    }
+                } catch (e: Exception) {
+                    throw e
+                } finally {
+                    com.iptv.app.data.db.OptimizedBulkInsert.endSeriesInsert(database.getSqliteDatabase())
+                }
+                
+                // Update cache metadata
+                val newMetadata = CacheMetadataEntity(
+                    contentType = "series",
+                    lastUpdated = System.currentTimeMillis(),
+                    itemCount = totalInserted,
+                    categoryCount = categories.size
+                )
+                database.cacheMetadataDao().insert(newMetadata)
+                
+                PerformanceLogger.log("loadSeries: Successfully inserted $totalInserted series")
+                
+                // Verify database count
+                val dbCount = database.seriesDao().getCount()
+                PerformanceLogger.log("loadSeries: DB count verification: $dbCount")
+                
+                // Emit Success state
+                _seriesState.value = DataState.Success(Unit)
+                
+                // Emit success effect
+                _seriesEffects.emit(SeriesEffect.LoadSuccess(totalInserted))
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("ContentRepository", "loadSeries failed", e)
+            
+            // Check if we have cached data
+            val cachedCount = database.cacheMetadataDao().get("series")?.itemCount ?: 0
+            val hasCache = cachedCount > 0
+            
+            // Emit Error state
+            _seriesState.value = DataState.Error(
+                error = e,
+                cachedData = if (hasCache) Unit else null
+            )
+            
+            // Emit error effect (for logging/analytics)
+            _seriesEffects.emit(SeriesEffect.LoadError(
+                message = e.message ?: "Unknown error",
+                hasCachedData = hasCache
+            ))
+        }
+    }
+    
+    @Deprecated("Use loadSeries() instead", ReplaceWith("loadSeries(forceRefresh)"))
     suspend fun getSeries(forceRefresh: Boolean = false): Result<List<Series>> = 
         withContext(Dispatchers.IO) {
             try {

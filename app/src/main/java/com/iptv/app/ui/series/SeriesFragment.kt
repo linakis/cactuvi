@@ -22,6 +22,7 @@ import com.iptv.app.R
 import com.iptv.app.data.models.Category
 import com.iptv.app.data.models.Series
 import com.iptv.app.data.repository.ContentRepository
+import com.iptv.app.data.repository.SeriesEffect
 import com.iptv.app.data.sync.ContentDiff
 import com.iptv.app.data.sync.ReactiveUpdateManager
 import com.iptv.app.ui.common.CategoryTreeAdapter
@@ -106,8 +107,13 @@ class SeriesFragment : Fragment() {
         setupToolbar()
         setupRecyclerView()
         setupReactiveUpdates()
-        setupLoadingStateObserver()
-        loadData()
+        
+        // NEW: Observe reactive state + effects
+        observeSeriesState()
+        observeSeriesEffects()
+        
+        // Trigger initial load ONCE
+        triggerDataLoad()
     }
     
     private fun setupToolbar() {
@@ -171,14 +177,76 @@ class SeriesFragment : Fragment() {
     /**
      * Observe loading state from repository and show/hide progress indicator.
      */
-    private fun setupLoadingStateObserver() {
+    /**
+     * Observe series state reactively (FRP pattern).
+     * Fragment NEVER calls loadSeries() directly after initial trigger.
+     * All UI updates driven by state changes from repository.
+     */
+    private fun observeSeriesState() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                repository.seriesLoading.collectLatest { isLoading ->
-                    if (isLoading) {
-                        showLoadingState()
+                repository.seriesState.collectLatest { state ->
+                    handleSeriesState(state)
+                }
+            }
+        }
+    }
+    
+    /**
+     * Handle series state changes reactively.
+     */
+    private fun handleSeriesState(state: com.iptv.app.data.models.DataState<Unit>) {
+        when (state) {
+            is com.iptv.app.data.models.DataState.Loading -> {
+                lifecycleScope.launch {
+                    val hasCache = (database.cacheMetadataDao().get("series")?.itemCount ?: 0) > 0
+                    if (!hasCache) {
+                        // First load - show full-screen spinner
+                        showLoadingWithMessage("Loading series for the first time...")
                     } else {
-                        hideLoadingState()
+                        // Has data - show refresh indicator only
+                        progressBar.visibility = View.VISIBLE
+                    }
+                }
+            }
+            is com.iptv.app.data.models.DataState.Success -> {
+                // Data loaded - refresh UI from cache
+                refreshUIFromCache()
+            }
+            is com.iptv.app.data.models.DataState.Error -> {
+                if (state.cachedData != null) {
+                    // Has cache - show cached data, silent error (logged via effects)
+                    refreshUIFromCache()
+                } else {
+                    // No cache - show error screen with retry
+                    showErrorWithRetry("Failed to load series: ${state.error.message}")
+                }
+            }
+        }
+    }
+    
+    /**
+     * Observe series effects (one-time actions like logs, analytics).
+     * Background refresh errors with cache are silent (log only).
+     */
+    private fun observeSeriesEffects() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                repository.seriesEffects.collect { effect ->
+                    when (effect) {
+                        is SeriesEffect.LoadSuccess -> {
+                            android.util.Log.d("SeriesFragment", "Series loaded successfully: ${effect.itemCount} items")
+                            // Could add analytics here: Analytics.log("series_load_success", ...)
+                        }
+                        is SeriesEffect.LoadError -> {
+                            if (effect.hasCachedData) {
+                                // Background refresh failed, cache exists - SILENT
+                                android.util.Log.w("SeriesFragment", "Background refresh failed (cache exists): ${effect.message}")
+                            } else {
+                                // First load failed, no cache - error already shown in handleSeriesState
+                                android.util.Log.e("SeriesFragment", "Initial load failed: ${effect.message}")
+                            }
+                        }
                     }
                 }
             }
@@ -186,19 +254,83 @@ class SeriesFragment : Fragment() {
     }
     
     /**
-     * Show loading indicator when background data load is in progress.
+     * Trigger data load from repository.
+     * Safe to call multiple times - repository handles deduplication.
      */
-    private fun showLoadingState() {
-        progressBar.visibility = View.VISIBLE
-        PerformanceLogger.log("SeriesFragment: Showing loading state")
+    private fun triggerDataLoad() {
+        lifecycleScope.launch {
+            repository.loadSeries(forceRefresh = false)
+        }
     }
     
     /**
-     * Hide loading indicator when background data load completes.
+     * Refresh UI from cached data without calling loadSeries().
      */
-    private fun hideLoadingState() {
+    private fun refreshUIFromCache() {
         progressBar.visibility = View.GONE
-        PerformanceLogger.log("SeriesFragment: Hiding loading state")
+        errorText.visibility = View.GONE
+        
+        // Load groups from cache (not API)
+        lifecycleScope.launch {
+            loadGroupsFromCache()
+        }
+    }
+    
+    /**
+     * Show error with retry button.
+     */
+    private fun showErrorWithRetry(message: String) {
+        progressBar.visibility = View.GONE
+        errorText.visibility = View.VISIBLE
+        errorText.text = "$message\n\nTap to retry"
+        recyclerView.visibility = View.GONE
+        
+        errorText.setOnClickListener {
+            triggerDataLoad()
+        }
+    }
+    
+    /**
+     * Load categories/groups from cache (database only, no API call).
+     */
+    private suspend fun loadGroupsFromCache() {
+        android.util.Log.d("IPTV_PERF", "[DEBUG SeriesFragment.loadGroupsFromCache] START")
+        
+        val preferencesManager = PreferencesManager.getInstance(requireContext())
+        
+        // Get filter settings
+        val groupingEnabled = preferencesManager.isGroupingEnabled(ContentFilterSettings.ContentType.SERIES)
+        val separator = preferencesManager.getCustomSeparator(ContentFilterSettings.ContentType.SERIES)
+        val hiddenGroups = preferencesManager.getHiddenGroups(ContentFilterSettings.ContentType.SERIES)
+        val hiddenCategories = preferencesManager.getHiddenCategories(ContentFilterSettings.ContentType.SERIES)
+        val filterMode = preferencesManager.getFilterMode(ContentFilterSettings.ContentType.SERIES)
+        
+        // Try to load cached navigation tree first
+        navigationTree = repository.getCachedSeriesNavigationTree()
+        
+        // Load categories
+        val categoriesResult = repository.getSeriesCategories()
+        android.util.Log.d("IPTV_PERF", "[DEBUG loadGroupsFromCache] Categories result: success=${categoriesResult.isSuccess}")
+        if (categoriesResult.isSuccess) {
+            categories = categoriesResult.getOrNull() ?: emptyList()
+            android.util.Log.d("IPTV_PERF", "[DEBUG loadGroupsFromCache] Categories loaded: count=${categories.size}")
+            
+            // Build navigation tree with hierarchical filter settings if cache miss
+            if (navigationTree == null) {
+                navigationTree = CategoryGrouper.buildSeriesNavigationTree(
+                    categories,
+                    groupingEnabled,
+                    separator,
+                    hiddenGroups,
+                    hiddenCategories,
+                    filterMode
+                )
+            }
+        }
+        
+        // Show groups
+        showGroups()
+        android.util.Log.d("IPTV_PERF", "[DEBUG loadGroupsFromCache] END")
     }
     
     private fun handleContentDiffs(diffs: List<ContentDiff>) {
@@ -268,100 +400,10 @@ class SeriesFragment : Fragment() {
         startActivity(intent)
     }
     
+    @Deprecated("Replaced by reactive pattern - use triggerDataLoad() and observe seriesState")
     private fun loadData() {
-        android.util.Log.d("IPTV_PERF", "[DEBUG SeriesFragment.loadData] START")
-        showLoading(true)
-        
-        lifecycleScope.launch {
-            // Check if already loading
-            if (repository.seriesLoading.value) {
-                android.util.Log.d("IPTV_PERF", "[DEBUG SeriesFragment.loadData] Already loading - waiting")
-                showLoadingWithMessage("Loading series data...")
-                
-                // Wait for current load to complete
-                repository.seriesLoading.first { !it }
-                android.util.Log.d("IPTV_PERF", "[DEBUG SeriesFragment.loadData] Load completed - checking cache")
-                
-                // Check cache again after load completes
-                val newMetadata = database.cacheMetadataDao().get("series")
-                val nowHasCache = (newMetadata?.itemCount ?: 0) > 0
-                
-                if (!nowHasCache) {
-                    // Still no cache after waiting - something went wrong
-                    android.util.Log.e("IPTV_PERF", "[DEBUG SeriesFragment.loadData] Still no cache after waiting")
-                    showError("Failed to load series data")
-                    return@launch
-                }
-                
-                // Fall through to load UI with cached data
-                android.util.Log.d("IPTV_PERF", "[DEBUG SeriesFragment.loadData] Cache now exists - loading UI")
-            }
-            
-            // Check if cache exists
-            val metadata = database.cacheMetadataDao().get("series")
-            val hasCache = (metadata?.itemCount ?: 0) > 0
-            android.util.Log.d("IPTV_PERF", "[DEBUG SeriesFragment.loadData] Cache check: hasCache=$hasCache, itemCount=${metadata?.itemCount ?: 0}")
-            
-            if (!hasCache) {
-                // No cache and not loading - trigger new load
-                android.util.Log.d("IPTV_PERF", "[DEBUG SeriesFragment.loadData] No cache - triggering background load")
-                showLoadingWithMessage("Loading series for the first time...")
-                
-                // Trigger background load
-                lifecycleScope.launch {
-                    val result = repository.getSeries(forceRefresh = true)
-                    if (result.isSuccess) {
-                        android.util.Log.d("IPTV_PERF", "[DEBUG SeriesFragment.loadData] Background load SUCCESS - reloading UI")
-                        // Reload data now that cache exists
-                        loadData()
-                    } else {
-                        android.util.Log.e("IPTV_PERF", "[DEBUG SeriesFragment.loadData] Background load FAILED: ${result.exceptionOrNull()?.message}")
-                        showError("Failed to load series: ${result.exceptionOrNull()?.message}")
-                    }
-                }
-                return@launch
-            }
-            
-            android.util.Log.d("IPTV_PERF", "[DEBUG SeriesFragment.loadData] Cache exists - loading categories")
-            val preferencesManager = PreferencesManager.getInstance(requireContext())
-            
-            // Get filter settings
-            val groupingEnabled = preferencesManager.isGroupingEnabled(ContentFilterSettings.ContentType.SERIES)
-            val separator = preferencesManager.getCustomSeparator(ContentFilterSettings.ContentType.SERIES)
-            val hiddenGroups = preferencesManager.getHiddenGroups(ContentFilterSettings.ContentType.SERIES)
-            val hiddenCategories = preferencesManager.getHiddenCategories(ContentFilterSettings.ContentType.SERIES)
-            val filterMode = preferencesManager.getFilterMode(ContentFilterSettings.ContentType.SERIES)
-            
-            // Try to load cached navigation tree first
-            navigationTree = repository.getCachedSeriesNavigationTree()
-            
-            // Load categories
-            val categoriesResult = repository.getSeriesCategories()
-            android.util.Log.d("IPTV_PERF", "[DEBUG SeriesFragment.loadData] Categories result: success=${categoriesResult.isSuccess}")
-            if (categoriesResult.isSuccess) {
-                categories = categoriesResult.getOrNull() ?: emptyList()
-                android.util.Log.d("IPTV_PERF", "[DEBUG SeriesFragment.loadData] Categories loaded: count=${categories.size}")
-                if (categories.size > 0) {
-                    android.util.Log.d("IPTV_PERF", "[DEBUG SeriesFragment.loadData] Sample categories: ${categories.take(3).map { "${it.categoryId}:${it.categoryName}" }}")
-                }
-                
-                // Build navigation tree with hierarchical filter settings if cache miss
-                if (navigationTree == null) {
-                    navigationTree = CategoryGrouper.buildSeriesNavigationTree(
-                        categories,
-                        groupingEnabled,
-                        separator,
-                        hiddenGroups,
-                        hiddenCategories,
-                        filterMode
-                    )
-                }
-            }
-            
-            // Show groups (no need to load all series)
-            showGroups()
-            showLoading(false)
-        }
+        // Legacy method - now handled by reactive state management
+        triggerDataLoad()
     }
     
     private fun showLoadingWithMessage(message: String) {
