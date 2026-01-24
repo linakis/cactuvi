@@ -59,9 +59,12 @@ class ContentRepository(
         private const val CACHE_TTL_CATEGORIES = 7 * 24 * 60 * 60 * 1000L  // 7 days
         
         // Batch size for bulk inserts - optimized for performance
-        // Increased from 500 to 999 to reduce transaction overhead
-        // 999 chosen to stay under SQLite's SQLITE_MAX_VARIABLE_NUMBER (999) for prepared statements
-        private const val BATCH_SIZE = 999
+        // Phase 1: 500 (initial)
+        // Phase 2: 999 (reduced transactions, stayed under SQLite variable limit)
+        // Phase 3: 2500 (optimal transaction size per expert recommendations: 2k-5k)
+        // Note: Multi-value INSERT uses 50-item chunks internally (unaffected by this)
+        // This controls transaction boundaries and context switching frequency
+        private const val BATCH_SIZE = 2500
         
         // TODO: Future optimization - implement parallel batch writes
         // With WAL mode enabled, SQLite supports concurrent writes from multiple threads
