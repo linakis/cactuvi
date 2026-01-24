@@ -152,10 +152,10 @@ This app is designed for TV screens and MUST support D-pad navigation. All UI el
 ./gradlew connectedAndroidTest
 
 # Run specific test class
-./gradlew test --tests "com.iptv.app.SpecificTestClass"
+./gradlew test --tests "com.cactuvi.app.SpecificTestClass"
 
 # Run single test method
-./gradlew test --tests "com.iptv.app.SpecificTestClass.testMethodName"
+./gradlew test --tests "com.cactuvi.app.SpecificTestClass.testMethodName"
 
 # Run tests with coverage
 ./gradlew testDebugUnitTest jacocoTestReport
@@ -180,22 +180,22 @@ This app is designed for TV screens and MUST support D-pad navigation. All UI el
 
 # View recent app logs
 adb devices
-adb logcat -d | grep "com.iptv.app" | tail -50
+adb logcat -d | grep "com.cactuvi.app" | tail -50
 
 # View only crash logs
 adb logcat -d -s "AndroidRuntime:E"
 
 # Clear logcat and watch live (filter errors and app logs)
-adb logcat -c && adb logcat | grep -E "com.iptv.app|ERROR|FATAL"
+adb logcat -c && adb logcat | grep -E "com.cactuvi.app|ERROR|FATAL"
 
 # Monitor memory usage
-adb shell dumpsys meminfo com.iptv.app
+adb shell dumpsys meminfo com.cactuvi.app
 
 # Force stop app
-adb shell am force-stop com.iptv.app
+adb shell am force-stop com.cactuvi.app
 
 # Launch app
-adb shell am start -n com.iptv.app/.ui.LoadingActivity
+adb shell am start -n com.cactuvi.app/.ui.LoadingActivity
 ```
 
 ### Manual Testing & Verification Commands
@@ -205,11 +205,11 @@ adb shell am start -n com.iptv.app/.ui.LoadingActivity
 # Build, install, and start fresh
 ./gradlew assembleDebug
 adb install -r app/build/outputs/apk/debug/app-debug.apk
-adb shell pm clear com.iptv.app  # Clear all app data
-adb shell am start -n com.iptv.app/.ui.LoadingActivity
+adb shell pm clear com.cactuvi.app  # Clear all app data
+adb shell am start -n com.cactuvi.app/.ui.LoadingActivity
 
 # Quick reinstall from clean state
-adb uninstall com.iptv.app
+adb uninstall com.cactuvi.app
 adb install app/build/outputs/apk/debug/app-debug.apk
 ```
 
@@ -255,7 +255,7 @@ grep -o 'text="Save Source"[^>]*bounds="\[[0-9,\[\] ]*\]"' hierarchy.xml
 adb shell dumpsys activity activities | grep "mResumedActivity"
 
 # View current fragment
-adb shell dumpsys activity com.iptv.app | grep "Fragment"
+adb shell dumpsys activity com.cactuvi.app | grep "Fragment"
 ```
 
 **UI Automation Workflow:**
@@ -298,7 +298,7 @@ adb shell input keyevent KEYCODE_DPAD_CENTER # D-pad select
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 # 2. Clear app data for clean test
-adb shell pm clear com.iptv.app
+adb shell pm clear com.cactuvi.app
 
 # 3. Start performance monitoring
 adb logcat -c
@@ -306,7 +306,7 @@ adb logcat | grep "IPTV_PERF" > perf_test.log &
 LOGCAT_PID=$!
 
 # 4. Launch app
-adb shell am start -n com.iptv.app/.ui.LoadingActivity
+adb shell am start -n com.cactuvi.app/.ui.LoadingActivity
 
 # 5. Take screenshot at key points
 sleep 3
@@ -332,7 +332,7 @@ adb shell uiautomator dump /sdcard/hierarchy.xml
 adb pull /sdcard/hierarchy.xml .
 
 # 10. Verify database content
-adb shell "run-as com.iptv.app sqlite3 /data/data/com.iptv.app/databases/iptv_database 'SELECT COUNT(*) FROM movies;'"
+adb shell "run-as com.cactuvi.app sqlite3 /data/data/com.cactuvi.app/databases/iptv_database 'SELECT COUNT(*) FROM movies;'"
 ```
 
 #### TV D-Pad Navigation Testing
@@ -350,16 +350,16 @@ adb shell input keyevent KEYCODE_BACK
 #### Performance & Memory Profiling
 ```bash
 # Continuous memory monitoring
-watch -n 1 'adb shell dumpsys meminfo com.iptv.app | grep -E "TOTAL|Native Heap"'
+watch -n 1 'adb shell dumpsys meminfo com.cactuvi.app | grep -E "TOTAL|Native Heap"'
 
 # CPU usage
-adb shell top -n 1 | grep com.iptv.app
+adb shell top -n 1 | grep com.cactuvi.app
 
 # Network traffic
-adb shell "dumpsys package com.iptv.app | grep -A 5 'Network'"
+adb shell "dumpsys package com.cactuvi.app | grep -A 5 'Network'"
 
 # Database size
-adb shell "run-as com.iptv.app du -h /data/data/com.iptv.app/databases/"
+adb shell "run-as com.cactuvi.app du -h /data/data/com.cactuvi.app/databases/"
 ```
 
 ## Code Style Guidelines
@@ -393,9 +393,9 @@ import androidx.paging.PagingData
 import com.google.android.material.chip.Chip
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import com.iptv.app.R
-import com.iptv.app.data.models.Movie
-import com.iptv.app.data.repository.ContentRepository
+import com.cactuvi.app.R
+import com.cactuvi.app.data.models.Movie
+import com.cactuvi.app.data.repository.ContentRepository
 ```
 
 **Important:** When using both `kotlinx.coroutines.flow.map` and `androidx.paging.map`, alias one:
@@ -663,7 +663,7 @@ This project uses Mobile-MCP for automated mobile app testing via OpenCode.
 - **Android Emulator:** `Medium_Phone` (available via `emulator -list-avds`)
 - **Node.js:** v20+ (already installed)
 - **Android SDK:** With Platform Tools at `/Users/nlinakis/Library/Android/sdk`
-- **Package Name:** `com.iptv.app`
+- **Package Name:** `com.cactuvi.app`
 
 ### Emulator Management
 
@@ -714,7 +714,7 @@ adb devices  # Verify connection
 #### Basic Navigation Flow
 ```
 Test Movies navigation:
-1. Launch com.iptv.app
+1. Launch com.cactuvi.app
 2. Wait 2 seconds for home screen
 3. List all elements on screen
 4. Click on Movies section
@@ -724,7 +724,7 @@ Test Movies navigation:
 #### D-Pad Navigation (Critical for TV)
 ```
 Test D-pad navigation in Movies:
-1. Launch com.iptv.app
+1. Launch com.cactuvi.app
 2. Navigate to Movies section
 3. Press DPAD_DOWN 3 times
 4. Take screenshot to verify focus moved
@@ -760,7 +760,7 @@ Test video player:
 #### Accessibility Tree Analysis
 ```
 Analyze accessibility for Movies screen:
-1. Launch com.iptv.app
+1. Launch com.cactuvi.app
 2. Navigate to Movies
 3. List all elements with accessibility properties
 4. Verify all interactive elements are focusable
@@ -829,10 +829,10 @@ adb devices
 **App not launching:**
 ```bash
 # Verify app is installed
-adb shell pm list packages | grep com.iptv.app
+adb shell pm list packages | grep com.cactuvi.app
 
 # Check logcat for errors
-adb logcat | grep "com.iptv.app"
+adb logcat | grep "com.cactuvi.app"
 ```
 
 **Mobile-MCP not responding:**

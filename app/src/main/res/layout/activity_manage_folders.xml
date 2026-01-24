@@ -6,7 +6,7 @@
     android:layout_height="match_parent"
     android:background="@color/background_primary">
 
-    <com.iptv.app.ui.common.ModernToolbar
+    <com.cactuvi.app.ui.common.ModernToolbar
         android:id="@+id/modernToolbar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

@@ -24,7 +24,7 @@ Result: Only 1 record in DB, all categories show (0).
 ```bash
 ./gradlew assembleDebug
 adb install -r app/build/outputs/apk/debug/app-debug.apk
-adb shell pm clear com.iptv.app
+adb shell pm clear com.cactuvi.app
 adb logcat -c
 ```
 
@@ -100,13 +100,13 @@ cd /Users/nlinakis/Development/iptv/iptv-app
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 # 2. Clear data and start logging
-adb shell pm clear com.iptv.app
+adb shell pm clear com.cactuvi.app
 adb logcat -c
 adb logcat | grep -E "IPTV_PERF|Repository\.(getSeries|getMovies|getLive)|SeriesFragment|MoviesFragment" > race_condition_test.log &
 LOGCAT_PID=$!
 
 # 3. Launch app
-adb shell am start -n com.iptv.app/.ui.LoadingActivity
+adb shell am start -n com.cactuvi.app/.ui.LoadingActivity
 
 # 4. Manual steps:
 #    - Add source (see credentials above)
@@ -124,11 +124,11 @@ grep "Series already loading" race_condition_test.log
 ### Check Category Counts in DB
 ```bash
 # After load completes, verify DB directly
-adb shell "run-as com.iptv.app sqlite3 /data/data/com.iptv.app/databases/iptv_database 'SELECT COUNT(*) FROM series;'"
+adb shell "run-as com.cactuvi.app sqlite3 /data/data/com.cactuvi.app/databases/iptv_database 'SELECT COUNT(*) FROM series;'"
 # Expected: 30477 (or similar large number)
 
 # Check sample category counts
-adb shell "run-as com.iptv.app sqlite3 /data/data/com.iptv.app/databases/iptv_database \"SELECT categoryId, COUNT(*) FROM series GROUP BY categoryId LIMIT 5;\""
+adb shell "run-as com.cactuvi.app sqlite3 /data/data/com.cactuvi.app/databases/iptv_database \"SELECT categoryId, COUNT(*) FROM series GROUP BY categoryId LIMIT 5;\""
 # Expected: Multiple categories with non-zero counts
 ```
 

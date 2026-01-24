@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "com.iptv.app"
+    namespace = "com.cactuvi.app"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.iptv.app"
+        applicationId = "com.cactuvi.app"
         minSdk = 26
         targetSdk = 34
         versionCode = 1

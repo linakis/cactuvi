@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "IPTV Player"
+rootProject.name = "Cactuvi"
 include(":app")

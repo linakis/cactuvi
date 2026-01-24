@@ -3,4 +3,4 @@
 -dontwarn retrofit2.**
 -keep class retrofit2.** { *; }
 -keep class com.google.gson.** { *; }
--keep class com.iptv.app.data.models.** { *; }
+-keep class com.cactuvi.app.data.models.** { *; }
