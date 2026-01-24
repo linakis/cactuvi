@@ -168,15 +168,19 @@ class ContentRepository(
                     totalInserted = StreamingJsonParser.parseArrayInBatches(
                         responseBody = responseBody,
                         itemClass = LiveChannel::class.java,
-                        batchSize = BATCH_SIZE
-                    ) { channelBatch ->
-                        val entities = channelBatch.map { channel ->
-                            val categoryName = categoryMap[channel.categoryId]?.categoryName ?: ""
-                            channel.categoryName = categoryName
-                            channel.toEntity(sourceId, categoryName)
+                        batchSize = BATCH_SIZE,
+                        processBatch = { channelBatch ->
+                            val entities = channelBatch.map { channel ->
+                                val categoryName = categoryMap[channel.categoryId]?.categoryName ?: ""
+                                channel.categoryName = categoryName
+                                channel.toEntity(sourceId, categoryName)
+                            }
+                            database.liveChannelDao().insertAllInTransaction(entities)
+                        },
+                        onProgress = { count ->
+                            PerformanceLogger.log("Progress: $count live channels parsed and inserted")
                         }
-                        database.liveChannelDao().insertAllInTransaction(entities)
-                    }
+                    )
                 } catch (e: Exception) {
                     throw e
                 }
@@ -299,17 +303,21 @@ class ContentRepository(
                     totalInserted = StreamingJsonParser.parseArrayInBatches(
                         responseBody = responseBody,
                         itemClass = Movie::class.java,
-                        batchSize = BATCH_SIZE
-                    ) { movieBatch ->
-                        // Map to entities with category names
-                        val entities = movieBatch.map { movie ->
-                            val categoryName = categoryMap[movie.categoryId]?.categoryName ?: ""
-                            movie.categoryName = categoryName
-                            movie.toEntity(sourceId, categoryName)
+                        batchSize = BATCH_SIZE,
+                        processBatch = { movieBatch ->
+                            // Map to entities with category names
+                            val entities = movieBatch.map { movie ->
+                                val categoryName = categoryMap[movie.categoryId]?.categoryName ?: ""
+                                movie.categoryName = categoryName
+                                movie.toEntity(sourceId, categoryName)
+                            }
+                            // Insert batch in single transaction
+                            database.movieDao().insertAllInTransaction(entities)
+                        },
+                        onProgress = { count ->
+                            PerformanceLogger.log("Progress: $count movies parsed and inserted")
                         }
-                        // Insert batch in single transaction
-                        database.movieDao().insertAllInTransaction(entities)
-                    }
+                    )
                 } catch (e: Exception) {
                     PerformanceLogger.log("Streaming parse error: ${e.message}")
                     throw e
@@ -462,15 +470,19 @@ class ContentRepository(
                     totalInserted = StreamingJsonParser.parseArrayInBatches(
                         responseBody = responseBody,
                         itemClass = Series::class.java,
-                        batchSize = BATCH_SIZE
-                    ) { seriesBatch ->
-                        val entities = seriesBatch.map { s ->
-                            val categoryName = categoryMap[s.categoryId]?.categoryName ?: ""
-                            s.categoryName = categoryName
-                            s.toEntity(sourceId, categoryName)
+                        batchSize = BATCH_SIZE,
+                        processBatch = { seriesBatch ->
+                            val entities = seriesBatch.map { s ->
+                                val categoryName = categoryMap[s.categoryId]?.categoryName ?: ""
+                                s.categoryName = categoryName
+                                s.toEntity(sourceId, categoryName)
+                            }
+                            database.seriesDao().insertAllInTransaction(entities)
+                        },
+                        onProgress = { count ->
+                            PerformanceLogger.log("Progress: $count series parsed and inserted")
                         }
-                        database.seriesDao().insertAllInTransaction(entities)
-                    }
+                    )
                 } catch (e: Exception) {
                     throw e
                 }

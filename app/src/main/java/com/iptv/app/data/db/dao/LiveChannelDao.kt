@@ -35,7 +35,7 @@ interface LiveChannelDao {
     @Query("DELETE FROM live_channels WHERE lastUpdated < :timestamp")
     suspend fun deleteOlderThan(timestamp: Long)
     
-    @Query("DELETE FROM live_channels")
+    @Query("DELETE FROM live_channels WHERE 1")
     suspend fun clearAll()
     
     // ========== CACHE VALIDATION QUERIES ==========

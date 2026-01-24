@@ -246,12 +246,24 @@ adb shell uiautomator dump /sdcard/hierarchy.xml
 adb pull /sdcard/hierarchy.xml .
 cat hierarchy.xml  # Inspect element structure
 
+# Extract UI element bounds for tap automation
+# Example: Find button bounds and tap center
+grep -o 'text="Save Source"[^>]*bounds="\[[0-9,\[\] ]*\]"' hierarchy.xml
+# Output: bounds="[42,1222][1038,1357]" means tap at center: (540, 1290)
+
 # View current activity
 adb shell dumpsys activity activities | grep "mResumedActivity"
 
 # View current fragment
 adb shell dumpsys activity com.iptv.app | grep "Fragment"
 ```
+
+**UI Automation Workflow:**
+1. Dump hierarchy: `adb shell uiautomator dump /sdcard/hierarchy.xml && adb pull /sdcard/hierarchy.xml .`
+2. Find element bounds: `grep 'text="Button Text"' hierarchy.xml` or `grep 'resource-id="button_id"' hierarchy.xml`
+3. Calculate tap coordinates: Center of bounds `[x1,y1][x2,y2]` = `((x1+x2)/2, (y1+y2)/2)`
+4. Perform tap: `adb shell input tap <x> <y>`
+5. Verify with screenshot: `adb exec-out screencap -p > after_tap.png`
 
 #### User Interaction Simulation
 ```bash

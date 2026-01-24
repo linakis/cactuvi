@@ -19,17 +19,21 @@ object StreamingJsonParser {
      * @param itemClass The class type to deserialize each item to
      * @param batchSize Number of items to collect before calling processBatch
      * @param processBatch Callback invoked for each batch of items
+     * @param onProgress Optional callback for progress updates (called every 10,000 items)
      * @return Total number of items processed
      */
     suspend fun <T> parseArrayInBatches(
         responseBody: ResponseBody,
         itemClass: Class<T>,
         batchSize: Int = 500,
-        processBatch: suspend (List<T>) -> Unit
+        processBatch: suspend (List<T>) -> Unit,
+        onProgress: ((Int) -> Unit)? = null
     ): Int {
         val gson = Gson()
         var totalCount = 0
         val currentBatch = mutableListOf<T>()
+        val progressInterval = 10000 // Report progress every 10k items
+        var lastProgressReport = 0
         
         responseBody.use { body ->
             val reader = JsonReader(InputStreamReader(body.byteStream(), Charsets.UTF_8))
@@ -42,6 +46,12 @@ object StreamingJsonParser {
                 val item = gson.fromJson<T>(reader, itemClass)
                 currentBatch.add(item)
                 totalCount++
+                
+                // Report progress every N items
+                if (onProgress != null && totalCount - lastProgressReport >= progressInterval) {
+                    onProgress(totalCount)
+                    lastProgressReport = totalCount
+                }
                 
                 // Process batch when it reaches batchSize
                 if (currentBatch.size >= batchSize) {

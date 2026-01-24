@@ -44,7 +44,7 @@ interface MovieDao {
     @Query("DELETE FROM movies WHERE lastUpdated < :timestamp")
     suspend fun deleteOlderThan(timestamp: Long)
     
-    @Query("DELETE FROM movies")
+    @Query("DELETE FROM movies WHERE 1")
     suspend fun clearAll()
     
     // ========== CACHE VALIDATION QUERIES ==========

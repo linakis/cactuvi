@@ -41,7 +41,7 @@ interface SeriesDao {
     @Query("DELETE FROM series WHERE lastUpdated < :timestamp")
     suspend fun deleteOlderThan(timestamp: Long)
     
-    @Query("DELETE FROM series")
+    @Query("DELETE FROM series WHERE 1")
     suspend fun clearAll()
     
     // ========== CACHE VALIDATION QUERIES ==========
