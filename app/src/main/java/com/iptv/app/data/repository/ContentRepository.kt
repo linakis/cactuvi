@@ -20,6 +20,8 @@ import com.iptv.app.utils.PerformanceLogger
 import com.iptv.app.utils.VPNDetector
 import com.iptv.app.utils.StreamingJsonParser
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -143,6 +145,52 @@ class ContentRepository(
             Result.failure(e)
         }
     }
+    
+    // ========== PARALLEL LOADING (PHASE 3) ==========
+    
+    /**
+     * Load all content types (Movies, Series, Live) in parallel.
+     * 
+     * This is the Phase 3 optimization that eliminates sequential parsing bottleneck.
+     * All 3 content types fetch and parse concurrently (CPU parallelization).
+     * Database writes remain serialized through DbWriter Mutex (no contention).
+     * 
+     * Expected performance:
+     * - Movies: 60s → ~35s (parallel with Series/Live)
+     * - Series: 30s → ~18s (parallel)
+     * - Live: 40s → ~22s (parallel)
+     * - Total: 124.6s → 75-85s (30-40% reduction)
+     * 
+     * @return Triple of results for (Movies, Series, Live)
+     */
+    suspend fun loadAllContentParallel(): Triple<Result<List<Movie>>, Result<List<Series>>, Result<List<LiveChannel>>> = 
+        coroutineScope {
+            PerformanceLogger.log("Starting parallel content load (Movies + Series + Live)")
+            val startTime = PerformanceLogger.start("Parallel content load")
+            
+            // Launch all 3 content types concurrently on IO dispatcher
+            val moviesDeferred = async(Dispatchers.IO) { 
+                getMovies(forceRefresh = true) 
+            }
+            val seriesDeferred = async(Dispatchers.IO) { 
+                getSeries(forceRefresh = true) 
+            }
+            val liveDeferred = async(Dispatchers.IO) { 
+                getLiveStreams(forceRefresh = true) 
+            }
+            
+            // Await all results (blocks until all complete)
+            val moviesResult = moviesDeferred.await()
+            val seriesResult = seriesDeferred.await()
+            val liveResult = liveDeferred.await()
+            
+            PerformanceLogger.end("Parallel content load", startTime, 
+                "Movies: ${if (moviesResult.isSuccess) "OK" else "FAIL"}, " +
+                "Series: ${if (seriesResult.isSuccess) "OK" else "FAIL"}, " +
+                "Live: ${if (liveResult.isSuccess) "OK" else "FAIL"}")
+            
+            Triple(moviesResult, seriesResult, liveResult)
+        }
     
     // ========== LIVE CHANNELS ==========
     
