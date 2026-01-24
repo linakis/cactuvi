@@ -248,6 +248,29 @@ class MoviesFragment : Fragment() {
             // Start total timer
             val totalStartTime = PerformanceLogger.start("MoviesFragment.loadData")
             
+            // Check if cache exists
+            val metadata = database.cacheMetadataDao().get("movies")
+            val hasCache = (metadata?.itemCount ?: 0) > 0
+            
+            if (!hasCache) {
+                // No cache - show loading state and trigger background load
+                showLoadingWithMessage("Loading movies for the first time...")
+                PerformanceLogger.log("No movies cache found - triggering background load")
+                
+                // Trigger background load
+                lifecycleScope.launch {
+                    val result = repository.getMovies(forceRefresh = true)
+                    if (result.isSuccess) {
+                        PerformanceLogger.log("Background movies load completed successfully")
+                        // Reload data now that cache exists
+                        loadData()
+                    } else {
+                        showError("Failed to load movies: ${result.exceptionOrNull()?.message}")
+                    }
+                }
+                return@launch
+            }
+            
             val preferencesManager = PreferencesManager.getInstance(requireContext())
             
             // Get filter settings
@@ -312,6 +335,22 @@ class MoviesFragment : Fragment() {
             // End total timer
             PerformanceLogger.end("MoviesFragment.loadData", totalStartTime, "SUCCESS")
         }
+    }
+    
+    private fun showLoadingWithMessage(message: String) {
+        progressBar.visibility = View.VISIBLE
+        emptyText.visibility = View.VISIBLE
+        emptyText.text = message
+        recyclerView.visibility = View.GONE
+        errorText.visibility = View.GONE
+    }
+    
+    private fun showError(message: String) {
+        progressBar.visibility = View.GONE
+        errorText.visibility = View.VISIBLE
+        errorText.text = message
+        recyclerView.visibility = View.GONE
+        emptyText.visibility = View.GONE
     }
     
     private fun showGroups() {

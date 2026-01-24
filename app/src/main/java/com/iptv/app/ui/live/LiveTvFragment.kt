@@ -225,6 +225,27 @@ class LiveTvFragment : Fragment() {
         showLoading(true)
         
         lifecycleScope.launch {
+            // Check if cache exists
+            val metadata = database.cacheMetadataDao().get("live")
+            val hasCache = (metadata?.itemCount ?: 0) > 0
+            
+            if (!hasCache) {
+                // No cache - show loading state and trigger background load
+                showLoadingWithMessage("Loading live channels for the first time...")
+                
+                // Trigger background load
+                lifecycleScope.launch {
+                    val result = repository.getLiveStreams(forceRefresh = true)
+                    if (result.isSuccess) {
+                        // Reload data now that cache exists
+                        loadData()
+                    } else {
+                        showError("Failed to load live channels: ${result.exceptionOrNull()?.message}")
+                    }
+                }
+                return@launch
+            }
+            
             val preferencesManager = PreferencesManager.getInstance(requireContext())
             
             // Get filter settings
@@ -259,6 +280,22 @@ class LiveTvFragment : Fragment() {
             showGroups()
             showLoading(false)
         }
+    }
+    
+    private fun showLoadingWithMessage(message: String) {
+        progressBar.visibility = View.VISIBLE
+        emptyText.visibility = View.VISIBLE
+        emptyText.text = message
+        recyclerView.visibility = View.GONE
+        errorText.visibility = View.GONE
+    }
+    
+    private fun showError(message: String) {
+        progressBar.visibility = View.GONE
+        errorText.visibility = View.VISIBLE
+        errorText.text = message
+        recyclerView.visibility = View.GONE
+        emptyText.visibility = View.GONE
     }
     
     private fun showGroups() {

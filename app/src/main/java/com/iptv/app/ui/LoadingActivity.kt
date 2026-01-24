@@ -19,11 +19,13 @@ import kotlinx.coroutines.launch
 
 /**
  * Loading screen for first app launch.
- * Checks if cache exists:
- * - No cache: Block and fetch initial data from API
- * - Cache exists: Skip immediately to MainActivity
  * 
- * Only shown on first launch, subsequent launches go directly to MainActivity.
+ * Strategy: Independent background loading for Movies/Series/Live
+ * - No sources: Navigate to Add Source screen
+ * - ANY cache exists: Navigate to MainActivity immediately (fragments handle loading)
+ * - NO cache: Trigger background sync and navigate to MainActivity (fragments show loading UI)
+ * 
+ * Each fragment (Movies/Series/Live) handles its own loading state independently.
  */
 class LoadingActivity : AppCompatActivity() {
     
@@ -63,67 +65,12 @@ class LoadingActivity : AppCompatActivity() {
                     return@launch
                 }
                 
-                val database = AppDatabase.getInstance(this@LoadingActivity)
-                
-                // Check if cache exists for any content type
-                val moviesMetadata = database.cacheMetadataDao().get("movies")
-                val seriesMetadata = database.cacheMetadataDao().get("series")
-                val liveMetadata = database.cacheMetadataDao().get("live")
-                
-                val hasCache = (moviesMetadata?.itemCount ?: 0) > 0 ||
-                               (seriesMetadata?.itemCount ?: 0) > 0 ||
-                               (liveMetadata?.itemCount ?: 0) > 0
-                
-                if (hasCache) {
-                    // Cache exists - skip to MainActivity
-                    navigateToMain()
-                } else {
-                    // No cache - fetch initial data
-                    fetchInitialData()
-                }
+                // Navigate immediately - fragments will handle their own loading states
+                // Background sync will load any missing content types
+                navigateToMain()
             } catch (e: Exception) {
                 showError("Failed to check cache: ${e.message}")
             }
-        }
-    }
-    
-    private suspend fun fetchInitialData() {
-        try {
-            val repository = ContentRepository(
-                SourceManager.getInstance(this),
-                this
-            )
-            
-            statusText.text = "Loading content for the first time..."
-            detailText.text = "This may take a few moments"
-            
-            // Fetch all content types in parallel
-            val results = lifecycleScope.async {
-                val moviesDeferred = async { repository.getMovies(forceRefresh = true) }
-                val seriesDeferred = async { repository.getSeries(forceRefresh = true) }
-                val liveDeferred = async { repository.getLiveStreams(forceRefresh = true) }
-                
-                Triple(
-                    moviesDeferred.await(),
-                    seriesDeferred.await(),
-                    liveDeferred.await()
-                )
-            }.await()
-            
-            val (moviesResult, seriesResult, liveResult) = results
-            
-            // Check if at least one succeeded
-            if (moviesResult.isSuccess || seriesResult.isSuccess || liveResult.isSuccess) {
-                statusText.text = "Ready!"
-                navigateToMain()
-            } else {
-                val error = moviesResult.exceptionOrNull()
-                    ?: seriesResult.exceptionOrNull()
-                    ?: liveResult.exceptionOrNull()
-                showError("Failed to load content: ${error?.message ?: "Unknown error"}")
-            }
-        } catch (e: Exception) {
-            showError("Failed to load content: ${e.message}")
         }
     }
     
