@@ -107,6 +107,7 @@ class MoviesFragment : Fragment() {
         setupToolbar()
         setupRecyclerView()
         setupReactiveUpdates()
+        setupLoadingStateObserver()
         loadData()
     }
     
@@ -170,6 +171,40 @@ class MoviesFragment : Fragment() {
                 }
             }
         }
+    }
+    
+    /**
+     * Observe loading state from repository and show/hide progress indicator.
+     * Shows Material 3 progress bar at top of screen during background loading.
+     */
+    private fun setupLoadingStateObserver() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                repository.moviesLoading.collectLatest { isLoading ->
+                    if (isLoading) {
+                        showLoadingState()
+                    } else {
+                        hideLoadingState()
+                    }
+                }
+            }
+        }
+    }
+    
+    /**
+     * Show loading indicator when background data load is in progress.
+     */
+    private fun showLoadingState() {
+        progressBar.visibility = View.VISIBLE
+        PerformanceLogger.log("MoviesFragment: Showing loading state")
+    }
+    
+    /**
+     * Hide loading indicator when background data load completes.
+     */
+    private fun hideLoadingState() {
+        progressBar.visibility = View.GONE
+        PerformanceLogger.log("MoviesFragment: Hiding loading state")
     }
     
     /**

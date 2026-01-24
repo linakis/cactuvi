@@ -45,6 +45,12 @@ abstract class AppDatabase : RoomDatabase() {
      */
     fun getSqliteDatabase(): SupportSQLiteDatabase = openHelper.writableDatabase
     
+    /**
+     * Get DbWriter instance for serialized database writes.
+     * Uses shared Mutex to eliminate concurrent write contention.
+     */
+    fun getDbWriter(): DbWriter = DbWriter(this)
+    
     companion object {
         @Volatile
         private var INSTANCE: AppDatabase? = null

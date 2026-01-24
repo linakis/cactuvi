@@ -21,6 +21,9 @@ import com.iptv.app.utils.VPNDetector
 import com.iptv.app.utils.StreamingJsonParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map as flowMap
 import kotlinx.coroutines.withContext
 
@@ -36,8 +39,18 @@ class ContentRepository(
     
     private var apiService: XtreamApiService? = null
     private val database = AppDatabase.getInstance(context)
+    private val dbWriter = database.getDbWriter()
     private val gson = Gson()
     private var currentSourceId: String? = null
+    
+    // Loading state flags to prevent duplicate background loads
+    private val _moviesLoading = MutableStateFlow(false)
+    private val _seriesLoading = MutableStateFlow(false)
+    private val _liveLoading = MutableStateFlow(false)
+    
+    val moviesLoading: StateFlow<Boolean> = _moviesLoading.asStateFlow()
+    val seriesLoading: StateFlow<Boolean> = _seriesLoading.asStateFlow()
+    val liveLoading: StateFlow<Boolean> = _liveLoading.asStateFlow()
     
     companion object {
         // Cache Time-To-Live (TTL) in milliseconds
@@ -133,6 +146,12 @@ class ContentRepository(
     suspend fun getLiveStreams(forceRefresh: Boolean = false): Result<List<LiveChannel>> = 
         withContext(Dispatchers.IO) {
             try {
+                // Check if already loading (prevent duplicate loads)
+                if (_liveLoading.value && !forceRefresh) {
+                    PerformanceLogger.log("Live channels already loading, skip duplicate request")
+                    return@withContext Result.success(emptyList())
+                }
+                
                 // Check cache metadata
                 val metadata = database.cacheMetadataDao().get("live")
                 
@@ -147,6 +166,9 @@ class ContentRepository(
                         }
                     }
                 }
+                
+                // Set loading flag
+                _liveLoading.value = true
                 
                 // Check VPN requirement before API call
                 checkVpnRequirement()
@@ -165,7 +187,10 @@ class ContentRepository(
                 // Drop indices before batch inserts
                 com.iptv.app.data.db.OptimizedBulkInsert.beginLiveChannelsInsert(database.getSqliteDatabase())
                 
+                // Accumulator for batching writes through DbWriter (5k chunks)
+                val accumulator = mutableListOf<LiveChannelEntity>()
                 var totalInserted = 0
+                
                 try {
                     totalInserted = StreamingJsonParser.parseArrayInBatches(
                         responseBody = responseBody,
@@ -177,15 +202,26 @@ class ContentRepository(
                                 channel.categoryName = categoryName
                                 channel.toEntity(sourceId, categoryName)
                             }
-                            com.iptv.app.data.db.OptimizedBulkInsert.insertLiveChannelBatchOptimized(
-                                database.getSqliteDatabase(),
-                                entities
-                            )
+                            
+                            // Accumulate entities
+                            accumulator.addAll(entities)
+                            
+                            // Write in 5k chunks through DbWriter
+                            if (accumulator.size >= 5000) {
+                                dbWriter.writeLiveChannels(accumulator.toList())
+                                accumulator.clear()
+                            }
                         },
                         onProgress = { count ->
                             PerformanceLogger.log("Progress: $count live channels parsed and inserted")
                         }
                     )
+                    
+                    // Flush remaining items
+                    if (accumulator.isNotEmpty()) {
+                        dbWriter.writeLiveChannels(accumulator)
+                        accumulator.clear()
+                    }
                 } catch (e: Exception) {
                     throw e
                 } finally {
@@ -211,6 +247,9 @@ class ContentRepository(
                 } else {
                     Result.failure(e)
                 }
+            } finally {
+                // Always reset loading flag
+                _liveLoading.value = false
             }
         }
     
@@ -254,6 +293,12 @@ class ContentRepository(
             val startTime = PerformanceLogger.start("Repository.getMovies")
             
             try {
+                // Check if already loading (prevent duplicate loads)
+                if (_moviesLoading.value && !forceRefresh) {
+                    PerformanceLogger.log("Movies already loading, skip duplicate request")
+                    return@withContext Result.success(emptyList())
+                }
+                
                 // Check cache metadata
                 PerformanceLogger.logPhase("getMovies", "Checking cache metadata")
                 val metadataCheckStart = PerformanceLogger.start("Metadata cache check")
@@ -278,6 +323,9 @@ class ContentRepository(
                         }
                     }
                 }
+                
+                // Set loading flag
+                _moviesLoading.value = true
                 
                 // Cache miss - fetch from API
                 PerformanceLogger.logCacheMiss("movies", "getMovies", if (forceRefresh) "forceRefresh" else "expired/empty")
@@ -308,7 +356,10 @@ class ContentRepository(
                 // Drop indices before batch inserts
                 com.iptv.app.data.db.OptimizedBulkInsert.beginMoviesInsert(database.getSqliteDatabase())
                 
+                // Accumulator for batching writes through DbWriter (5k chunks)
+                val accumulator = mutableListOf<MovieEntity>()
                 var totalInserted = 0
+                
                 try {
                     totalInserted = StreamingJsonParser.parseArrayInBatches(
                         responseBody = responseBody,
@@ -321,16 +372,26 @@ class ContentRepository(
                                 movie.categoryName = categoryName
                                 movie.toEntity(sourceId, categoryName)
                             }
-                            // Optimized batch insert (no index overhead per batch)
-                            com.iptv.app.data.db.OptimizedBulkInsert.insertMovieBatchOptimized(
-                                database.getSqliteDatabase(),
-                                entities
-                            )
+                            
+                            // Accumulate entities
+                            accumulator.addAll(entities)
+                            
+                            // Write in 5k chunks through DbWriter (serialized, optimal transaction size)
+                            if (accumulator.size >= 5000) {
+                                dbWriter.writeMovies(accumulator.toList())
+                                accumulator.clear()
+                            }
                         },
                         onProgress = { count ->
                             PerformanceLogger.log("Progress: $count movies parsed and inserted")
                         }
                     )
+                    
+                    // Flush remaining items
+                    if (accumulator.isNotEmpty()) {
+                        dbWriter.writeMovies(accumulator)
+                        accumulator.clear()
+                    }
                 } catch (e: Exception) {
                     PerformanceLogger.log("Streaming parse error: ${e.message}")
                     throw e
@@ -374,6 +435,9 @@ class ContentRepository(
                     PerformanceLogger.end("Repository.getMovies", startTime, "FAILED - no fallback")
                     Result.failure(e)
                 }
+            } finally {
+                // Always reset loading flag
+                _moviesLoading.value = false
             }
         }
     
@@ -455,6 +519,12 @@ class ContentRepository(
     suspend fun getSeries(forceRefresh: Boolean = false): Result<List<Series>> = 
         withContext(Dispatchers.IO) {
             try {
+                // Check if already loading (prevent duplicate loads)
+                if (_seriesLoading.value && !forceRefresh) {
+                    PerformanceLogger.log("Series already loading, skip duplicate request")
+                    return@withContext Result.success(emptyList())
+                }
+                
                 // Check cache metadata
                 val metadata = database.cacheMetadataDao().get("series")
                 
@@ -469,6 +539,9 @@ class ContentRepository(
                         }
                     }
                 }
+                
+                // Set loading flag
+                _seriesLoading.value = true
                 
                 // Check VPN requirement before API call
                 checkVpnRequirement()
@@ -485,7 +558,10 @@ class ContentRepository(
                 // Drop indices before batch inserts
                 com.iptv.app.data.db.OptimizedBulkInsert.beginSeriesInsert(database.getSqliteDatabase())
                 
+                // Accumulator for batching writes through DbWriter (5k chunks)
+                val accumulator = mutableListOf<SeriesEntity>()
                 var totalInserted = 0
+                
                 try {
                     totalInserted = StreamingJsonParser.parseArrayInBatches(
                         responseBody = responseBody,
@@ -497,15 +573,26 @@ class ContentRepository(
                                 s.categoryName = categoryName
                                 s.toEntity(sourceId, categoryName)
                             }
-                            com.iptv.app.data.db.OptimizedBulkInsert.insertSeriesBatchOptimized(
-                                database.getSqliteDatabase(),
-                                entities
-                            )
+                            
+                            // Accumulate entities
+                            accumulator.addAll(entities)
+                            
+                            // Write in 5k chunks through DbWriter
+                            if (accumulator.size >= 5000) {
+                                dbWriter.writeSeries(accumulator.toList())
+                                accumulator.clear()
+                            }
                         },
                         onProgress = { count ->
                             PerformanceLogger.log("Progress: $count series parsed and inserted")
                         }
                     )
+                    
+                    // Flush remaining items
+                    if (accumulator.isNotEmpty()) {
+                        dbWriter.writeSeries(accumulator)
+                        accumulator.clear()
+                    }
                 } catch (e: Exception) {
                     throw e
                 } finally {
@@ -530,6 +617,9 @@ class ContentRepository(
                 } else {
                     Result.failure(e)
                 }
+            } finally {
+                // Always reset loading flag
+                _seriesLoading.value = false
             }
         }
     

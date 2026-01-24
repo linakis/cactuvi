@@ -35,6 +35,7 @@ import com.iptv.app.utils.CategoryGrouper.NavigationTree
 import com.iptv.app.utils.CredentialsManager
 import com.iptv.app.utils.SourceManager
 import com.iptv.app.utils.IdleDetectionHelper
+import com.iptv.app.utils.PerformanceLogger
 import com.iptv.app.utils.PreferencesManager
 import com.iptv.app.utils.StreamUrlBuilder
 import kotlinx.coroutines.flow.collectLatest
@@ -105,6 +106,7 @@ class LiveTvFragment : Fragment() {
         setupToolbar()
         setupRecyclerView()
         setupReactiveUpdates()
+        setupLoadingStateObserver()
         loadData()
     }
     
@@ -162,6 +164,39 @@ class LiveTvFragment : Fragment() {
                 }
             }
         }
+    }
+    
+    /**
+     * Observe loading state from repository and show/hide progress indicator.
+     */
+    private fun setupLoadingStateObserver() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                repository.liveLoading.collectLatest { isLoading ->
+                    if (isLoading) {
+                        showLoadingState()
+                    } else {
+                        hideLoadingState()
+                    }
+                }
+            }
+        }
+    }
+    
+    /**
+     * Show loading indicator when background data load is in progress.
+     */
+    private fun showLoadingState() {
+        progressBar.visibility = View.VISIBLE
+        PerformanceLogger.log("LiveTvFragment: Showing loading state")
+    }
+    
+    /**
+     * Hide loading indicator when background data load completes.
+     */
+    private fun hideLoadingState() {
+        progressBar.visibility = View.GONE
+        PerformanceLogger.log("LiveTvFragment: Hiding loading state")
     }
     
     private fun handleContentDiffs(diffs: List<ContentDiff>) {
