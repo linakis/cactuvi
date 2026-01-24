@@ -39,6 +39,74 @@ import kotlinx.coroutines.TimeoutCancellationException
 import kotlin.time.Duration.Companion.minutes
 
 /**
+ * ContentRepository - Data layer for IPTV content
+ * 
+ * ==================== ARCHITECTURE ====================
+ * 
+ * This repository uses REACTIVE STATE MANAGEMENT with StateFlow and SharedFlow
+ * to provide a single source of truth for data loading state.
+ * 
+ * PATTERN: StateFlow<DataState<T>> + SharedFlow<Effect>
+ * 
+ * - StateFlow<DataState<Unit>>: UI state (Loading/Success/Error)
+ *   - Conflation OK: UI only cares about latest state
+ *   - Built-in distinctUntilChanged prevents redundant updates
+ * 
+ * - SharedFlow<Effect>: One-time effects (logs, analytics, silent errors)
+ *   - No conflation: Every effect must execute
+ *   - No replay: Effects are fire-once actions
+ * 
+ * ==================== RACE CONDITION PREVENTION ====================
+ * 
+ * Multiple concurrent calls are prevented by:
+ * 1. Early exit check BEFORE mutex acquisition
+ * 2. Double-check inside mutex (thread-safe)
+ * 3. Mutex ensures serial execution of API fetches
+ * 4. StateFlow conflation prevents redundant UI updates
+ * 
+ * Example: 4 loadSeries() calls → Only 1 executes, others exit early
+ * 
+ * ==================== USAGE PATTERN ====================
+ * 
+ * In Fragment/Activity:
+ * ```kotlin
+ * // Observe state changes
+ * lifecycleScope.launch {
+ *     repository.seriesState.collectLatest { state ->
+ *         when (state) {
+ *             is DataState.Loading -> showSpinner()
+ *             is DataState.Success -> refreshUI()
+ *             is DataState.Error -> showError()
+ *         }
+ *     }
+ * }
+ * 
+ * // Observe effects (one-time actions)
+ * lifecycleScope.launch {
+ *     repository.seriesEffects.collect { effect ->
+ *         when (effect) {
+ *             is LoadSuccess -> Log.d("Success", ...)
+ *             is LoadError -> if (!hasCachedData) showToast()
+ *         }
+ *     }
+ * }
+ * 
+ * // Trigger load (safe to call multiple times)
+ * repository.loadSeries(forceRefresh = false)
+ * ```
+ * 
+ * ==================== BACKGROUND REFRESH UX ====================
+ * 
+ * - Initial load without cache → Show loading spinner
+ * - Initial load fails without cache → Show error screen with retry
+ * - Background refresh with cache → Show data + refresh indicator
+ * - Background refresh fails with cache → SILENT (log only via effects)
+ * 
+ * This prevents annoying error toasts during background refreshes when
+ * the user already has usable cached data.
+ */
+
+/**
  * Exception thrown when VPN is required but not active.
  */
 class VpnRequiredException : Exception("VPN connection required but not active")
