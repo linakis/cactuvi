@@ -235,16 +235,39 @@ class SeriesFragment : Fragment() {
                 repository.seriesEffects.collect { effect ->
                     when (effect) {
                         is SeriesEffect.LoadSuccess -> {
-                            android.util.Log.d("SeriesFragment", "Series loaded successfully: ${effect.itemCount} items")
-                            // Could add analytics here: Analytics.log("series_load_success", ...)
+                            val source = if (effect.fromCache) "cache" else "API"
+                            android.util.Log.d("SeriesFragment", 
+                                "Series loaded successfully: ${effect.itemCount} items from $source in ${effect.durationMs}ms")
+                            
+                            // Performance monitoring
+                            if (effect.durationMs > 5000 && !effect.fromCache) {
+                                android.util.Log.w("SeriesFragment", 
+                                    "SLOW LOAD: Series API fetch took ${effect.durationMs}ms (threshold: 5000ms)")
+                            }
+                            
+                            // Analytics: Track successful loads with performance metrics
+                            // Analytics.log("series_load_success", mapOf(
+                            //     "item_count" to effect.itemCount,
+                            //     "duration_ms" to effect.durationMs,
+                            //     "from_cache" to effect.fromCache
+                            // ))
                         }
                         is SeriesEffect.LoadError -> {
                             if (effect.hasCachedData) {
                                 // Background refresh failed, cache exists - SILENT
-                                android.util.Log.w("SeriesFragment", "Background refresh failed (cache exists): ${effect.message}")
+                                android.util.Log.w("SeriesFragment", 
+                                    "Background refresh failed (cache exists) after ${effect.durationMs}ms: ${effect.message}")
                             } else {
                                 // First load failed, no cache - error already shown in handleSeriesState
-                                android.util.Log.e("SeriesFragment", "Initial load failed: ${effect.message}")
+                                android.util.Log.e("SeriesFragment", 
+                                    "Initial load failed after ${effect.durationMs}ms: ${effect.message}")
+                                
+                                // Analytics: Track failures
+                                // Analytics.log("series_load_error", mapOf(
+                                //     "duration_ms" to effect.durationMs,
+                                //     "error_message" to effect.message,
+                                //     "has_cache" to effect.hasCachedData
+                                // ))
                             }
                         }
                     }

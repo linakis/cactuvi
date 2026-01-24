@@ -112,27 +112,69 @@ import kotlin.time.Duration.Companion.minutes
 class VpnRequiredException : Exception("VPN connection required but not active")
 
 /**
- * One-time effects for Series loading
+ * One-time effects for Series loading.
+ * Used for logging, analytics, and performance monitoring.
  */
 sealed class SeriesEffect {
-    data class LoadSuccess(val itemCount: Int) : SeriesEffect()
-    data class LoadError(val message: String, val hasCachedData: Boolean) : SeriesEffect()
+    /**
+     * Load completed successfully.
+     * @param itemCount Number of items inserted
+     * @param durationMs Time taken to complete load (milliseconds)
+     * @param fromCache True if served from cache, false if fetched from API
+     */
+    data class LoadSuccess(
+        val itemCount: Int,
+        val durationMs: Long = 0,
+        val fromCache: Boolean = false
+    ) : SeriesEffect()
+    
+    /**
+     * Load failed.
+     * @param message Error message
+     * @param hasCachedData True if cached data is available
+     * @param durationMs Time until failure (milliseconds)
+     */
+    data class LoadError(
+        val message: String,
+        val hasCachedData: Boolean,
+        val durationMs: Long = 0
+    ) : SeriesEffect()
 }
 
 /**
- * One-time effects for Movies loading
+ * One-time effects for Movies loading.
+ * Used for logging, analytics, and performance monitoring.
  */
 sealed class MoviesEffect {
-    data class LoadSuccess(val itemCount: Int) : MoviesEffect()
-    data class LoadError(val message: String, val hasCachedData: Boolean) : MoviesEffect()
+    data class LoadSuccess(
+        val itemCount: Int,
+        val durationMs: Long = 0,
+        val fromCache: Boolean = false
+    ) : MoviesEffect()
+    
+    data class LoadError(
+        val message: String,
+        val hasCachedData: Boolean,
+        val durationMs: Long = 0
+    ) : MoviesEffect()
 }
 
 /**
- * One-time effects for Live channels loading
+ * One-time effects for Live channels loading.
+ * Used for logging, analytics, and performance monitoring.
  */
 sealed class LiveEffect {
-    data class LoadSuccess(val itemCount: Int) : LiveEffect()
-    data class LoadError(val message: String, val hasCachedData: Boolean) : LiveEffect()
+    data class LoadSuccess(
+        val itemCount: Int,
+        val durationMs: Long = 0,
+        val fromCache: Boolean = false
+    ) : LiveEffect()
+    
+    data class LoadError(
+        val message: String,
+        val hasCachedData: Boolean,
+        val durationMs: Long = 0
+    ) : LiveEffect()
 }
 
 class ContentRepository(
@@ -1056,6 +1098,8 @@ class ContentRepository(
      * @param forceRefresh If true, bypass cache and force API fetch
      */
     suspend fun loadSeries(forceRefresh: Boolean = false) = withContext(Dispatchers.IO) {
+        val startTime = System.currentTimeMillis()
+        
         // Race condition check - BEFORE mutex acquisition
         if (_seriesState.value.isLoading() && !forceRefresh) {
             PerformanceLogger.log("loadSeries: Already loading, skipping duplicate call")
@@ -1078,8 +1122,14 @@ class ContentRepository(
                     if (metadata != null && metadata.itemCount > 0) {
                         val isExtremelyStale = !isCacheValid(metadata.lastUpdated, CACHE_TTL_FALLBACK)
                         if (!isExtremelyStale) {
-                            PerformanceLogger.log("loadSeries: Cache valid, skipping API fetch")
+                            val duration = System.currentTimeMillis() - startTime
+                            PerformanceLogger.log("loadSeries: Cache valid, skipping API fetch (${duration}ms)")
                             _seriesState.value = DataState.Success(Unit)
+                            _seriesEffects.emit(SeriesEffect.LoadSuccess(
+                                itemCount = metadata.itemCount,
+                                durationMs = duration,
+                                fromCache = true
+                            ))
                             return@withLock
                         }
                     }
@@ -1163,14 +1213,22 @@ class ContentRepository(
                 val dbCount = database.seriesDao().getCount()
                 PerformanceLogger.log("loadSeries: DB count verification: $dbCount")
                 
+                val duration = System.currentTimeMillis() - startTime
+                PerformanceLogger.log("loadSeries: API fetch completed (${duration}ms)")
+                
                 // Emit Success state
                 _seriesState.value = DataState.Success(Unit)
                 
-                // Emit success effect
-                _seriesEffects.emit(SeriesEffect.LoadSuccess(totalInserted))
+                // Emit success effect with performance metrics
+                _seriesEffects.emit(SeriesEffect.LoadSuccess(
+                    itemCount = totalInserted,
+                    durationMs = duration,
+                    fromCache = false
+                ))
             }
         } catch (e: Exception) {
-            android.util.Log.e("ContentRepository", "loadSeries failed", e)
+            val duration = System.currentTimeMillis() - startTime
+            android.util.Log.e("ContentRepository", "loadSeries failed after ${duration}ms", e)
             
             // Check if we have cached data
             val cachedCount = database.cacheMetadataDao().get("series")?.itemCount ?: 0
@@ -1182,10 +1240,11 @@ class ContentRepository(
                 cachedData = if (hasCache) Unit else null
             )
             
-            // Emit error effect (for logging/analytics)
+            // Emit error effect with performance metrics
             _seriesEffects.emit(SeriesEffect.LoadError(
                 message = e.message ?: "Unknown error",
-                hasCachedData = hasCache
+                hasCachedData = hasCache,
+                durationMs = duration
             ))
         }
     }
