@@ -21,6 +21,7 @@ import com.iptv.app.R
 import com.iptv.app.data.models.Category
 import com.iptv.app.data.models.LiveChannel
 import com.iptv.app.data.repository.ContentRepository
+import com.iptv.app.data.repository.LiveEffect
 import com.iptv.app.data.sync.ContentDiff
 import com.iptv.app.data.sync.ReactiveUpdateManager
 import com.iptv.app.ui.common.CategoryTreeAdapter
@@ -107,8 +108,13 @@ class LiveTvFragment : Fragment() {
         setupToolbar()
         setupRecyclerView()
         setupReactiveUpdates()
-        setupLoadingStateObserver()
-        loadData()
+        
+        // NEW: Observe reactive state + effects
+        observeLiveState()
+        observeLiveEffects()
+        
+        // Trigger initial load ONCE
+        triggerDataLoad()
     }
     
     private fun setupToolbar() {
@@ -170,14 +176,65 @@ class LiveTvFragment : Fragment() {
     /**
      * Observe loading state from repository and show/hide progress indicator.
      */
-    private fun setupLoadingStateObserver() {
+    /**
+     * Observe live state reactively (FRP pattern).
+     */
+    private fun observeLiveState() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                repository.liveLoading.collectLatest { isLoading ->
-                    if (isLoading) {
-                        showLoadingState()
+                repository.liveState.collectLatest { state ->
+                    handleLiveState(state)
+                }
+            }
+        }
+    }
+    
+    /**
+     * Handle live state changes reactively.
+     */
+    private fun handleLiveState(state: com.iptv.app.data.models.DataState<Unit>) {
+        when (state) {
+            is com.iptv.app.data.models.DataState.Loading -> {
+                lifecycleScope.launch {
+                    val hasCache = (database.cacheMetadataDao().get("live")?.itemCount ?: 0) > 0
+                    if (!hasCache) {
+                        showLoadingWithMessage("Loading live channels for the first time...")
                     } else {
-                        hideLoadingState()
+                        progressBar.visibility = View.VISIBLE
+                    }
+                }
+            }
+            is com.iptv.app.data.models.DataState.Success -> {
+                refreshUIFromCache()
+            }
+            is com.iptv.app.data.models.DataState.Error -> {
+                if (state.cachedData != null) {
+                    refreshUIFromCache()
+                } else {
+                    showErrorWithRetry("Failed to load live channels: ${state.error.message}")
+                }
+            }
+        }
+    }
+    
+    /**
+     * Observe live effects (one-time actions).
+     */
+    private fun observeLiveEffects() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                repository.liveEffects.collect { effect ->
+                    when (effect) {
+                        is LiveEffect.LoadSuccess -> {
+                            android.util.Log.d("LiveTvFragment", "Live channels loaded successfully: ${effect.itemCount} items")
+                        }
+                        is LiveEffect.LoadError -> {
+                            if (effect.hasCachedData) {
+                                android.util.Log.w("LiveTvFragment", "Background refresh failed (cache exists): ${effect.message}")
+                            } else {
+                                android.util.Log.e("LiveTvFragment", "Initial load failed: ${effect.message}")
+                            }
+                        }
                     }
                 }
             }
@@ -185,19 +242,73 @@ class LiveTvFragment : Fragment() {
     }
     
     /**
-     * Show loading indicator when background data load is in progress.
+     * Trigger data load from repository.
      */
-    private fun showLoadingState() {
-        progressBar.visibility = View.VISIBLE
-        PerformanceLogger.log("LiveTvFragment: Showing loading state")
+    private fun triggerDataLoad() {
+        lifecycleScope.launch {
+            repository.loadLive(forceRefresh = false)
+        }
     }
     
     /**
-     * Hide loading indicator when background data load completes.
+     * Refresh UI from cached data.
      */
-    private fun hideLoadingState() {
+    private fun refreshUIFromCache() {
         progressBar.visibility = View.GONE
-        PerformanceLogger.log("LiveTvFragment: Hiding loading state")
+        errorText.visibility = View.GONE
+        
+        lifecycleScope.launch {
+            loadCategoriesFromCache()
+        }
+    }
+    
+    /**
+     * Show error with retry button.
+     */
+    private fun showErrorWithRetry(message: String) {
+        progressBar.visibility = View.GONE
+        errorText.visibility = View.VISIBLE
+        errorText.text = "$message\n\nTap to retry"
+        recyclerView.visibility = View.GONE
+        
+        errorText.setOnClickListener {
+            triggerDataLoad()
+        }
+    }
+    
+    /**
+     * Load categories from cache.
+     */
+    private suspend fun loadCategoriesFromCache() {
+        android.util.Log.d("IPTV_PERF", "[DEBUG LiveTvFragment.loadCategoriesFromCache] START")
+        
+        val preferencesManager = PreferencesManager.getInstance(requireContext())
+        val groupingEnabled = preferencesManager.isGroupingEnabled(ContentFilterSettings.ContentType.LIVE_TV)
+        val separator = preferencesManager.getCustomSeparator(ContentFilterSettings.ContentType.LIVE_TV)
+        val hiddenGroups = preferencesManager.getHiddenGroups(ContentFilterSettings.ContentType.LIVE_TV)
+        val hiddenCategories = preferencesManager.getHiddenCategories(ContentFilterSettings.ContentType.LIVE_TV)
+        val filterMode = preferencesManager.getFilterMode(ContentFilterSettings.ContentType.LIVE_TV)
+        
+        navigationTree = repository.getCachedLiveNavigationTree()
+        
+        val categoriesResult = repository.getLiveCategories()
+        if (categoriesResult.isSuccess) {
+            categories = categoriesResult.getOrNull() ?: emptyList()
+            
+            if (navigationTree == null) {
+                navigationTree = CategoryGrouper.buildLiveNavigationTree(
+                    categories,
+                    groupingEnabled,
+                    separator,
+                    hiddenGroups,
+                    hiddenCategories,
+                    filterMode
+                )
+            }
+        }
+        
+        showGroups()
+        android.util.Log.d("IPTV_PERF", "[DEBUG LiveTvFragment.loadCategoriesFromCache] END")
     }
     
     private fun handleContentDiffs(diffs: List<ContentDiff>) {
@@ -257,89 +368,9 @@ class LiveTvFragment : Fragment() {
         }
     }
     
+    @Deprecated("Replaced by reactive pattern - use triggerDataLoad() and observe liveState")
     private fun loadData() {
-        showLoading(true)
-        
-        lifecycleScope.launch {
-            // Check if already loading
-            if (repository.liveLoading.value) {
-                PerformanceLogger.log("Live channels already loading - waiting for completion")
-                showLoadingWithMessage("Loading live channels data...")
-                
-                // Wait for current load to complete
-                repository.liveLoading.first { !it }
-                PerformanceLogger.log("Live channels load completed - checking cache")
-                
-                // Check cache again after load completes
-                val newMetadata = database.cacheMetadataDao().get("live")
-                val nowHasCache = (newMetadata?.itemCount ?: 0) > 0
-                
-                if (!nowHasCache) {
-                    // Still no cache after waiting - something went wrong
-                    PerformanceLogger.log("ERROR: Still no cache after waiting for load")
-                    showError("Failed to load live channels data")
-                    return@launch
-                }
-                
-                // Fall through to load UI with cached data
-                PerformanceLogger.log("Cache now exists - loading UI")
-            }
-            
-            // Check if cache exists
-            val metadata = database.cacheMetadataDao().get("live")
-            val hasCache = (metadata?.itemCount ?: 0) > 0
-            
-            if (!hasCache) {
-                // No cache and not loading - trigger new load
-                showLoadingWithMessage("Loading live channels for the first time...")
-                
-                // Trigger background load
-                lifecycleScope.launch {
-                    val result = repository.getLiveStreams(forceRefresh = true)
-                    if (result.isSuccess) {
-                        // Reload data now that cache exists
-                        loadData()
-                    } else {
-                        showError("Failed to load live channels: ${result.exceptionOrNull()?.message}")
-                    }
-                }
-                return@launch
-            }
-            
-            val preferencesManager = PreferencesManager.getInstance(requireContext())
-            
-            // Get filter settings
-            val groupingEnabled = preferencesManager.isGroupingEnabled(ContentFilterSettings.ContentType.LIVE_TV)
-            val separator = preferencesManager.getCustomSeparator(ContentFilterSettings.ContentType.LIVE_TV)
-            val hiddenGroups = preferencesManager.getHiddenGroups(ContentFilterSettings.ContentType.LIVE_TV)
-            val hiddenCategories = preferencesManager.getHiddenCategories(ContentFilterSettings.ContentType.LIVE_TV)
-            val filterMode = preferencesManager.getFilterMode(ContentFilterSettings.ContentType.LIVE_TV)
-            
-            // Try to load cached navigation tree first
-            navigationTree = repository.getCachedLiveNavigationTree()
-            
-            // Load categories
-            val categoriesResult = repository.getLiveCategories()
-            if (categoriesResult.isSuccess) {
-                categories = categoriesResult.getOrNull() ?: emptyList()
-                
-                // Build navigation tree with hierarchical filter settings if cache miss
-                if (navigationTree == null) {
-                    navigationTree = CategoryGrouper.buildLiveNavigationTree(
-                        categories,
-                        groupingEnabled,
-                        separator,
-                        hiddenGroups,
-                        hiddenCategories,
-                        filterMode
-                    )
-                }
-            }
-            
-            // Show groups (no need to load all channels)
-            showGroups()
-            showLoading(false)
-        }
+        triggerDataLoad()
     }
     
     private fun showLoadingWithMessage(message: String) {

@@ -22,6 +22,7 @@ import com.iptv.app.R
 import com.iptv.app.data.models.Category
 import com.iptv.app.data.models.Movie
 import com.iptv.app.data.repository.ContentRepository
+import com.iptv.app.data.repository.MoviesEffect
 import com.iptv.app.data.sync.ContentDiff
 import com.iptv.app.data.sync.ReactiveUpdateManager
 import com.iptv.app.ui.common.CategoryTreeAdapter
@@ -108,8 +109,13 @@ class MoviesFragment : Fragment() {
         setupToolbar()
         setupRecyclerView()
         setupReactiveUpdates()
-        setupLoadingStateObserver()
-        loadData()
+        
+        // NEW: Observe reactive state + effects
+        observeMoviesState()
+        observeMoviesEffects()
+        
+        // Trigger initial load ONCE
+        triggerDataLoad()
     }
     
     private fun setupToolbar() {
@@ -178,14 +184,65 @@ class MoviesFragment : Fragment() {
      * Observe loading state from repository and show/hide progress indicator.
      * Shows Material 3 progress bar at top of screen during background loading.
      */
-    private fun setupLoadingStateObserver() {
+    /**
+     * Observe movies state reactively (FRP pattern).
+     */
+    private fun observeMoviesState() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                repository.moviesLoading.collectLatest { isLoading ->
-                    if (isLoading) {
-                        showLoadingState()
+                repository.moviesState.collectLatest { state ->
+                    handleMoviesState(state)
+                }
+            }
+        }
+    }
+    
+    /**
+     * Handle movies state changes reactively.
+     */
+    private fun handleMoviesState(state: com.iptv.app.data.models.DataState<Unit>) {
+        when (state) {
+            is com.iptv.app.data.models.DataState.Loading -> {
+                lifecycleScope.launch {
+                    val hasCache = (database.cacheMetadataDao().get("movies")?.itemCount ?: 0) > 0
+                    if (!hasCache) {
+                        showLoadingWithMessage("Loading movies for the first time...")
                     } else {
-                        hideLoadingState()
+                        progressBar.visibility = View.VISIBLE
+                    }
+                }
+            }
+            is com.iptv.app.data.models.DataState.Success -> {
+                refreshUIFromCache()
+            }
+            is com.iptv.app.data.models.DataState.Error -> {
+                if (state.cachedData != null) {
+                    refreshUIFromCache()
+                } else {
+                    showErrorWithRetry("Failed to load movies: ${state.error.message}")
+                }
+            }
+        }
+    }
+    
+    /**
+     * Observe movies effects (one-time actions).
+     */
+    private fun observeMoviesEffects() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                repository.moviesEffects.collect { effect ->
+                    when (effect) {
+                        is MoviesEffect.LoadSuccess -> {
+                            android.util.Log.d("MoviesFragment", "Movies loaded successfully: ${effect.itemCount} items")
+                        }
+                        is MoviesEffect.LoadError -> {
+                            if (effect.hasCachedData) {
+                                android.util.Log.w("MoviesFragment", "Background refresh failed (cache exists): ${effect.message}")
+                            } else {
+                                android.util.Log.e("MoviesFragment", "Initial load failed: ${effect.message}")
+                            }
+                        }
                     }
                 }
             }
@@ -193,19 +250,73 @@ class MoviesFragment : Fragment() {
     }
     
     /**
-     * Show loading indicator when background data load is in progress.
+     * Trigger data load from repository.
      */
-    private fun showLoadingState() {
-        progressBar.visibility = View.VISIBLE
-        PerformanceLogger.log("MoviesFragment: Showing loading state")
+    private fun triggerDataLoad() {
+        lifecycleScope.launch {
+            repository.loadMovies(forceRefresh = false)
+        }
     }
     
     /**
-     * Hide loading indicator when background data load completes.
+     * Refresh UI from cached data.
      */
-    private fun hideLoadingState() {
+    private fun refreshUIFromCache() {
         progressBar.visibility = View.GONE
-        PerformanceLogger.log("MoviesFragment: Hiding loading state")
+        errorText.visibility = View.GONE
+        
+        lifecycleScope.launch {
+            loadGroupsFromCache()
+        }
+    }
+    
+    /**
+     * Show error with retry button.
+     */
+    private fun showErrorWithRetry(message: String) {
+        progressBar.visibility = View.GONE
+        errorText.visibility = View.VISIBLE
+        errorText.text = "$message\n\nTap to retry"
+        recyclerView.visibility = View.GONE
+        
+        errorText.setOnClickListener {
+            triggerDataLoad()
+        }
+    }
+    
+    /**
+     * Load groups from cache.
+     */
+    private suspend fun loadGroupsFromCache() {
+        android.util.Log.d("IPTV_PERF", "[DEBUG MoviesFragment.loadGroupsFromCache] START")
+        
+        val preferencesManager = PreferencesManager.getInstance(requireContext())
+        val groupingEnabled = preferencesManager.isGroupingEnabled(ContentFilterSettings.ContentType.MOVIES)
+        val separator = preferencesManager.getCustomSeparator(ContentFilterSettings.ContentType.MOVIES)
+        val hiddenGroups = preferencesManager.getHiddenGroups(ContentFilterSettings.ContentType.MOVIES)
+        val hiddenCategories = preferencesManager.getHiddenCategories(ContentFilterSettings.ContentType.MOVIES)
+        val filterMode = preferencesManager.getFilterMode(ContentFilterSettings.ContentType.MOVIES)
+        
+        navigationTree = repository.getCachedVodNavigationTree()
+        
+        val categoriesResult = repository.getMovieCategories()
+        if (categoriesResult.isSuccess) {
+            categories = categoriesResult.getOrNull() ?: emptyList()
+            
+            if (navigationTree == null) {
+                navigationTree = CategoryGrouper.buildVodNavigationTree(
+                    categories,
+                    groupingEnabled,
+                    separator,
+                    hiddenGroups,
+                    hiddenCategories,
+                    filterMode
+                )
+            }
+        }
+        
+        showGroups()
+        android.util.Log.d("IPTV_PERF", "[DEBUG MoviesFragment.loadGroupsFromCache] END")
     }
     
     /**
@@ -277,124 +388,9 @@ class MoviesFragment : Fragment() {
         }
     }
     
+    @Deprecated("Replaced by reactive pattern - use triggerDataLoad() and observe moviesState")
     private fun loadData() {
-        showLoading(true)
-        
-        lifecycleScope.launch {
-            // Start total timer
-            val totalStartTime = PerformanceLogger.start("MoviesFragment.loadData")
-            
-            // Check if already loading
-            if (repository.moviesLoading.value) {
-                PerformanceLogger.log("Movies already loading - waiting for completion")
-                showLoadingWithMessage("Loading movies data...")
-                
-                // Wait for current load to complete
-                repository.moviesLoading.first { !it }
-                PerformanceLogger.log("Movies load completed - checking cache")
-                
-                // Check cache again after load completes
-                val newMetadata = database.cacheMetadataDao().get("movies")
-                val nowHasCache = (newMetadata?.itemCount ?: 0) > 0
-                
-                if (!nowHasCache) {
-                    // Still no cache after waiting - something went wrong
-                    PerformanceLogger.log("ERROR: Still no cache after waiting for load")
-                    showError("Failed to load movies data")
-                    return@launch
-                }
-                
-                // Fall through to load UI with cached data
-                PerformanceLogger.log("Cache now exists - loading UI")
-            }
-            
-            // Check if cache exists
-            val metadata = database.cacheMetadataDao().get("movies")
-            val hasCache = (metadata?.itemCount ?: 0) > 0
-            
-            if (!hasCache) {
-                // No cache and not loading - trigger new load
-                showLoadingWithMessage("Loading movies for the first time...")
-                PerformanceLogger.log("No movies cache found - triggering background load")
-                
-                // Trigger background load
-                lifecycleScope.launch {
-                    val result = repository.getMovies(forceRefresh = true)
-                    if (result.isSuccess) {
-                        PerformanceLogger.log("Background movies load completed successfully")
-                        // Reload data now that cache exists
-                        loadData()
-                    } else {
-                        showError("Failed to load movies: ${result.exceptionOrNull()?.message}")
-                    }
-                }
-                return@launch
-            }
-            
-            val preferencesManager = PreferencesManager.getInstance(requireContext())
-            
-            // Get filter settings
-            PerformanceLogger.logPhase("MoviesFragment.loadData", "Loading filter settings")
-            val filterStartTime = PerformanceLogger.start("Filter settings load")
-            val groupingEnabled = preferencesManager.isGroupingEnabled(ContentFilterSettings.ContentType.MOVIES)
-            val separator = preferencesManager.getCustomSeparator(ContentFilterSettings.ContentType.MOVIES)
-            val hiddenGroups = preferencesManager.getHiddenGroups(ContentFilterSettings.ContentType.MOVIES)
-            val hiddenCategories = preferencesManager.getHiddenCategories(ContentFilterSettings.ContentType.MOVIES)
-            val filterMode = preferencesManager.getFilterMode(ContentFilterSettings.ContentType.MOVIES)
-            PerformanceLogger.end("Filter settings load", filterStartTime, 
-                "grouping=$groupingEnabled, hiddenGroups=${hiddenGroups.size}, hiddenCategories=${hiddenCategories.size}")
-            
-            // Try to load cached navigation tree first
-            PerformanceLogger.logPhase("MoviesFragment.loadData", "Checking navigation tree cache")
-            val navTreeStartTime = PerformanceLogger.start("Navigation tree cache lookup")
-            navigationTree = repository.getCachedVodNavigationTree()
-            if (navigationTree != null) {
-                PerformanceLogger.logCacheHit("movies", "navigationTree", navigationTree?.groups?.size ?: 0)
-                PerformanceLogger.end("Navigation tree cache lookup", navTreeStartTime, "HIT")
-            } else {
-                PerformanceLogger.logCacheMiss("movies", "navigationTree", "not cached")
-                PerformanceLogger.end("Navigation tree cache lookup", navTreeStartTime, "MISS")
-            }
-            
-            // Load categories
-            PerformanceLogger.logPhase("MoviesFragment.loadData", "Loading categories")
-            val categoriesStartTime = PerformanceLogger.start("Categories load")
-            val categoriesResult = repository.getMovieCategories()
-            if (categoriesResult.isSuccess) {
-                categories = categoriesResult.getOrNull() ?: emptyList()
-                PerformanceLogger.end("Categories load", categoriesStartTime, "count=${categories.size}")
-                
-                // Build navigation tree with hierarchical filter settings if cache miss
-                if (navigationTree == null) {
-                    PerformanceLogger.logPhase("MoviesFragment.loadData", "Building navigation tree")
-                    val treeStartTime = PerformanceLogger.start("Build navigation tree")
-                    navigationTree = CategoryGrouper.buildVodNavigationTree(
-                        categories,
-                        groupingEnabled,
-                        separator,
-                        hiddenGroups,
-                        hiddenCategories,
-                        filterMode
-                    )
-                    val groupCount = navigationTree?.groups?.size ?: 0
-                    PerformanceLogger.end("Build navigation tree", treeStartTime, "groups=$groupCount")
-                }
-            } else {
-                PerformanceLogger.end("Categories load", categoriesStartTime, "FAILED")
-            }
-            
-            // Show groups (no need to load all movies)
-            PerformanceLogger.logPhase("MoviesFragment.loadData", "Updating UI")
-            PerformanceLogger.log("Skipping allMovies load - using DB counts and Paging3 for categories")
-            val uiStartTime = PerformanceLogger.start("Show groups UI update")
-            showGroups()
-            PerformanceLogger.end("Show groups UI update", uiStartTime)
-            
-            showLoading(false)
-            
-            // End total timer
-            PerformanceLogger.end("MoviesFragment.loadData", totalStartTime, "SUCCESS")
-        }
+        triggerDataLoad()
     }
     
     private fun showLoadingWithMessage(message: String) {

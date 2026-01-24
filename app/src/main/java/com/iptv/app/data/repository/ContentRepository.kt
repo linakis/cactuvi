@@ -264,22 +264,21 @@ class ContentRepository(
             val startTime = PerformanceLogger.start("Parallel content load")
             
             // Launch all 3 content types concurrently on IO dispatcher
-            // Series uses new FRP pattern (fire-and-forget, state managed via StateFlow)
-            // Movies/Live still use old Result pattern temporarily
+            // All use new FRP pattern (fire-and-forget, state managed via StateFlow)
+            async(Dispatchers.IO) { 
+                loadMovies(forceRefresh = false)  // NEW: Reactive pattern
+            }
             async(Dispatchers.IO) { 
                 loadSeries(forceRefresh = false)  // NEW: Reactive pattern
             }
-            val moviesDeferred = async(Dispatchers.IO) { 
-                getMovies(forceRefresh = false)  // OLD: Result pattern (will convert later)
-            }
-            val liveDeferred = async(Dispatchers.IO) { 
-                getLiveStreams(forceRefresh = false)  // OLD: Result pattern (will convert later)
+            async(Dispatchers.IO) { 
+                loadLive(forceRefresh = false)  // NEW: Reactive pattern
             }
             
-            // Await results (Series doesn't return Result, uses StateFlow instead)
-            val moviesResult = moviesDeferred.await()
-            val seriesResult = Result.success(emptyList<Series>())  // Series state managed via StateFlow
-            val liveResult = liveDeferred.await()
+            // All state managed via StateFlow - return dummy Results for backward compatibility
+            val moviesResult = Result.success(emptyList<Movie>())
+            val seriesResult = Result.success(emptyList<Series>())
+            val liveResult = Result.success(emptyList<LiveChannel>())
             
             PerformanceLogger.end("Parallel content load", startTime, 
                 "Movies: ${if (moviesResult.isSuccess) "OK" else "FAIL"}, " +
@@ -291,6 +290,148 @@ class ContentRepository(
     
     // ========== LIVE CHANNELS ==========
     
+    /**
+     * Load live channels data from API with reactive state management.
+     * Emits state changes to liveState StateFlow.
+     * Thread-safe: Uses mutex to prevent concurrent loads.
+     * 
+     * @param forceRefresh If true, bypass cache and force API fetch
+     */
+    suspend fun loadLive(forceRefresh: Boolean = false) = withContext(Dispatchers.IO) {
+        // Race condition check - BEFORE mutex acquisition
+        if (_liveState.value.isLoading() && !forceRefresh) {
+            PerformanceLogger.log("loadLive: Already loading, skipping duplicate call")
+            return@withContext
+        }
+        
+        try {
+            liveMutex.withLock {
+                // Double-check inside mutex
+                if (_liveState.value.isLoading() && !forceRefresh) {
+                    return@withLock
+                }
+                
+                // Emit Loading state
+                _liveState.value = DataState.Loading
+                
+                // Check cache first (unless forcing refresh)
+                if (!forceRefresh) {
+                    val metadata = database.cacheMetadataDao().get("live")
+                    if (metadata != null && metadata.itemCount > 0) {
+                        val isExtremelyStale = !isCacheValid(metadata.lastUpdated, CACHE_TTL_FALLBACK)
+                        if (!isExtremelyStale) {
+                            PerformanceLogger.log("loadLive: Cache valid, skipping API fetch")
+                            _liveState.value = DataState.Success(Unit)
+                            return@withLock
+                        }
+                    }
+                }
+                
+                // Fetch from API
+                PerformanceLogger.log("loadLive: Starting API fetch")
+                checkVpnRequirement()
+                
+                val (username, password, sourceId) = getCredentials()
+                
+                // Fetch from API with retry
+                val responseBody = retryWithExponentialBackoff {
+                    getApiService().getLiveStreams(username, password)
+                }
+                
+                // Load categories for mapping
+                val categories = getLiveCategories().getOrNull() ?: emptyList()
+                val categoryMap = categories.associateBy { it.categoryId }
+                
+                // Clear old data for this source
+                database.liveChannelDao().deleteBySourceId(sourceId)
+                
+                // Drop indices before batch inserts
+                com.iptv.app.data.db.OptimizedBulkInsert.beginLiveChannelsInsert(database.getSqliteDatabase())
+                
+                // Accumulator for batching writes through DbWriter
+                val accumulator = mutableListOf<LiveChannelEntity>()
+                var totalInserted = 0
+                
+                try {
+                    totalInserted = StreamingJsonParser.parseArrayInBatches(
+                        responseBody = responseBody,
+                        itemClass = LiveChannel::class.java,
+                        batchSize = BATCH_SIZE,
+                        processBatch = { channelBatch ->
+                            val entities = channelBatch.map { channel ->
+                                val categoryName = categoryMap[channel.categoryId]?.categoryName ?: ""
+                                channel.categoryName = categoryName
+                                channel.toEntity(sourceId, categoryName)
+                            }
+                            
+                            // Accumulate entities
+                            accumulator.addAll(entities)
+                            
+                            // Write in 5k chunks through DbWriter
+                            if (accumulator.size >= 5000) {
+                                dbWriter.writeLiveChannels(accumulator.toList())
+                                accumulator.clear()
+                            }
+                        },
+                        onProgress = { count ->
+                            PerformanceLogger.log("Progress: $count live channels parsed and inserted")
+                        }
+                    )
+                    
+                    // Flush remaining items
+                    if (accumulator.isNotEmpty()) {
+                        dbWriter.writeLiveChannels(accumulator)
+                        accumulator.clear()
+                    }
+                } catch (e: Exception) {
+                    throw e
+                } finally {
+                    com.iptv.app.data.db.OptimizedBulkInsert.endLiveChannelsInsert(database.getSqliteDatabase())
+                }
+                
+                // Update cache metadata
+                val newMetadata = CacheMetadataEntity(
+                    contentType = "live",
+                    lastUpdated = System.currentTimeMillis(),
+                    itemCount = totalInserted,
+                    categoryCount = categories.size
+                )
+                database.cacheMetadataDao().insert(newMetadata)
+                
+                PerformanceLogger.log("loadLive: Successfully inserted $totalInserted live channels")
+                
+                // Verify database count
+                val dbCount = database.liveChannelDao().getCount()
+                PerformanceLogger.log("loadLive: DB count verification: $dbCount")
+                
+                // Emit Success state
+                _liveState.value = DataState.Success(Unit)
+                
+                // Emit success effect
+                _liveEffects.emit(LiveEffect.LoadSuccess(totalInserted))
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("ContentRepository", "loadLive failed", e)
+            
+            // Check if we have cached data
+            val cachedCount = database.cacheMetadataDao().get("live")?.itemCount ?: 0
+            val hasCache = cachedCount > 0
+            
+            // Emit Error state
+            _liveState.value = DataState.Error(
+                error = e,
+                cachedData = if (hasCache) Unit else null
+            )
+            
+            // Emit error effect
+            _liveEffects.emit(LiveEffect.LoadError(
+                message = e.message ?: "Unknown error",
+                hasCachedData = hasCache
+            ))
+        }
+    }
+    
+    @Deprecated("Use loadLive() instead", ReplaceWith("loadLive(forceRefresh)"))
     suspend fun getLiveStreams(forceRefresh: Boolean = false): Result<List<LiveChannel>> = 
         withContext(Dispatchers.IO) {
             try {
@@ -450,6 +591,148 @@ class ContentRepository(
     
     // ========== MOVIES ==========
     
+    /**
+     * Load movies data from API with reactive state management.
+     * Emits state changes to moviesState StateFlow.
+     * Thread-safe: Uses mutex to prevent concurrent loads.
+     * 
+     * @param forceRefresh If true, bypass cache and force API fetch
+     */
+    suspend fun loadMovies(forceRefresh: Boolean = false) = withContext(Dispatchers.IO) {
+        // Race condition check - BEFORE mutex acquisition
+        if (_moviesState.value.isLoading() && !forceRefresh) {
+            PerformanceLogger.log("loadMovies: Already loading, skipping duplicate call")
+            return@withContext
+        }
+        
+        try {
+            moviesMutex.withLock {
+                // Double-check inside mutex
+                if (_moviesState.value.isLoading() && !forceRefresh) {
+                    return@withLock
+                }
+                
+                // Emit Loading state
+                _moviesState.value = DataState.Loading
+                
+                // Check cache first (unless forcing refresh)
+                if (!forceRefresh) {
+                    val metadata = database.cacheMetadataDao().get("movies")
+                    if (metadata != null && metadata.itemCount > 0) {
+                        val isExtremelyStale = !isCacheValid(metadata.lastUpdated, CACHE_TTL_FALLBACK)
+                        if (!isExtremelyStale) {
+                            PerformanceLogger.log("loadMovies: Cache valid, skipping API fetch")
+                            _moviesState.value = DataState.Success(Unit)
+                            return@withLock
+                        }
+                    }
+                }
+                
+                // Fetch from API
+                PerformanceLogger.log("loadMovies: Starting API fetch")
+                checkVpnRequirement()
+                
+                val (username, password, sourceId) = getCredentials()
+                
+                // Fetch from API with retry
+                val responseBody = retryWithExponentialBackoff {
+                    getApiService().getVodStreams(username, password)
+                }
+                
+                // Load categories for mapping
+                val categories = getMovieCategories().getOrNull() ?: emptyList()
+                val categoryMap = categories.associateBy { it.categoryId }
+                
+                // Clear old data for this source
+                database.movieDao().deleteBySourceId(sourceId)
+                
+                // Drop indices before batch inserts
+                com.iptv.app.data.db.OptimizedBulkInsert.beginMoviesInsert(database.getSqliteDatabase())
+                
+                // Accumulator for batching writes through DbWriter
+                val accumulator = mutableListOf<MovieEntity>()
+                var totalInserted = 0
+                
+                try {
+                    totalInserted = StreamingJsonParser.parseArrayInBatches(
+                        responseBody = responseBody,
+                        itemClass = Movie::class.java,
+                        batchSize = BATCH_SIZE,
+                        processBatch = { movieBatch ->
+                            val entities = movieBatch.map { movie ->
+                                val categoryName = categoryMap[movie.categoryId]?.categoryName ?: ""
+                                movie.categoryName = categoryName
+                                movie.toEntity(sourceId, categoryName)
+                            }
+                            
+                            // Accumulate entities
+                            accumulator.addAll(entities)
+                            
+                            // Write in 5k chunks through DbWriter
+                            if (accumulator.size >= 5000) {
+                                dbWriter.writeMovies(accumulator.toList())
+                                accumulator.clear()
+                            }
+                        },
+                        onProgress = { count ->
+                            PerformanceLogger.log("Progress: $count movies parsed and inserted")
+                        }
+                    )
+                    
+                    // Flush remaining items
+                    if (accumulator.isNotEmpty()) {
+                        dbWriter.writeMovies(accumulator)
+                        accumulator.clear()
+                    }
+                } catch (e: Exception) {
+                    throw e
+                } finally {
+                    com.iptv.app.data.db.OptimizedBulkInsert.endMoviesInsert(database.getSqliteDatabase())
+                }
+                
+                // Update cache metadata
+                val newMetadata = CacheMetadataEntity(
+                    contentType = "movies",
+                    lastUpdated = System.currentTimeMillis(),
+                    itemCount = totalInserted,
+                    categoryCount = categories.size
+                )
+                database.cacheMetadataDao().insert(newMetadata)
+                
+                PerformanceLogger.log("loadMovies: Successfully inserted $totalInserted movies")
+                
+                // Verify database count
+                val dbCount = database.movieDao().getCount()
+                PerformanceLogger.log("loadMovies: DB count verification: $dbCount")
+                
+                // Emit Success state
+                _moviesState.value = DataState.Success(Unit)
+                
+                // Emit success effect
+                _moviesEffects.emit(MoviesEffect.LoadSuccess(totalInserted))
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("ContentRepository", "loadMovies failed", e)
+            
+            // Check if we have cached data
+            val cachedCount = database.cacheMetadataDao().get("movies")?.itemCount ?: 0
+            val hasCache = cachedCount > 0
+            
+            // Emit Error state
+            _moviesState.value = DataState.Error(
+                error = e,
+                cachedData = if (hasCache) Unit else null
+            )
+            
+            // Emit error effect
+            _moviesEffects.emit(MoviesEffect.LoadError(
+                message = e.message ?: "Unknown error",
+                hasCachedData = hasCache
+            ))
+        }
+    }
+    
+    @Deprecated("Use loadMovies() instead", ReplaceWith("loadMovies(forceRefresh)"))
     suspend fun getMovies(forceRefresh: Boolean = false): Result<List<Movie>> = 
         withContext(Dispatchers.IO) {
             try {
