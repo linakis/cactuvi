@@ -22,6 +22,7 @@ import com.iptv.app.utils.StreamingJsonParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -126,6 +127,40 @@ class ContentRepository(
         val source = sourceManager.getActiveSource()
             ?: throw IllegalStateException("No active source configured")
         return Triple(source.username, source.password, source.id)
+    }
+    
+    /**
+     * Retry helper with exponential backoff for API calls.
+     * Attempts: 3 (initial + 2 retries)
+     * Delays: 1s, 2s, 4s
+     */
+    private suspend fun <T> retryWithExponentialBackoff(
+        maxAttempts: Int = 3,
+        initialDelayMs: Long = 1000,
+        operation: suspend () -> T
+    ): T {
+        var currentAttempt = 0
+        var currentDelay = initialDelayMs
+        var lastException: Exception? = null
+        
+        while (currentAttempt < maxAttempts) {
+            try {
+                return operation()
+            } catch (e: Exception) {
+                lastException = e
+                currentAttempt++
+                
+                if (currentAttempt >= maxAttempts) {
+                    break
+                }
+                
+                PerformanceLogger.log("Retry attempt $currentAttempt failed: ${e.message}. Retrying in ${currentDelay}ms...")
+                kotlinx.coroutines.delay(currentDelay)
+                currentDelay *= 2 // Exponential backoff
+            }
+        }
+        
+        throw lastException ?: Exception("Operation failed after $maxAttempts attempts")
     }
     
     private fun isCacheValid(lastUpdated: Long, ttl: Long): Boolean {
@@ -239,7 +274,11 @@ class ContentRepository(
                 
                 // Fetch from API
                 val (username, password, sourceId) = getCredentials()
-                val responseBody = getApiService().getLiveStreams(username, password)
+                
+                // Fetch from API with retry
+                val responseBody = retryWithExponentialBackoff {
+                    getApiService().getLiveStreams(username, password)
+                }
                 
                 // Get categories for names
                 val categories = getLiveCategories().getOrNull() ?: emptyList()
@@ -410,7 +449,11 @@ class ContentRepository(
                 
                 val apiStart = PerformanceLogger.start("API fetch")
                 val (username, password, sourceId) = getCredentials()
-                val responseBody = getApiService().getVodStreams(username, password)
+                
+                // Fetch from API with retry
+                val responseBody = retryWithExponentialBackoff {
+                    getApiService().getVodStreams(username, password)
+                }
                 PerformanceLogger.end("API fetch", apiStart, "streaming started")
                 
                 // Get categories first (small dataset, can load fully)
@@ -631,7 +674,11 @@ class ContentRepository(
                 checkVpnRequirement()
                 
                 val (username, password, sourceId) = getCredentials()
-                val responseBody = getApiService().getSeries(username, password)
+                
+                // Fetch from API with retry
+                val responseBody = retryWithExponentialBackoff {
+                    getApiService().getSeries(username, password)
+                }
                 
                 // DEBUG: Load and validate categories
                 val categoriesResult = getSeriesCategories()
