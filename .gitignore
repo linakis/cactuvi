@@ -101,3 +101,6 @@ lint-results*.xml
 
 # Project specific
 output.json
+
+# Environment variables
+.env

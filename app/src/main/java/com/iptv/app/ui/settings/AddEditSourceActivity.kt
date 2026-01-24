@@ -62,7 +62,17 @@ class AddEditSourceActivity : AppCompatActivity() {
         
         if (isEditMode) {
             loadSourceData()
+        } else {
+            // Hardcode test credentials for development
+            prefillTestCredentials()
         }
+    }
+    
+    private fun prefillTestCredentials() {
+        serverEditText.setText("http://garlic82302.cdngold.me")
+        usernameEditText.setText("2bd16b40497f")
+        passwordEditText.setText("fc8edbab6b")
+        nicknameEditText.setText("Test Server")
     }
     
     private fun setupViews() {

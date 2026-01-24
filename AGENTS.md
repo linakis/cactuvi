@@ -76,6 +76,31 @@ This app is designed for TV screens and MUST support D-pad navigation. All UI el
 ./gradlew dependencyUpdates
 ```
 
+### Debugging Commands
+```bash
+# Build and check for Kotlin compile errors
+./gradlew assembleDebug 2>&1 | grep "e: file"
+
+# View recent app logs
+adb devices
+adb logcat -d | grep "com.iptv.app" | tail -50
+
+# View only crash logs
+adb logcat -d -s "AndroidRuntime:E"
+
+# Clear logcat and watch live (filter errors and app logs)
+adb logcat -c && adb logcat | grep -E "com.iptv.app|ERROR|FATAL"
+
+# Monitor memory usage
+adb shell dumpsys meminfo com.iptv.app
+
+# Force stop app
+adb shell am force-stop com.iptv.app
+
+# Launch app
+adb shell am start -n com.iptv.app/.ui.LoadingActivity
+```
+
 ## Code Style Guidelines
 
 ### File Organization

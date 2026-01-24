@@ -10,6 +10,10 @@ interface MovieDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(movies: List<MovieEntity>)
     
+    @Transaction
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAllInTransaction(movies: List<MovieEntity>)
+    
     @Query("SELECT * FROM movies ORDER BY num ASC")
     suspend fun getAll(): List<MovieEntity>
     

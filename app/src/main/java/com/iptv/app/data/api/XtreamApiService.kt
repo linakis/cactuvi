@@ -1,8 +1,10 @@
 package com.iptv.app.data.api
 
 import com.iptv.app.data.models.*
+import okhttp3.ResponseBody
 import retrofit2.http.GET
 import retrofit2.http.Query
+import retrofit2.http.Streaming
 
 interface XtreamApiService {
     
@@ -13,26 +15,29 @@ interface XtreamApiService {
         @Query("action") action: String = "get_account_info"
     ): LoginResponse
     
+    @Streaming
     @GET("player_api.php")
     suspend fun getLiveStreams(
         @Query("username") username: String,
         @Query("password") password: String,
         @Query("action") action: String = "get_live_streams"
-    ): List<LiveChannel>
+    ): ResponseBody
     
+    @Streaming
     @GET("player_api.php")
     suspend fun getVodStreams(
         @Query("username") username: String,
         @Query("password") password: String,
         @Query("action") action: String = "get_vod_streams"
-    ): List<Movie>
+    ): ResponseBody
     
+    @Streaming
     @GET("player_api.php")
     suspend fun getSeries(
         @Query("username") username: String,
         @Query("password") password: String,
         @Query("action") action: String = "get_series"
-    ): List<Series>
+    ): ResponseBody
     
     @GET("player_api.php")
     suspend fun getLiveCategories(

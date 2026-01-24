@@ -18,6 +18,7 @@ import com.iptv.app.utils.PreferencesManager
 import com.iptv.app.utils.SourceManager
 import com.iptv.app.utils.PerformanceLogger
 import com.iptv.app.utils.VPNDetector
+import com.iptv.app.utils.StreamingJsonParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map as flowMap
@@ -43,6 +44,24 @@ class ContentRepository(
         // NOTE: TTL only used for fallback safety check (7 days) - background sync handles freshness
         private const val CACHE_TTL_FALLBACK = 7 * 24 * 60 * 60 * 1000L  // 7 days
         private const val CACHE_TTL_CATEGORIES = 7 * 24 * 60 * 60 * 1000L  // 7 days
+        
+        // Batch size for bulk inserts - optimized for performance
+        // Reduced from 1000 to 500 for better memory management with streaming
+        private const val BATCH_SIZE = 500
+    }
+    
+    /**
+     * Optimized bulk insert with batching and transaction wrapping.
+     * Processes items in batches to reduce memory pressure and improve performance.
+     * 
+     * NOTE: This is now used by streaming parsers where items arrive in batches.
+     */
+    private suspend fun <T> bulkInsertBatch(
+        items: List<T>,
+        insertBatch: suspend (List<T>) -> Unit
+    ) {
+        // Items are already batched by streaming parser, just insert them
+        insertBatch(items)
     }
     
     private suspend fun getApiService(): XtreamApiService {
@@ -124,30 +143,45 @@ class ContentRepository(
                 
                 // Fetch from API
                 val (username, password, sourceId) = getCredentials()
-                val channels = getApiService().getLiveStreams(username, password)
+                val responseBody = getApiService().getLiveStreams(username, password)
                 
                 // Get categories for names
                 val categories = getLiveCategories().getOrNull() ?: emptyList()
                 val categoryMap = categories.associateBy { it.categoryId }
                 
-                // Convert and cache
-                val entities = channels.map { channel ->
-                    val categoryName = categoryMap[channel.categoryId]?.categoryName ?: ""
-                    channel.categoryName = categoryName
-                    channel.toEntity(sourceId, categoryName)
+                // Clear old data before streaming
+                database.liveChannelDao().clearAll()
+                
+                // Stream parse and insert in batches
+                var totalInserted = 0
+                try {
+                    totalInserted = StreamingJsonParser.parseArrayInBatches(
+                        responseBody = responseBody,
+                        itemClass = LiveChannel::class.java,
+                        batchSize = BATCH_SIZE
+                    ) { channelBatch ->
+                        val entities = channelBatch.map { channel ->
+                            val categoryName = categoryMap[channel.categoryId]?.categoryName ?: ""
+                            channel.categoryName = categoryName
+                            channel.toEntity(sourceId, categoryName)
+                        }
+                        database.liveChannelDao().insertAllInTransaction(entities)
+                    }
+                } catch (e: Exception) {
+                    throw e
                 }
-                database.liveChannelDao().insertAll(entities)
                 
                 // Update cache metadata
                 val newMetadata = CacheMetadataEntity(
                     contentType = "live",
                     lastUpdated = System.currentTimeMillis(),
-                    itemCount = channels.size,
+                    itemCount = totalInserted,
                     categoryCount = categories.size
                 )
                 database.cacheMetadataDao().insert(newMetadata)
                 
-                Result.success(channels)
+                // Return empty list since UI uses Paging
+                Result.success(emptyList())
             } catch (e: Exception) {
                 // Try returning cached data on error
                 val cachedChannels = database.liveChannelDao().getAll()
@@ -233,22 +267,45 @@ class ContentRepository(
                 
                 val apiStart = PerformanceLogger.start("API fetch")
                 val (username, password, sourceId) = getCredentials()
-                val movies = getApiService().getVodStreams(username, password)
-                PerformanceLogger.end("API fetch", apiStart, "count=${movies.size}")
+                val responseBody = getApiService().getVodStreams(username, password)
+                PerformanceLogger.end("API fetch", apiStart, "streaming started")
                 
+                // Get categories first (small dataset, can load fully)
                 val categories = getMovieCategories().getOrNull() ?: emptyList()
                 val categoryMap = categories.associateBy { it.categoryId }
                 
-                // Insert into database
-                PerformanceLogger.logPhase("getMovies", "Inserting into DB")
-                val dbInsertStart = PerformanceLogger.start("DB insert")
-                val entities = movies.map { movie ->
-                    val categoryName = categoryMap[movie.categoryId]?.categoryName ?: ""
-                    movie.categoryName = categoryName
-                    movie.toEntity(sourceId, categoryName)
+                // Clear old data before streaming new data to avoid conflicts
+                PerformanceLogger.logPhase("getMovies", "Clearing old data")
+                val clearStart = PerformanceLogger.start("Clear movies")
+                database.movieDao().clearAll()
+                PerformanceLogger.end("Clear movies", clearStart)
+                
+                // Stream parse and insert in batches to minimize memory usage
+                PerformanceLogger.logPhase("getMovies", "Streaming parse + batched DB insert")
+                val dbInsertStart = PerformanceLogger.start("Stream + DB insert")
+                
+                var totalInserted = 0
+                try {
+                    totalInserted = StreamingJsonParser.parseArrayInBatches(
+                        responseBody = responseBody,
+                        itemClass = Movie::class.java,
+                        batchSize = BATCH_SIZE
+                    ) { movieBatch ->
+                        // Map to entities with category names
+                        val entities = movieBatch.map { movie ->
+                            val categoryName = categoryMap[movie.categoryId]?.categoryName ?: ""
+                            movie.categoryName = categoryName
+                            movie.toEntity(sourceId, categoryName)
+                        }
+                        // Insert batch in single transaction
+                        database.movieDao().insertAllInTransaction(entities)
+                    }
+                } catch (e: Exception) {
+                    PerformanceLogger.log("Streaming parse error: ${e.message}")
+                    throw e
                 }
-                database.movieDao().insertAll(entities)
-                PerformanceLogger.end("DB insert", dbInsertStart, "inserted=${entities.size}")
+                
+                PerformanceLogger.end("Stream + DB insert", dbInsertStart, "inserted=$totalInserted")
                 
                 // Update cache metadata
                 PerformanceLogger.logPhase("getMovies", "Updating cache metadata")
@@ -256,14 +313,17 @@ class ContentRepository(
                 val newMetadata = CacheMetadataEntity(
                     contentType = "movies",
                     lastUpdated = System.currentTimeMillis(),
-                    itemCount = movies.size,
+                    itemCount = totalInserted,
                     categoryCount = categories.size
                 )
                 database.cacheMetadataDao().insert(newMetadata)
                 PerformanceLogger.end("Update metadata", metadataUpdateStart)
                 
-                PerformanceLogger.end("Repository.getMovies", startTime, "SUCCESS - count=${movies.size}")
-                Result.success(movies)
+                PerformanceLogger.end("Repository.getMovies", startTime, "SUCCESS - count=$totalInserted")
+                
+                // Return empty list since UI uses Paging to load data
+                // Returning the full list would defeat the purpose of streaming
+                Result.success(emptyList())
             } catch (e: Exception) {
                 PerformanceLogger.log("getMovies API failed: ${e.message}")
                 
@@ -378,28 +438,44 @@ class ContentRepository(
                 checkVpnRequirement()
                 
                 val (username, password, sourceId) = getCredentials()
-                val series = getApiService().getSeries(username, password)
+                val responseBody = getApiService().getSeries(username, password)
                 
                 val categories = getSeriesCategories().getOrNull() ?: emptyList()
                 val categoryMap = categories.associateBy { it.categoryId }
                 
-                val entities = series.map { s ->
-                    val categoryName = categoryMap[s.categoryId]?.categoryName ?: ""
-                    s.categoryName = categoryName
-                    s.toEntity(sourceId, categoryName)
+                // Clear old data before streaming
+                database.seriesDao().clearAll()
+                
+                // Stream parse and insert in batches
+                var totalInserted = 0
+                try {
+                    totalInserted = StreamingJsonParser.parseArrayInBatches(
+                        responseBody = responseBody,
+                        itemClass = Series::class.java,
+                        batchSize = BATCH_SIZE
+                    ) { seriesBatch ->
+                        val entities = seriesBatch.map { s ->
+                            val categoryName = categoryMap[s.categoryId]?.categoryName ?: ""
+                            s.categoryName = categoryName
+                            s.toEntity(sourceId, categoryName)
+                        }
+                        database.seriesDao().insertAllInTransaction(entities)
+                    }
+                } catch (e: Exception) {
+                    throw e
                 }
-                database.seriesDao().insertAll(entities)
                 
                 // Update cache metadata
                 val newMetadata = CacheMetadataEntity(
                     contentType = "series",
                     lastUpdated = System.currentTimeMillis(),
-                    itemCount = series.size,
+                    itemCount = totalInserted,
                     categoryCount = categories.size
                 )
                 database.cacheMetadataDao().insert(newMetadata)
                 
-                Result.success(series)
+                // Return empty list since UI uses Paging
+                Result.success(emptyList())
             } catch (e: Exception) {
                 val cached = database.seriesDao().getAll()
                 if (cached.isNotEmpty()) {

@@ -10,6 +10,10 @@ interface SeriesDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(series: List<SeriesEntity>)
     
+    @Transaction
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAllInTransaction(series: List<SeriesEntity>)
+    
     @Query("SELECT * FROM series ORDER BY num ASC")
     suspend fun getAll(): List<SeriesEntity>
     

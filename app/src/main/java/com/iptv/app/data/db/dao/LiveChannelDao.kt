@@ -10,6 +10,10 @@ interface LiveChannelDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(channels: List<LiveChannelEntity>)
     
+    @Transaction
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAllInTransaction(channels: List<LiveChannelEntity>)
+    
     @Query("SELECT * FROM live_channels ORDER BY num ASC")
     suspend fun getAll(): List<LiveChannelEntity>
     

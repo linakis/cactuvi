@@ -13,7 +13,7 @@ A clean, modern Android IPTV player built from scratch based on the IP-Pro app s
 - **Category Filtering** - Filter content by categories
 - **Clean Architecture** - MVVM pattern with Repository layer
 - **Android TV Support** - Works on both mobile and Android TV
-- **No MAC Address Spoofing Needed** - Your provider (cf.cdn-959.me) doesn't require it!
+- **No MAC Address Spoofing Needed** - Your provider (garlic82302.cdngold.me) doesn't require it!
 
 ### 🚧 To Be Implemented
 - Series episodes playback
@@ -67,7 +67,7 @@ app/src/main/java/com/iptv/app/
 The app is ready to use with your Xtream Codes provider:
 
 ```
-Server: http://cf.cdn-959.me
+Server: http://garlic82302.cdngold.me
 Username: 2bd16b40497f
 Password: fc8edbab6b
 ```
@@ -103,7 +103,7 @@ Password: fc8edbab6b
 
 1. The app will open the "Add Playlist" screen
 2. Enter your credentials:
-   - Server URL: `http://cf.cdn-959.me`
+   - Server URL: `http://garlic82302.cdngold.me`
    - Username: `2bd16b40497f`
    - Password: `fc8edbab6b`
 3. Click "Test Connection" to verify
@@ -144,9 +144,9 @@ Password: fc8edbab6b
 
 ### Stream URL Format
 
-- **Live TV**: `http://cf.cdn-959.me/live/2bd16b40497f/fc8edbab6b/{stream_id}.ts`
-- **Movies**: `http://cf.cdn-959.me/movie/2bd16b40497f/fc8edbab6b/{stream_id}.{extension}`
-- **Series**: `http://cf.cdn-959.me/series/2bd16b40497f/fc8edbab6b/{episode_id}.{extension}`
+- **Live TV**: `http://garlic82302.cdngold.me/live/2bd16b40497f/fc8edbab6b/{stream_id}.ts`
+- **Movies**: `http://garlic82302.cdngold.me/movie/2bd16b40497f/fc8edbab6b/{stream_id}.{extension}`
+- **Series**: `http://garlic82302.cdngold.me/series/2bd16b40497f/fc8edbab6b/{episode_id}.{extension}`
 
 ## Technology Stack
 

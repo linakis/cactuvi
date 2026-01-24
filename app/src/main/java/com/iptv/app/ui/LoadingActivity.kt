@@ -58,8 +58,8 @@ class LoadingActivity : AppCompatActivity() {
                 val sources = sourceManager.getAllSources()
                 
                 if (sources.isEmpty()) {
-                    // No sources configured - redirect to add source
-                    showNoSourcesError()
+                    // No sources configured - jump directly to add source screen
+                    navigateToAddSource()
                     return@launch
                 }
                 
@@ -135,6 +135,11 @@ class LoadingActivity : AppCompatActivity() {
         retryButton.requestFocus()
     }
     
+    private fun navigateToAddSource() {
+        val intent = Intent(this, com.iptv.app.ui.settings.AddEditSourceActivity::class.java)
+        startActivityForResult(intent, REQUEST_ADD_SOURCE)
+    }
+    
     private fun showNoSourcesError() {
         progressBar.visibility = View.GONE
         statusText.text = "No Sources Configured"
@@ -144,9 +149,7 @@ class LoadingActivity : AppCompatActivity() {
         retryButton.requestFocus()
         
         retryButton.setOnClickListener {
-            // Navigate to Add Source screen
-            val intent = Intent(this, com.iptv.app.ui.settings.AddEditSourceActivity::class.java)
-            startActivityForResult(intent, REQUEST_ADD_SOURCE)
+            navigateToAddSource()
         }
     }
     

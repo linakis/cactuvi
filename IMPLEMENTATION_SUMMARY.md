@@ -7,7 +7,7 @@ A complete, functional IPTV player Android app based on analyzing the IP-Pro dec
 ## Key Findings from IP-Pro Analysis
 
 ### Authentication Discovery
-After testing your actual credentials (`cf.cdn-959.me`), we found:
+After testing your actual credentials (`garlic82302.cdngold.me`), we found:
 
 ✅ **Your provider uses pure Xtream Codes API**
 ✅ **No MAC address required** (tested with and without - identical responses)

@@ -37,7 +37,7 @@ When you first open the app:
 
 1. You'll see "Add Playlist" screen
 2. Enter these credentials:
-   - **Server URL**: `http://cf.cdn-959.me`
+   - **Server URL**: `http://garlic82302.cdngold.me`
    - **Username**: `2bd16b40497f`
    - **Password**: `fc8edbab6b`
 3. Click **"Test Connection"**
