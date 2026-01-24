@@ -40,6 +40,7 @@ import com.iptv.app.utils.PerformanceLogger
 import com.iptv.app.utils.PreferencesManager
 import com.iptv.app.utils.StreamUrlBuilder
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 class MoviesFragment : Fragment() {
@@ -283,12 +284,36 @@ class MoviesFragment : Fragment() {
             // Start total timer
             val totalStartTime = PerformanceLogger.start("MoviesFragment.loadData")
             
+            // Check if already loading
+            if (repository.moviesLoading.value) {
+                PerformanceLogger.log("Movies already loading - waiting for completion")
+                showLoadingWithMessage("Loading movies data...")
+                
+                // Wait for current load to complete
+                repository.moviesLoading.first { !it }
+                PerformanceLogger.log("Movies load completed - checking cache")
+                
+                // Check cache again after load completes
+                val newMetadata = database.cacheMetadataDao().get("movies")
+                val nowHasCache = (newMetadata?.itemCount ?: 0) > 0
+                
+                if (!nowHasCache) {
+                    // Still no cache after waiting - something went wrong
+                    PerformanceLogger.log("ERROR: Still no cache after waiting for load")
+                    showError("Failed to load movies data")
+                    return@launch
+                }
+                
+                // Fall through to load UI with cached data
+                PerformanceLogger.log("Cache now exists - loading UI")
+            }
+            
             // Check if cache exists
             val metadata = database.cacheMetadataDao().get("movies")
             val hasCache = (metadata?.itemCount ?: 0) > 0
             
             if (!hasCache) {
-                // No cache - show loading state and trigger background load
+                // No cache and not loading - trigger new load
                 showLoadingWithMessage("Loading movies for the first time...")
                 PerformanceLogger.log("No movies cache found - triggering background load")
                 

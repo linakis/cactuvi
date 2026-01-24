@@ -27,6 +27,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map as flowMap
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /**
@@ -53,6 +55,11 @@ class ContentRepository(
     val moviesLoading: StateFlow<Boolean> = _moviesLoading.asStateFlow()
     val seriesLoading: StateFlow<Boolean> = _seriesLoading.asStateFlow()
     val liveLoading: StateFlow<Boolean> = _liveLoading.asStateFlow()
+    
+    // Mutexes to prevent concurrent data loading and database corruption
+    private val moviesMutex = Mutex()
+    private val seriesMutex = Mutex()
+    private val liveMutex = Mutex()
     
     companion object {
         // Cache Time-To-Live (TTL) in milliseconds
@@ -196,27 +203,28 @@ class ContentRepository(
     
     suspend fun getLiveStreams(forceRefresh: Boolean = false): Result<List<LiveChannel>> = 
         withContext(Dispatchers.IO) {
-            try {
-                // Check if already loading (prevent duplicate loads)
-                if (_liveLoading.value && !forceRefresh) {
-                    PerformanceLogger.log("Live channels already loading, skip duplicate request")
-                    return@withContext Result.success(emptyList())
-                }
-                
-                // Check cache metadata
-                val metadata = database.cacheMetadataDao().get("live")
-                
-                // Return cache immediately if exists and not forcing refresh
-                // Unless extremely stale (7+ days) - then force refresh for safety
-                if (!forceRefresh && metadata != null) {
-                    val isExtremelyStale = !isCacheValid(metadata.lastUpdated, CACHE_TTL_FALLBACK)
-                    if (!isExtremelyStale) {
-                        val cachedChannels = database.liveChannelDao().getAll()
-                        if (cachedChannels.isNotEmpty()) {
-                            return@withContext Result.success(cachedChannels.map { it.toModel() })
+            liveMutex.withLock {
+                try {
+                    // Check if already loading (prevent duplicate loads)
+                    if (_liveLoading.value && !forceRefresh) {
+                        PerformanceLogger.log("Live channels already loading, skip duplicate request")
+                        return@withLock Result.success(emptyList())
+                    }
+                    
+                    // Check cache metadata
+                    val metadata = database.cacheMetadataDao().get("live")
+                    
+                    // Return cache immediately if exists and not forcing refresh
+                    // Unless extremely stale (7+ days) - then force refresh for safety
+                    if (!forceRefresh && metadata != null) {
+                        val isExtremelyStale = !isCacheValid(metadata.lastUpdated, CACHE_TTL_FALLBACK)
+                        if (!isExtremelyStale) {
+                            val cachedChannels = database.liveChannelDao().getAll()
+                            if (cachedChannels.isNotEmpty()) {
+                                return@withLock Result.success(cachedChannels.map { it.toModel() })
+                            }
                         }
                     }
-                }
                 
                 // Set loading flag
                 _liveLoading.value = true
@@ -298,9 +306,10 @@ class ContentRepository(
                 } else {
                     Result.failure(e)
                 }
-            } finally {
-                // Always reset loading flag
-                _liveLoading.value = false
+                } finally {
+                    // Always reset loading flag
+                    _liveLoading.value = false
+                }
             }
         }
     
@@ -341,39 +350,40 @@ class ContentRepository(
     
     suspend fun getMovies(forceRefresh: Boolean = false): Result<List<Movie>> = 
         withContext(Dispatchers.IO) {
-            val startTime = PerformanceLogger.start("Repository.getMovies")
+            moviesMutex.withLock {
+                val startTime = PerformanceLogger.start("Repository.getMovies")
             
-            try {
-                // Check if already loading (prevent duplicate loads)
-                if (_moviesLoading.value && !forceRefresh) {
-                    PerformanceLogger.log("Movies already loading, skip duplicate request")
-                    return@withContext Result.success(emptyList())
-                }
-                
-                // Check cache metadata
-                PerformanceLogger.logPhase("getMovies", "Checking cache metadata")
-                val metadataCheckStart = PerformanceLogger.start("Metadata cache check")
-                val metadata = database.cacheMetadataDao().get("movies")
-                PerformanceLogger.end("Metadata cache check", metadataCheckStart, 
-                    "exists=${metadata != null}, count=${metadata?.itemCount ?: 0}")
-                
-                // Return cache immediately if exists and not forcing refresh
-                // Unless extremely stale (7+ days) - then force refresh for safety
-                if (!forceRefresh && metadata != null) {
-                    val isExtremelyStale = !isCacheValid(metadata.lastUpdated, CACHE_TTL_FALLBACK)
-                    if (!isExtremelyStale) {
-                        PerformanceLogger.logPhase("getMovies", "Loading cached data")
-                        val dataLoadStart = PerformanceLogger.start("Load cached movies")
-                        val cached = database.movieDao().getAll()
-                        PerformanceLogger.end("Load cached movies", dataLoadStart, "count=${cached.size}")
-                        
-                        if (cached.isNotEmpty()) {
-                            PerformanceLogger.logCacheHit("movies", "getMovies", cached.size)
-                            PerformanceLogger.end("Repository.getMovies", startTime, "HIT - count=${cached.size}")
-                            return@withContext Result.success(cached.map { it.toModel() })
+                try {
+                    // Check if already loading (prevent duplicate loads)
+                    if (_moviesLoading.value && !forceRefresh) {
+                        PerformanceLogger.log("Movies already loading, skip duplicate request")
+                        return@withLock Result.success(emptyList())
+                    }
+                    
+                    // Check cache metadata
+                    PerformanceLogger.logPhase("getMovies", "Checking cache metadata")
+                    val metadataCheckStart = PerformanceLogger.start("Metadata cache check")
+                    val metadata = database.cacheMetadataDao().get("movies")
+                    PerformanceLogger.end("Metadata cache check", metadataCheckStart, 
+                        "exists=${metadata != null}, count=${metadata?.itemCount ?: 0}")
+                    
+                    // Return cache immediately if exists and not forcing refresh
+                    // Unless extremely stale (7+ days) - then force refresh for safety
+                    if (!forceRefresh && metadata != null) {
+                        val isExtremelyStale = !isCacheValid(metadata.lastUpdated, CACHE_TTL_FALLBACK)
+                        if (!isExtremelyStale) {
+                            PerformanceLogger.logPhase("getMovies", "Loading cached data")
+                            val dataLoadStart = PerformanceLogger.start("Load cached movies")
+                            val cached = database.movieDao().getAll()
+                            PerformanceLogger.end("Load cached movies", dataLoadStart, "count=${cached.size}")
+                            
+                            if (cached.isNotEmpty()) {
+                                PerformanceLogger.logCacheHit("movies", "getMovies", cached.size)
+                                PerformanceLogger.end("Repository.getMovies", startTime, "HIT - count=${cached.size}")
+                                return@withLock Result.success(cached.map { it.toModel() })
+                            }
                         }
                     }
-                }
                 
                 // Set loading flag
                 _moviesLoading.value = true
@@ -486,9 +496,10 @@ class ContentRepository(
                     PerformanceLogger.end("Repository.getMovies", startTime, "FAILED - no fallback")
                     Result.failure(e)
                 }
-            } finally {
-                // Always reset loading flag
-                _moviesLoading.value = false
+                } finally {
+                    // Always reset loading flag
+                    _moviesLoading.value = false
+                }
             }
         }
     
@@ -569,27 +580,28 @@ class ContentRepository(
     
     suspend fun getSeries(forceRefresh: Boolean = false): Result<List<Series>> = 
         withContext(Dispatchers.IO) {
-            try {
-                // Check if already loading (prevent duplicate loads)
-                if (_seriesLoading.value && !forceRefresh) {
-                    PerformanceLogger.log("Series already loading, skip duplicate request")
-                    return@withContext Result.success(emptyList())
-                }
-                
-                // Check cache metadata
-                val metadata = database.cacheMetadataDao().get("series")
-                
-                // Return cache immediately if exists and not forcing refresh
-                // Unless extremely stale (7+ days) - then force refresh for safety
-                if (!forceRefresh && metadata != null) {
-                    val isExtremelyStale = !isCacheValid(metadata.lastUpdated, CACHE_TTL_FALLBACK)
-                    if (!isExtremelyStale) {
-                        val cached = database.seriesDao().getAll()
-                        if (cached.isNotEmpty()) {
-                            return@withContext Result.success(cached.map { it.toModel() })
+            seriesMutex.withLock {
+                try {
+                    // Check if already loading (prevent duplicate loads)
+                    if (_seriesLoading.value && !forceRefresh) {
+                        PerformanceLogger.log("Series already loading, skip duplicate request")
+                        return@withLock Result.success(emptyList())
+                    }
+                    
+                    // Check cache metadata
+                    val metadata = database.cacheMetadataDao().get("series")
+                    
+                    // Return cache immediately if exists and not forcing refresh
+                    // Unless extremely stale (7+ days) - then force refresh for safety
+                    if (!forceRefresh && metadata != null) {
+                        val isExtremelyStale = !isCacheValid(metadata.lastUpdated, CACHE_TTL_FALLBACK)
+                        if (!isExtremelyStale) {
+                            val cached = database.seriesDao().getAll()
+                            if (cached.isNotEmpty()) {
+                                return@withLock Result.success(cached.map { it.toModel() })
+                            }
                         }
                     }
-                }
                 
                 // Set loading flag
                 _seriesLoading.value = true
@@ -600,8 +612,17 @@ class ContentRepository(
                 val (username, password, sourceId) = getCredentials()
                 val responseBody = getApiService().getSeries(username, password)
                 
-                val categories = getSeriesCategories().getOrNull() ?: emptyList()
+                // DEBUG: Load and validate categories
+                val categoriesResult = getSeriesCategories()
+                PerformanceLogger.log("[DEBUG getSeries] Categories result: success=${categoriesResult.isSuccess}")
+                val categories = categoriesResult.getOrNull() ?: emptyList()
+                PerformanceLogger.log("[DEBUG getSeries] Categories loaded: count=${categories.size}")
+                if (categories.size > 0) {
+                    PerformanceLogger.log("[DEBUG getSeries] Sample categories: ${categories.take(3).map { "${it.categoryId}:${it.categoryName}" }}")
+                }
+                
                 val categoryMap = categories.associateBy { it.categoryId }
+                PerformanceLogger.log("[DEBUG getSeries] CategoryMap size: ${categoryMap.size}")
                 
                 // Clear old data before streaming
                 database.seriesDao().clearAll()
@@ -619,8 +640,19 @@ class ContentRepository(
                         itemClass = Series::class.java,
                         batchSize = BATCH_SIZE,
                         processBatch = { seriesBatch ->
+                            // DEBUG: Log first batch to check categoryId mapping
+                            if (totalInserted == 0 && seriesBatch.isNotEmpty()) {
+                                val sample = seriesBatch.first()
+                                val categoryName = categoryMap[sample.categoryId]?.categoryName ?: ""
+                                PerformanceLogger.log("[DEBUG getSeries] First series: id=${sample.seriesId}, name=${sample.name}, categoryId=${sample.categoryId}, mapped='$categoryName'")
+                            }
+                            
                             val entities = seriesBatch.map { s ->
                                 val categoryName = categoryMap[s.categoryId]?.categoryName ?: ""
+                                // DEBUG: Log unmapped categories
+                                if (categoryName.isEmpty()) {
+                                    PerformanceLogger.log("[DEBUG getSeries] UNMAPPED categoryId=${s.categoryId} for series=${s.name}")
+                                }
                                 s.categoryName = categoryName
                                 s.toEntity(sourceId, categoryName)
                             }
@@ -659,6 +691,18 @@ class ContentRepository(
                 )
                 database.cacheMetadataDao().insert(newMetadata)
                 
+                // DEBUG: Verify data in database
+                PerformanceLogger.log("[DEBUG getSeries] Total inserted: $totalInserted")
+                val dbCount = database.seriesDao().getCount()
+                PerformanceLogger.log("[DEBUG getSeries] DB count verification: $dbCount")
+                
+                // DEBUG: Check sample category counts
+                val sampleCategories = categories.take(3)
+                sampleCategories.forEach { cat ->
+                    val count = database.seriesDao().getCountByCategory(cat.categoryId)
+                    PerformanceLogger.log("[DEBUG getSeries] Category ${cat.categoryName} (${cat.categoryId}): $count items in DB")
+                }
+                
                 // Return empty list since UI uses Paging
                 Result.success(emptyList())
             } catch (e: Exception) {
@@ -668,9 +712,10 @@ class ContentRepository(
                 } else {
                     Result.failure(e)
                 }
-            } finally {
-                // Always reset loading flag
-                _seriesLoading.value = false
+                } finally {
+                    // Always reset loading flag
+                    _seriesLoading.value = false
+                }
             }
         }
     
@@ -678,9 +723,14 @@ class ContentRepository(
         withContext(Dispatchers.IO) {
             try {
                 val cached = database.categoryDao().getAllByType("series")
+                PerformanceLogger.log("[DEBUG getSeriesCategories] Cached count: ${cached.size}")
                 
                 if (!forceRefresh && cached.isNotEmpty() &&
                     isCacheValid(cached.first().lastUpdated, CACHE_TTL_CATEGORIES)) {
+                    PerformanceLogger.log("[DEBUG getSeriesCategories] Returning cached categories: ${cached.size}")
+                    if (cached.size > 0) {
+                        PerformanceLogger.log("[DEBUG getSeriesCategories] Sample cached: ${cached.take(3).map { "${it.categoryId}:${it.categoryName}" }}")
+                    }
                     return@withContext Result.success(cached.map { it.toModel() })
                 }
                 
@@ -689,9 +739,14 @@ class ContentRepository(
                 
                 val (username, password, sourceId) = getCredentials()
                 val categories = getApiService().getSeriesCategories(username, password)
+                PerformanceLogger.log("[DEBUG getSeriesCategories] Fetched from API: ${categories.size}")
+                if (categories.size > 0) {
+                    PerformanceLogger.log("[DEBUG getSeriesCategories] Sample API: ${categories.take(3).map { "${it.categoryId}:${it.categoryName}" }}")
+                }
                 
                 val entities = categories.map { it.toEntity(sourceId, "series") }
                 database.categoryDao().insertAll(entities)
+                PerformanceLogger.log("[DEBUG getSeriesCategories] Inserted ${entities.size} categories into DB")
                 
                 // Cache navigation tree
                 cacheSeriesNavigationTree(categories)

@@ -39,6 +39,7 @@ import com.iptv.app.utils.PerformanceLogger
 import com.iptv.app.utils.PreferencesManager
 import com.iptv.app.utils.StreamUrlBuilder
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 class LiveTvFragment : Fragment() {
@@ -260,12 +261,36 @@ class LiveTvFragment : Fragment() {
         showLoading(true)
         
         lifecycleScope.launch {
+            // Check if already loading
+            if (repository.liveLoading.value) {
+                PerformanceLogger.log("Live channels already loading - waiting for completion")
+                showLoadingWithMessage("Loading live channels data...")
+                
+                // Wait for current load to complete
+                repository.liveLoading.first { !it }
+                PerformanceLogger.log("Live channels load completed - checking cache")
+                
+                // Check cache again after load completes
+                val newMetadata = database.cacheMetadataDao().get("live")
+                val nowHasCache = (newMetadata?.itemCount ?: 0) > 0
+                
+                if (!nowHasCache) {
+                    // Still no cache after waiting - something went wrong
+                    PerformanceLogger.log("ERROR: Still no cache after waiting for load")
+                    showError("Failed to load live channels data")
+                    return@launch
+                }
+                
+                // Fall through to load UI with cached data
+                PerformanceLogger.log("Cache now exists - loading UI")
+            }
+            
             // Check if cache exists
             val metadata = database.cacheMetadataDao().get("live")
             val hasCache = (metadata?.itemCount ?: 0) > 0
             
             if (!hasCache) {
-                // No cache - show loading state and trigger background load
+                // No cache and not loading - trigger new load
                 showLoadingWithMessage("Loading live channels for the first time...")
                 
                 // Trigger background load
