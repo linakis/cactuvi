@@ -287,18 +287,6 @@ class ContentRepositoryImpl private constructor(
     private val _liveEffects = MutableSharedFlow<LiveEffect>()
     val liveEffects: SharedFlow<LiveEffect> = _liveEffects.asSharedFlow()
     
-    // Legacy boolean flags for deprecated getSeries/getMovies/getLiveStreams methods
-    private val _seriesLoading = MutableStateFlow(false)
-    private val _moviesLoading = MutableStateFlow(false)
-    private val _liveLoading = MutableStateFlow(false)
-    
-    @Deprecated("Use seriesState instead", ReplaceWith("seriesState"))
-    val seriesLoading: StateFlow<Boolean> = _seriesLoading.asStateFlow()
-    @Deprecated("Use moviesState instead", ReplaceWith("moviesState"))
-    val moviesLoading: StateFlow<Boolean> = _moviesLoading.asStateFlow()
-    @Deprecated("Use liveState instead", ReplaceWith("liveState"))
-    val liveLoading: StateFlow<Boolean> = _liveLoading.asStateFlow()
-    
     // Mutexes to prevent concurrent data loading and database corruption
     private val moviesMutex = Mutex()
     private val seriesMutex = Mutex()
@@ -807,12 +795,6 @@ class ContentRepositoryImpl private constructor(
                 withTimeout(5.minutes.inWholeMilliseconds) {
                     liveMutex.withLock {
                         try {
-                    // Check if already loading (prevent duplicate loads)
-                    if (_liveLoading.value && !forceRefresh) {
-                        PerformanceLogger.log("Live channels already loading, skip duplicate request")
-                        return@withLock Result.success(emptyList())
-                    }
-                    
                     // Check cache metadata
                     val metadata = database.cacheMetadataDao().get("live")
                     
@@ -827,9 +809,6 @@ class ContentRepositoryImpl private constructor(
                             }
                         }
                     }
-                
-                // Set loading flag
-                _liveLoading.value = true
                 
                 // Check VPN requirement before API call
                 checkVpnRequirement()
@@ -912,15 +891,11 @@ class ContentRepositoryImpl private constructor(
                 } else {
                     Result.failure(e)
                 }
-                } finally {
-                    // Always reset loading flag
-                    _liveLoading.value = false
                 }
                     }
                 }
             } catch (e: TimeoutCancellationException) {
                 PerformanceLogger.log("getLiveStreams timed out after 5 minutes")
-                _liveLoading.value = false
                 Result.failure(Exception("Live channels data load timed out. Please try again.", e))
             }
         }
@@ -1256,12 +1231,6 @@ class ContentRepositoryImpl private constructor(
                         val startTime = PerformanceLogger.start("Repository.getMovies")
             
                         try {
-                    // Check if already loading (prevent duplicate loads)
-                    if (_moviesLoading.value && !forceRefresh) {
-                        PerformanceLogger.log("Movies already loading, skip duplicate request")
-                        return@withLock Result.success(emptyList())
-                    }
-                    
                     // Check cache metadata
                     PerformanceLogger.logPhase("getMovies", "Checking cache metadata")
                     val metadataCheckStart = PerformanceLogger.start("Metadata cache check")
@@ -1286,9 +1255,6 @@ class ContentRepositoryImpl private constructor(
                             }
                         }
                     }
-                
-                // Set loading flag
-                _moviesLoading.value = true
                 
                 // Cache miss - fetch from API
                 PerformanceLogger.logCacheMiss("movies", "getMovies", if (forceRefresh) "forceRefresh" else "expired/empty")
@@ -1402,15 +1368,11 @@ class ContentRepositoryImpl private constructor(
                     PerformanceLogger.end("Repository.getMovies", startTime, "FAILED - no fallback")
                     Result.failure(e)
                 }
-                } finally {
-                    // Always reset loading flag
-                    _moviesLoading.value = false
                 }
                     }
                 }
             } catch (e: TimeoutCancellationException) {
                 PerformanceLogger.log("getMovies timed out after 5 minutes")
-                _moviesLoading.value = false
                 Result.failure(Exception("Movies data load timed out. Please try again.", e))
             }
         }
@@ -1661,12 +1623,6 @@ class ContentRepositoryImpl private constructor(
                 withTimeout(5.minutes.inWholeMilliseconds) {
                     seriesMutex.withLock {
                         try {
-                    // Check if already loading (prevent duplicate loads)
-                    if (_seriesLoading.value && !forceRefresh) {
-                        PerformanceLogger.log("Series already loading, skip duplicate request")
-                        return@withLock Result.success(emptyList())
-                    }
-                    
                     // Check cache metadata
                     val metadata = database.cacheMetadataDao().get("series")
                     
@@ -1681,9 +1637,6 @@ class ContentRepositoryImpl private constructor(
                             }
                         }
                     }
-                
-                // Set loading flag
-                _seriesLoading.value = true
                 
                 // Check VPN requirement before API call
                 checkVpnRequirement()
@@ -1795,15 +1748,11 @@ class ContentRepositoryImpl private constructor(
                 } else {
                     Result.failure(e)
                 }
-                } finally {
-                    // Always reset loading flag
-                    _seriesLoading.value = false
                 }
                     }
                 }
             } catch (e: TimeoutCancellationException) {
                 PerformanceLogger.log("getSeries timed out after 5 minutes")
-                _seriesLoading.value = false
                 Result.failure(Exception("Series data load timed out. Please try again.", e))
             }
         }
