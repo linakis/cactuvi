@@ -71,6 +71,14 @@ abstract class ContentNavigationFragment<T : Any> : Fragment() {
     /** Handle click on content item (navigate to detail screen) */
     protected abstract fun onContentItemClick(item: T)
 
+    /**
+     * Get layout manager for content view. Override to customize layout (e.g. list vs grid).
+     * Default: GridLayoutManager with 3 columns
+     */
+    protected open fun getContentLayoutManager(): RecyclerView.LayoutManager {
+        return GridLayoutManager(requireContext(), 3)
+    }
+
     // ========== LIFECYCLE ==========
 
     override fun onCreateView(
@@ -243,7 +251,7 @@ abstract class ContentNavigationFragment<T : Any> : Fragment() {
     }
 
     private fun showContentView(categoryId: String) {
-        recyclerView.layoutManager = GridLayoutManager(requireContext(), 3)
+        recyclerView.layoutManager = getContentLayoutManager()
         recyclerView.adapter = contentAdapter
         // Paged data is automatically loaded via observePagedContent()
     }

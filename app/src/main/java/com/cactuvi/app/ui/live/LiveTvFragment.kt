@@ -3,6 +3,8 @@ package com.cactuvi.app.ui.live
 import android.content.Intent
 import androidx.fragment.app.viewModels
 import androidx.paging.PagingDataAdapter
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.cactuvi.app.data.models.LiveChannel
 import com.cactuvi.app.ui.common.ContentNavigationFragment
 import com.cactuvi.app.ui.common.ContentViewModel
@@ -52,5 +54,10 @@ class LiveTvFragment : ContentNavigationFragment<LiveChannel>() {
                     putExtra("CATEGORY_ID", item.categoryId)
                 }
         startActivity(intent)
+    }
+
+    // Override to use LinearLayoutManager for list display (not grid)
+    override fun getContentLayoutManager(): RecyclerView.LayoutManager {
+        return LinearLayoutManager(requireContext())
     }
 }
