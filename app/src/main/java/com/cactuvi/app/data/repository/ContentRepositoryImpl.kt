@@ -1057,8 +1057,10 @@ private constructor(
                 val entities = categories.map { it.toEntity(sourceId, "live") }
                 database.categoryDao().insertAll(entities)
 
-                // Cache navigation tree
-                cacheLiveNavigationTree(categories)
+                // Cache navigation tree with user's separator preference
+                val prefsManager = PreferencesManager.getInstance(context)
+                val separator = prefsManager.getLiveGroupingSeparator()
+                cacheLiveNavigationTree(categories, separator)
 
                 Result.success(categories)
             } catch (e: Exception) {
@@ -1691,10 +1693,12 @@ private constructor(
                 database.categoryDao().insertAll(entities)
                 PerformanceLogger.end("DB insert", dbInsertStart, "inserted=${entities.size}")
 
-                // Cache navigation tree
+                // Cache navigation tree with user's separator preference
                 PerformanceLogger.logPhase("getMovieCategories", "Caching navigation tree")
                 val treeCacheStart = PerformanceLogger.start("Cache navigation tree")
-                cacheVodNavigationTree(categories)
+                val prefsManager = PreferencesManager.getInstance(context)
+                val separator = prefsManager.getMoviesGroupingSeparator()
+                cacheVodNavigationTree(categories, separator)
                 PerformanceLogger.end("Cache navigation tree", treeCacheStart)
 
                 PerformanceLogger.end(
@@ -2164,8 +2168,10 @@ private constructor(
                     "[DEBUG getSeriesCategories] Inserted ${entities.size} categories into DB"
                 )
 
-                // Cache navigation tree
-                cacheSeriesNavigationTree(categories)
+                // Cache navigation tree with user's separator preference
+                val prefsManager = PreferencesManager.getInstance(context)
+                val separator = prefsManager.getSeriesGroupingSeparator()
+                cacheSeriesNavigationTree(categories, separator)
 
                 Result.success(categories)
             } catch (e: Exception) {
