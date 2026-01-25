@@ -1,0 +1,319 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>AnnotationOnSeparateLine:CacheMetadataDao.kt$CacheMetadataDao$@Query("DELETE FROM cache_metadata") suspend</ID>
+    <ID>AnnotationOnSeparateLine:CacheMetadataDao.kt$CacheMetadataDao$@Query("SELECT * FROM cache_metadata") suspend</ID>
+    <ID>AnnotationOnSeparateLine:CategoryDao.kt$CategoryDao$@Query("DELETE FROM categories WHERE type = :type") suspend</ID>
+    <ID>AnnotationOnSeparateLine:CategoryDao.kt$CategoryDao$@Query("DELETE FROM categories") suspend</ID>
+    <ID>AnnotationOnSeparateLine:DownloadDao.kt$DownloadDao$@Insert(onConflict = OnConflictStrategy.REPLACE) suspend</ID>
+    <ID>AnnotationOnSeparateLine:DownloadDao.kt$DownloadDao$@Query("DELETE FROM downloads WHERE status = 'completed'") suspend</ID>
+    <ID>AnnotationOnSeparateLine:DownloadDao.kt$DownloadDao$@Query("DELETE FROM downloads") suspend</ID>
+    <ID>AnnotationOnSeparateLine:FavoriteDao.kt$FavoriteDao$@Insert(onConflict = OnConflictStrategy.REPLACE) suspend</ID>
+    <ID>AnnotationOnSeparateLine:FavoriteDao.kt$FavoriteDao$@Query("DELETE FROM favorites") suspend</ID>
+    <ID>AnnotationOnSeparateLine:LiveChannelDao.kt$LiveChannelDao$@Query("DELETE FROM live_channels WHERE 1") suspend</ID>
+    <ID>AnnotationOnSeparateLine:LiveChannelDao.kt$LiveChannelDao$@Query("SELECT COUNT(*) FROM live_channels") suspend</ID>
+    <ID>AnnotationOnSeparateLine:LiveChannelDao.kt$LiveChannelDao$@Query("SELECT lastUpdated FROM live_channels LIMIT 1") suspend</ID>
+    <ID>AnnotationOnSeparateLine:MovieDao.kt$MovieDao$@Query("DELETE FROM movies WHERE 1") suspend</ID>
+    <ID>AnnotationOnSeparateLine:MovieDao.kt$MovieDao$@Query("SELECT * FROM movies ORDER BY num ASC") suspend</ID>
+    <ID>AnnotationOnSeparateLine:MovieDao.kt$MovieDao$@Query("SELECT COUNT(*) FROM movies") suspend</ID>
+    <ID>AnnotationOnSeparateLine:MovieDao.kt$MovieDao$@Query("SELECT lastUpdated FROM movies LIMIT 1") suspend</ID>
+    <ID>AnnotationOnSeparateLine:NavigationGroupDao.kt$NavigationGroupDao$@Query("DELETE FROM navigation_groups") suspend</ID>
+    <ID>AnnotationOnSeparateLine:Qualifiers.kt$ActiveSourceCredentials$@Qualifier @Retention(AnnotationRetention.BINARY) annotation</ID>
+    <ID>AnnotationOnSeparateLine:Qualifiers.kt$ActiveSourceUrl$@Qualifier @Retention(AnnotationRetention.BINARY) annotation</ID>
+    <ID>AnnotationOnSeparateLine:SeriesDao.kt$SeriesDao$@Query("DELETE FROM series WHERE 1") suspend</ID>
+    <ID>AnnotationOnSeparateLine:SeriesDao.kt$SeriesDao$@Query("SELECT * FROM series ORDER BY num ASC") suspend</ID>
+    <ID>AnnotationOnSeparateLine:SeriesDao.kt$SeriesDao$@Query("SELECT COUNT(*) FROM series") suspend</ID>
+    <ID>AnnotationOnSeparateLine:SeriesDao.kt$SeriesDao$@Query("SELECT lastUpdated FROM series LIMIT 1") suspend</ID>
+    <ID>AnnotationOnSeparateLine:StreamSourceDao.kt$StreamSourceDao$@Insert(onConflict = OnConflictStrategy.REPLACE) suspend</ID>
+    <ID>AnnotationOnSeparateLine:StreamSourceDao.kt$StreamSourceDao$@Query("UPDATE stream_sources SET isActive = 0") suspend</ID>
+    <ID>AnnotationOnSeparateLine:WatchHistoryDao.kt$WatchHistoryDao$@Insert(onConflict = OnConflictStrategy.REPLACE) suspend</ID>
+    <ID>AnnotationOnSeparateLine:WatchHistoryDao.kt$WatchHistoryDao$@Query("DELETE FROM watch_history") suspend</ID>
+    <ID>CyclomaticComplexMethod:AddEditSourceActivity.kt$AddEditSourceActivity$private fun saveSource()</ID>
+    <ID>CyclomaticComplexMethod:ContentRepositoryImpl.kt$ContentRepositoryImpl$@Deprecated("Use loadMovies() instead", ReplaceWith("loadMovies(forceRefresh)")) suspend fun getMovies(forceRefresh: Boolean = false): Result&lt;List&lt;Movie&gt;&gt;</ID>
+    <ID>CyclomaticComplexMethod:ContentRepositoryImpl.kt$ContentRepositoryImpl$@Deprecated("Use loadSeries() instead", ReplaceWith("loadSeries(forceRefresh)")) suspend fun getSeries(forceRefresh: Boolean = false): Result&lt;List&lt;Series&gt;&gt;</ID>
+    <ID>CyclomaticComplexMethod:ContentRepositoryImpl.kt$ContentRepositoryImpl$suspend fun loadLive(forceRefresh: Boolean = false)</ID>
+    <ID>CyclomaticComplexMethod:ContentRepositoryImpl.kt$ContentRepositoryImpl$suspend fun loadMovies(forceRefresh: Boolean = false)</ID>
+    <ID>CyclomaticComplexMethod:ContentRepositoryImpl.kt$ContentRepositoryImpl$suspend fun loadSeries(forceRefresh: Boolean = false)</ID>
+    <ID>CyclomaticComplexMethod:OptimizedBulkInsert.kt$OptimizedBulkInsert$private fun insertSeriesBatch(database: SupportSQLiteDatabase, series: List&lt;SeriesEntity&gt;)</ID>
+    <ID>CyclomaticComplexMethod:SyncCoordinator.kt$SyncCoordinator$suspend fun syncAll(): SyncResult</ID>
+    <ID>FunctionReturnTypeSpacing:ContentRepositoryImpl.kt$ContentRepositoryImpl$override fun observeLive(): Flow&lt;com.cactuvi.app.domain.model.Resource&lt;com.cactuvi.app.domain.model.NavigationTree&gt;&gt;</ID>
+    <ID>FunctionReturnTypeSpacing:ContentRepositoryImpl.kt$ContentRepositoryImpl$override fun observeMovies(): Flow&lt;com.cactuvi.app.domain.model.Resource&lt;com.cactuvi.app.domain.model.NavigationTree&gt;&gt;</ID>
+    <ID>FunctionReturnTypeSpacing:ContentRepositoryImpl.kt$ContentRepositoryImpl$override fun observeSeries(): Flow&lt;com.cactuvi.app.domain.model.Resource&lt;com.cactuvi.app.domain.model.NavigationTree&gt;&gt;</ID>
+    <ID>FunctionReturnTypeSpacing:ContentRepositoryImpl.kt$ContentRepositoryImpl$suspend fun loadAllContentParallel(): Triple&lt;Result&lt;List&lt;Movie&gt;&gt;, Result&lt;List&lt;Series&gt;&gt;, Result&lt;List&lt;LiveChannel&gt;&gt;&gt;</ID>
+    <ID>ImplicitDefaultLocale:ActiveDownloadsAdapter.kt$ActiveDownloadsAdapter.ActiveDownloadViewHolder$String.format("%.1f MB / %.1f MB", downloadedMB, totalMB)</ID>
+    <ID>ImplicitDefaultLocale:ActiveDownloadsAdapter.kt$ActiveDownloadsAdapter.ActiveDownloadViewHolder$String.format("%.1f MB", downloadedMB)</ID>
+    <ID>ImplicitDefaultLocale:ContinueWatchingActivity.kt$ContinueWatchingActivity$String.format("%d:%02d", minutes, seconds)</ID>
+    <ID>ImplicitDefaultLocale:ContinueWatchingActivity.kt$ContinueWatchingActivity$String.format("%d:%02d:%02d", hours, minutes, seconds)</ID>
+    <ID>ImplicitDefaultLocale:ContinueWatchingAdapter.kt$ContinueWatchingAdapter.ViewHolder$String.format("%d:%02d", minutes, seconds)</ID>
+    <ID>ImplicitDefaultLocale:ContinueWatchingAdapter.kt$ContinueWatchingAdapter.ViewHolder$String.format("%d:%02d:%02d", hours, minutes, seconds)</ID>
+    <ID>ImplicitDefaultLocale:MovieDetailActivity.kt$MovieDetailActivity$String.format("%d:%02d", minutes, seconds)</ID>
+    <ID>ImplicitDefaultLocale:MovieDetailActivity.kt$MovieDetailActivity$String.format("%d:%02d:%02d", hours, minutes, seconds)</ID>
+    <ID>ImportOrdering:AddEditSourceActivity.kt$import android.app.Activity import android.os.Bundle import android.view.View import android.widget.Button import android.widget.ProgressBar import android.widget.Toast import androidx.appcompat.app.AppCompatActivity import androidx.lifecycle.lifecycleScope import com.cactuvi.app.R import com.cactuvi.app.data.models.StreamSource import com.cactuvi.app.ui.common.ModernToolbar import com.cactuvi.app.utils.SourceManager import com.google.android.material.textfield.TextInputEditText import com.google.android.material.textfield.TextInputLayout import java.net.URL import java.util.UUID import kotlinx.coroutines.Dispatchers import kotlinx.coroutines.launch import kotlinx.coroutines.withContext</ID>
+    <ID>ImportOrdering:ApiClient.kt$import java.util.concurrent.TimeUnit import okhttp3.Interceptor import okhttp3.OkHttpClient import okhttp3.logging.HttpLoggingInterceptor import retrofit2.Retrofit import retrofit2.converter.gson.GsonConverterFactory</ID>
+    <ID>ImportOrdering:ContentRepositoryImpl.kt$import android.content.Context import androidx.paging.Pager import androidx.paging.PagingConfig import androidx.paging.PagingData import androidx.paging.map import com.cactuvi.app.data.api.ApiClient import com.cactuvi.app.data.api.XtreamApiService import com.cactuvi.app.data.db.AppDatabase import com.cactuvi.app.data.db.entities.* import com.cactuvi.app.data.db.mappers.* import com.cactuvi.app.data.mappers.toDomain import com.cactuvi.app.data.models.* import com.cactuvi.app.utils.CategoryGrouper import com.cactuvi.app.utils.PerformanceLogger import com.cactuvi.app.utils.PreferencesManager import com.cactuvi.app.utils.SourceManager import com.cactuvi.app.utils.StreamingJsonParser import com.cactuvi.app.utils.VPNDetector import com.google.gson.Gson import com.google.gson.reflect.TypeToken import kotlin.time.Duration.Companion.minutes import kotlinx.coroutines.Dispatchers import kotlinx.coroutines.TimeoutCancellationException import kotlinx.coroutines.async import kotlinx.coroutines.channels.Channel import kotlinx.coroutines.coroutineScope import kotlinx.coroutines.delay import kotlinx.coroutines.flow.Flow import kotlinx.coroutines.flow.MutableSharedFlow import kotlinx.coroutines.flow.MutableStateFlow import kotlinx.coroutines.flow.SharedFlow import kotlinx.coroutines.flow.StateFlow import kotlinx.coroutines.flow.asSharedFlow import kotlinx.coroutines.flow.asStateFlow import kotlinx.coroutines.flow.flatMapLatest import kotlinx.coroutines.flow.flow import kotlinx.coroutines.flow.flowOn import kotlinx.coroutines.flow.map as flowMap import kotlinx.coroutines.flow.onStart import kotlinx.coroutines.runBlocking import kotlinx.coroutines.sync.Mutex import kotlinx.coroutines.sync.withLock import kotlinx.coroutines.withContext import kotlinx.coroutines.withTimeout</ID>
+    <ID>ImportOrdering:ContinueWatchingViewModel.kt$import androidx.lifecycle.ViewModel import androidx.lifecycle.viewModelScope import com.cactuvi.app.domain.usecase.DeleteWatchHistoryItemUseCase import com.cactuvi.app.domain.usecase.ObserveWatchHistoryUseCase import dagger.hilt.android.lifecycle.HiltViewModel import javax.inject.Inject import kotlinx.coroutines.flow.MutableStateFlow import kotlinx.coroutines.flow.StateFlow import kotlinx.coroutines.flow.asStateFlow import kotlinx.coroutines.flow.update import kotlinx.coroutines.launch</ID>
+    <ID>ImportOrdering:DataModule.kt$import android.content.Context import com.cactuvi.app.data.api.ApiClient import com.cactuvi.app.data.api.XtreamApiService import com.cactuvi.app.data.db.AppDatabase import com.cactuvi.app.data.source.local.LiveLocalDataSource import com.cactuvi.app.data.source.local.MovieLocalDataSource import com.cactuvi.app.data.source.local.SeriesLocalDataSource import com.cactuvi.app.data.source.remote.LiveRemoteDataSource import com.cactuvi.app.data.source.remote.MovieRemoteDataSource import com.cactuvi.app.data.source.remote.SeriesRemoteDataSource import com.cactuvi.app.utils.SourceManager import dagger.Module import dagger.Provides import dagger.hilt.InstallIn import dagger.hilt.android.qualifiers.ApplicationContext import dagger.hilt.components.SingletonComponent import javax.inject.Singleton import kotlinx.coroutines.runBlocking</ID>
+    <ID>ImportOrdering:DownloadRepository.kt$import android.content.Context import android.net.Uri import androidx.media3.common.util.UnstableApi import androidx.media3.exoplayer.offline.Download import androidx.media3.exoplayer.offline.DownloadRequest import androidx.media3.exoplayer.offline.DownloadService as Media3DownloadService import com.cactuvi.app.data.db.AppDatabase import com.cactuvi.app.data.db.entities.DownloadEntity import com.cactuvi.app.services.DownloadService import com.cactuvi.app.services.DownloadUtil import kotlinx.coroutines.flow.Flow import kotlinx.coroutines.flow.map</ID>
+    <ID>ImportOrdering:DownloadService.kt$import android.app.Notification import android.app.NotificationChannel import android.app.NotificationManager import android.content.Context import android.os.Build import androidx.core.app.NotificationCompat import androidx.media3.common.util.UnstableApi import androidx.media3.exoplayer.offline.Download import androidx.media3.exoplayer.offline.DownloadManager import androidx.media3.exoplayer.offline.DownloadService as Media3DownloadService import androidx.media3.exoplayer.scheduler.Scheduler import com.cactuvi.app.R</ID>
+    <ID>ImportOrdering:LiveTvFragment.kt$import android.content.Intent import android.content.res.ColorStateList import android.os.Bundle import android.view.LayoutInflater import android.view.View import android.view.ViewGroup import android.widget.HorizontalScrollView import android.widget.ProgressBar import android.widget.TextView import androidx.core.view.isVisible import androidx.fragment.app.Fragment import androidx.fragment.app.viewModels import androidx.lifecycle.Lifecycle import androidx.lifecycle.lifecycleScope import androidx.lifecycle.repeatOnLifecycle import androidx.recyclerview.widget.GridLayoutManager import androidx.recyclerview.widget.LinearLayoutManager import androidx.recyclerview.widget.RecyclerView import com.cactuvi.app.R import com.cactuvi.app.data.models.LiveChannel import com.cactuvi.app.ui.common.CategoryTreeAdapter import com.cactuvi.app.ui.common.ContentUiState import com.cactuvi.app.ui.common.GroupAdapter import com.cactuvi.app.ui.common.LiveChannelPagingAdapter import com.cactuvi.app.ui.common.ModernToolbar import com.cactuvi.app.ui.common.NavigationLevel import com.cactuvi.app.utils.CategoryGrouper.GroupNode import com.cactuvi.app.utils.IdleDetectionHelper import com.cactuvi.app.utils.SourceManager import com.google.android.material.chip.Chip import com.google.android.material.chip.ChipGroup import dagger.hilt.android.AndroidEntryPoint import javax.inject.Inject import kotlinx.coroutines.flow.collectLatest import kotlinx.coroutines.launch</ID>
+    <ID>ImportOrdering:LiveTvViewModel.kt$import androidx.paging.PagingData import com.cactuvi.app.data.models.LiveChannel import com.cactuvi.app.domain.model.NavigationTree import com.cactuvi.app.domain.model.Resource import com.cactuvi.app.domain.repository.ContentRepository import com.cactuvi.app.domain.usecase.ObserveLiveUseCase import com.cactuvi.app.domain.usecase.RefreshLiveUseCase import com.cactuvi.app.ui.common.ContentViewModel import dagger.hilt.android.lifecycle.HiltViewModel import javax.inject.Inject import kotlinx.coroutines.flow.Flow</ID>
+    <ID>ImportOrdering:MovieDetailViewModel.kt$import androidx.lifecycle.SavedStateHandle import androidx.lifecycle.ViewModel import androidx.lifecycle.viewModelScope import com.cactuvi.app.domain.usecase.AddToFavoritesUseCase import com.cactuvi.app.domain.usecase.GetMovieInfoUseCase import com.cactuvi.app.domain.usecase.ObserveIsFavoriteUseCase import com.cactuvi.app.domain.usecase.ObserveWatchHistoryUseCase import com.cactuvi.app.domain.usecase.RemoveFromFavoritesUseCase import dagger.hilt.android.lifecycle.HiltViewModel import javax.inject.Inject import kotlinx.coroutines.flow.MutableStateFlow import kotlinx.coroutines.flow.StateFlow import kotlinx.coroutines.flow.asStateFlow import kotlinx.coroutines.flow.update import kotlinx.coroutines.launch</ID>
+    <ID>ImportOrdering:MoviesFragment.kt$import android.content.Intent import android.content.res.ColorStateList import android.os.Bundle import android.view.LayoutInflater import android.view.View import android.view.ViewGroup import android.widget.HorizontalScrollView import android.widget.ProgressBar import android.widget.TextView import androidx.core.view.isVisible import androidx.fragment.app.Fragment import androidx.fragment.app.viewModels import androidx.lifecycle.Lifecycle import androidx.lifecycle.lifecycleScope import androidx.lifecycle.repeatOnLifecycle import androidx.recyclerview.widget.GridLayoutManager import androidx.recyclerview.widget.LinearLayoutManager import androidx.recyclerview.widget.RecyclerView import com.cactuvi.app.R import com.cactuvi.app.data.models.Movie import com.cactuvi.app.ui.common.CategoryTreeAdapter import com.cactuvi.app.ui.common.ContentUiState import com.cactuvi.app.ui.common.GroupAdapter import com.cactuvi.app.ui.common.ModernToolbar import com.cactuvi.app.ui.common.MoviePagingAdapter import com.cactuvi.app.ui.common.NavigationLevel import com.cactuvi.app.utils.CategoryGrouper.GroupNode import com.cactuvi.app.utils.IdleDetectionHelper import com.cactuvi.app.utils.PerformanceLogger import com.cactuvi.app.utils.SourceManager import com.google.android.material.chip.Chip import com.google.android.material.chip.ChipGroup import dagger.hilt.android.AndroidEntryPoint import javax.inject.Inject import kotlinx.coroutines.flow.collectLatest import kotlinx.coroutines.launch</ID>
+    <ID>ImportOrdering:MoviesViewModel.kt$import androidx.paging.PagingData import com.cactuvi.app.data.models.Movie import com.cactuvi.app.domain.model.NavigationTree import com.cactuvi.app.domain.model.Resource import com.cactuvi.app.domain.repository.ContentRepository import com.cactuvi.app.domain.usecase.ObserveMoviesUseCase import com.cactuvi.app.domain.usecase.RefreshMoviesUseCase import com.cactuvi.app.ui.common.ContentViewModel import dagger.hilt.android.lifecycle.HiltViewModel import javax.inject.Inject import kotlinx.coroutines.flow.Flow</ID>
+    <ID>ImportOrdering:MyListViewModel.kt$import androidx.lifecycle.ViewModel import androidx.lifecycle.viewModelScope import com.cactuvi.app.domain.usecase.ObserveFavoritesUseCase import dagger.hilt.android.lifecycle.HiltViewModel import javax.inject.Inject import kotlinx.coroutines.flow.MutableStateFlow import kotlinx.coroutines.flow.StateFlow import kotlinx.coroutines.flow.asStateFlow import kotlinx.coroutines.flow.update import kotlinx.coroutines.launch</ID>
+    <ID>ImportOrdering:ObserveLiveUseCase.kt$import com.cactuvi.app.domain.model.NavigationTree import com.cactuvi.app.domain.model.Resource import com.cactuvi.app.domain.repository.ContentRepository import javax.inject.Inject import kotlinx.coroutines.flow.Flow</ID>
+    <ID>ImportOrdering:ObserveMoviesUseCase.kt$import com.cactuvi.app.domain.model.NavigationTree import com.cactuvi.app.domain.model.Resource import com.cactuvi.app.domain.repository.ContentRepository import javax.inject.Inject import kotlinx.coroutines.flow.Flow</ID>
+    <ID>ImportOrdering:ObserveSeriesUseCase.kt$import com.cactuvi.app.domain.model.NavigationTree import com.cactuvi.app.domain.model.Resource import com.cactuvi.app.domain.repository.ContentRepository import javax.inject.Inject import kotlinx.coroutines.flow.Flow</ID>
+    <ID>ImportOrdering:ReactiveUpdateManager.kt$import java.util.concurrent.CopyOnWriteArrayList import kotlinx.coroutines.CoroutineScope import kotlinx.coroutines.Dispatchers import kotlinx.coroutines.SupervisorJob import kotlinx.coroutines.delay import kotlinx.coroutines.flow.MutableSharedFlow import kotlinx.coroutines.flow.SharedFlow import kotlinx.coroutines.flow.asSharedFlow import kotlinx.coroutines.launch</ID>
+    <ID>ImportOrdering:SearchViewModel.kt$import android.content.Context import androidx.lifecycle.ViewModel import androidx.lifecycle.viewModelScope import com.cactuvi.app.data.db.AppDatabase import com.cactuvi.app.data.db.mappers.toModel import com.cactuvi.app.data.models.Movie import com.cactuvi.app.data.models.Series import com.cactuvi.app.domain.usecase.RefreshMoviesUseCase import com.cactuvi.app.domain.usecase.RefreshSeriesUseCase import dagger.hilt.android.lifecycle.HiltViewModel import dagger.hilt.android.qualifiers.ApplicationContext import javax.inject.Inject import kotlinx.coroutines.Dispatchers import kotlinx.coroutines.FlowPreview import kotlinx.coroutines.flow.MutableStateFlow import kotlinx.coroutines.flow.StateFlow import kotlinx.coroutines.flow.asStateFlow import kotlinx.coroutines.flow.debounce import kotlinx.coroutines.flow.update import kotlinx.coroutines.launch import kotlinx.coroutines.withContext</ID>
+    <ID>ImportOrdering:SeriesDetailViewModel.kt$import androidx.lifecycle.SavedStateHandle import androidx.lifecycle.ViewModel import androidx.lifecycle.viewModelScope import com.cactuvi.app.domain.usecase.AddToFavoritesUseCase import com.cactuvi.app.domain.usecase.GetSeriesInfoUseCase import com.cactuvi.app.domain.usecase.ObserveIsFavoriteUseCase import com.cactuvi.app.domain.usecase.RemoveFromFavoritesUseCase import dagger.hilt.android.lifecycle.HiltViewModel import javax.inject.Inject import kotlinx.coroutines.flow.MutableStateFlow import kotlinx.coroutines.flow.StateFlow import kotlinx.coroutines.flow.asStateFlow import kotlinx.coroutines.flow.update import kotlinx.coroutines.launch</ID>
+    <ID>ImportOrdering:SeriesFragment.kt$import android.content.Intent import android.content.res.ColorStateList import android.os.Bundle import android.view.LayoutInflater import android.view.View import android.view.ViewGroup import android.widget.HorizontalScrollView import android.widget.ProgressBar import android.widget.TextView import androidx.core.view.isVisible import androidx.fragment.app.Fragment import androidx.fragment.app.viewModels import androidx.lifecycle.Lifecycle import androidx.lifecycle.lifecycleScope import androidx.lifecycle.repeatOnLifecycle import androidx.recyclerview.widget.GridLayoutManager import androidx.recyclerview.widget.LinearLayoutManager import androidx.recyclerview.widget.RecyclerView import com.cactuvi.app.R import com.cactuvi.app.data.models.Series import com.cactuvi.app.ui.common.CategoryTreeAdapter import com.cactuvi.app.ui.common.ContentUiState import com.cactuvi.app.ui.common.GroupAdapter import com.cactuvi.app.ui.common.ModernToolbar import com.cactuvi.app.ui.common.NavigationLevel import com.cactuvi.app.ui.common.SeriesPagingAdapter import com.cactuvi.app.utils.CategoryGrouper.GroupNode import com.cactuvi.app.utils.IdleDetectionHelper import com.cactuvi.app.utils.PerformanceLogger import com.cactuvi.app.utils.SourceManager import com.google.android.material.chip.Chip import com.google.android.material.chip.ChipGroup import dagger.hilt.android.AndroidEntryPoint import javax.inject.Inject import kotlinx.coroutines.flow.collectLatest import kotlinx.coroutines.launch</ID>
+    <ID>ImportOrdering:SeriesViewModel.kt$import androidx.paging.PagingData import com.cactuvi.app.data.models.Series import com.cactuvi.app.domain.model.NavigationTree import com.cactuvi.app.domain.model.Resource import com.cactuvi.app.domain.repository.ContentRepository import com.cactuvi.app.domain.usecase.ObserveSeriesUseCase import com.cactuvi.app.domain.usecase.RefreshSeriesUseCase import com.cactuvi.app.ui.common.ContentViewModel import dagger.hilt.android.lifecycle.HiltViewModel import javax.inject.Inject import kotlinx.coroutines.flow.Flow</ID>
+    <ID>ImportOrdering:StreamingJsonParser.kt$import com.google.gson.Gson import com.google.gson.stream.JsonReader import com.google.gson.stream.JsonToken import java.io.InputStreamReader import okhttp3.ResponseBody</ID>
+    <ID>Indentation:ActiveDownloadsFragment.kt$ActiveDownloadsFragment$ </ID>
+    <ID>Indentation:AddEditSourceActivity.kt$AddEditSourceActivity$ </ID>
+    <ID>Indentation:AppDatabase.kt$AppDatabase$ </ID>
+    <ID>Indentation:AppDatabase.kt$AppDatabase.Companion$ </ID>
+    <ID>Indentation:BackgroundSyncWorker.kt$BackgroundSyncWorker.Companion$ </ID>
+    <ID>Indentation:CompletedDownloadsFragment.kt$CompletedDownloadsFragment$ </ID>
+    <ID>Indentation:ContentRepositoryImpl.kt$ContentRepositoryImpl$ </ID>
+    <ID>Indentation:ContentViewModel.kt$ContentViewModel$ </ID>
+    <ID>Indentation:ContinueWatchingActivity.kt$ContinueWatchingActivity$ </ID>
+    <ID>Indentation:DownloadService.kt$DownloadService$ </ID>
+    <ID>Indentation:DownloadUtil.kt$DownloadUtil$ </ID>
+    <ID>Indentation:DownloadsActivity.kt$DownloadsActivity$ </ID>
+    <ID>Indentation:HierarchicalFolderAdapter.kt$HierarchicalFolderAdapter$ </ID>
+    <ID>Indentation:HomeActivity.kt$HomeActivity$ </ID>
+    <ID>Indentation:LiveChannelEntity.kt$LiveChannelEntity$ </ID>
+    <ID>Indentation:LiveTvFragment.kt$LiveTvFragment$ </ID>
+    <ID>Indentation:MacAddressManager.kt$MacAddressManager$ </ID>
+    <ID>Indentation:ManageFoldersActivity.kt$ManageFoldersActivity$ </ID>
+    <ID>Indentation:ManageSourcesActivity.kt$ManageSourcesActivity$ </ID>
+    <ID>Indentation:MovieDetailActivity.kt$MovieDetailActivity$ </ID>
+    <ID>Indentation:MovieEntity.kt$MovieEntity$ </ID>
+    <ID>Indentation:MoviesFragment.kt$MoviesFragment$ </ID>
+    <ID>Indentation:MyListActivity.kt$MyListActivity$ </ID>
+    <ID>Indentation:NavigationGroupEntity.kt$NavigationGroupEntity$ </ID>
+    <ID>Indentation:PlayerActivity.kt$PlayerActivity.&lt;no name provided&gt;$ </ID>
+    <ID>Indentation:SeasonEpisodeAdapter.kt$SeasonEpisodeAdapter$ </ID>
+    <ID>Indentation:SeasonEpisodeAdapter.kt$SeasonEpisodeAdapter.SeasonHeaderViewHolder$ </ID>
+    <ID>Indentation:SeriesDetailActivity.kt$SeriesDetailActivity$ </ID>
+    <ID>Indentation:SeriesEntity.kt$SeriesEntity$ </ID>
+    <ID>Indentation:SeriesFragment.kt$SeriesFragment$ </ID>
+    <ID>Indentation:SettingsActivity.kt$SettingsActivity$ </ID>
+    <ID>Indentation:SyncCoordinator.kt$SyncCoordinator$ </ID>
+    <ID>Indentation:WatchHistoryEntity.kt$WatchHistoryEntity$ </ID>
+    <ID>LargeClass:ContentRepositoryImpl.kt$ContentRepositoryImpl : ContentRepository</ID>
+    <ID>LongMethod:AddEditSourceActivity.kt$AddEditSourceActivity$private fun saveSource()</ID>
+    <ID>LongMethod:ContentRepositoryImpl.kt$ContentRepositoryImpl$@Deprecated("Use loadLive() instead", ReplaceWith("loadLive(forceRefresh)")) suspend fun getLiveStreams(forceRefresh: Boolean = false): Result&lt;List&lt;LiveChannel&gt;&gt;</ID>
+    <ID>LongMethod:ContentRepositoryImpl.kt$ContentRepositoryImpl$@Deprecated("Use loadMovies() instead", ReplaceWith("loadMovies(forceRefresh)")) suspend fun getMovies(forceRefresh: Boolean = false): Result&lt;List&lt;Movie&gt;&gt;</ID>
+    <ID>LongMethod:ContentRepositoryImpl.kt$ContentRepositoryImpl$@Deprecated("Use loadSeries() instead", ReplaceWith("loadSeries(forceRefresh)")) suspend fun getSeries(forceRefresh: Boolean = false): Result&lt;List&lt;Series&gt;&gt;</ID>
+    <ID>LongMethod:ContentRepositoryImpl.kt$ContentRepositoryImpl$override fun observeLive(): Flow&lt;com.cactuvi.app.domain.model.Resource&lt;com.cactuvi.app.domain.model.NavigationTree&gt;&gt;</ID>
+    <ID>LongMethod:ContentRepositoryImpl.kt$ContentRepositoryImpl$override fun observeMovies(): Flow&lt;com.cactuvi.app.domain.model.Resource&lt;com.cactuvi.app.domain.model.NavigationTree&gt;&gt;</ID>
+    <ID>LongMethod:ContentRepositoryImpl.kt$ContentRepositoryImpl$override fun observeSeries(): Flow&lt;com.cactuvi.app.domain.model.Resource&lt;com.cactuvi.app.domain.model.NavigationTree&gt;&gt;</ID>
+    <ID>LongMethod:ContentRepositoryImpl.kt$ContentRepositoryImpl$suspend fun getCachedVodNavigationTree(): CategoryGrouper.NavigationTree?</ID>
+    <ID>LongMethod:ContentRepositoryImpl.kt$ContentRepositoryImpl$suspend fun getMovieCategories(forceRefresh: Boolean = false): Result&lt;List&lt;Category&gt;&gt;</ID>
+    <ID>LongMethod:ContentRepositoryImpl.kt$ContentRepositoryImpl$suspend fun loadLive(forceRefresh: Boolean = false)</ID>
+    <ID>LongMethod:ContentRepositoryImpl.kt$ContentRepositoryImpl$suspend fun loadMovies(forceRefresh: Boolean = false)</ID>
+    <ID>LongMethod:ContentRepositoryImpl.kt$ContentRepositoryImpl$suspend fun loadSeries(forceRefresh: Boolean = false)</ID>
+    <ID>LongMethod:HomeMenuFragment.kt$HomeMenuFragment$private fun loadMenuItems()</ID>
+    <ID>LongMethod:ManageFoldersActivity.kt$ManageFoldersActivity$private fun loadFolders()</ID>
+    <ID>LongMethod:OptimizedBulkInsert.kt$OptimizedBulkInsert$private fun insertLiveChannelBatch( database: SupportSQLiteDatabase, channels: List&lt;LiveChannelEntity&gt; )</ID>
+    <ID>LongMethod:OptimizedBulkInsert.kt$OptimizedBulkInsert$private fun insertMovieBatch(database: SupportSQLiteDatabase, movies: List&lt;MovieEntity&gt;)</ID>
+    <ID>LongMethod:OptimizedBulkInsert.kt$OptimizedBulkInsert$private fun insertSeriesBatch(database: SupportSQLiteDatabase, series: List&lt;SeriesEntity&gt;)</ID>
+    <ID>LongMethod:SearchViewModel.kt$SearchViewModel$private fun performSearch(query: String)</ID>
+    <ID>LongMethod:SyncCoordinator.kt$SyncCoordinator$suspend fun syncAll(): SyncResult</ID>
+    <ID>LongParameterList:ContentRepositoryImpl.kt$ContentRepositoryImpl$( contentId: String, contentType: String, contentName: String, posterUrl: String?, resumePosition: Long, duration: Long, seriesId: Int? = null, seasonNumber: Int? = null, episodeNumber: Int? = null, )</ID>
+    <ID>LongParameterList:WatchHistoryDao.kt$WatchHistoryDao$( sourceId: String, id: String, type: String, position: Long, timestamp: Long, isCompleted: Boolean, )</ID>
+    <ID>MagicNumber:ActiveDownloadsAdapter.kt$ActiveDownloadsAdapter.ActiveDownloadViewHolder$1024.0</ID>
+    <ID>MagicNumber:ApiClient.kt$ApiClient$30</ID>
+    <ID>MagicNumber:CompletedDownloadsFragment.kt$CompletedDownloadsFragment$3</ID>
+    <ID>MagicNumber:ContentRepositoryImpl.kt$ContentRepositoryImpl$0.9</ID>
+    <ID>MagicNumber:ContentRepositoryImpl.kt$ContentRepositoryImpl$10</ID>
+    <ID>MagicNumber:ContentRepositoryImpl.kt$ContentRepositoryImpl$3</ID>
+    <ID>MagicNumber:ContinueWatchingActivity.kt$ContinueWatchingActivity$60</ID>
+    <ID>MagicNumber:ContinueWatchingAdapter.kt$ContinueWatchingAdapter.ViewHolder$60</ID>
+    <ID>MagicNumber:DbWriter.kt$DbWriter$999</ID>
+    <ID>MagicNumber:DownloadUtil.kt$DownloadUtil$3</ID>
+    <ID>MagicNumber:DownloadUtil.kt$DownloadUtil$30000</ID>
+    <ID>MagicNumber:FilterSettingsActivity.kt$FilterSettingsActivity$0.5f</ID>
+    <ID>MagicNumber:FilterSettingsActivity.kt$FilterSettingsActivity$3</ID>
+    <ID>MagicNumber:FilterSettingsActivity.kt$FilterSettingsActivity.&lt;no name provided&gt;$3</ID>
+    <ID>MagicNumber:LiveTvFragment.kt$LiveTvFragment$3</ID>
+    <ID>MagicNumber:MacAddressManager.kt$MacAddressManager$16</ID>
+    <ID>MagicNumber:MovieDetailActivity.kt$MovieDetailActivity$4</ID>
+    <ID>MagicNumber:MovieDetailActivity.kt$MovieDetailActivity$60</ID>
+    <ID>MagicNumber:MoviesFragment.kt$MoviesFragment$3</ID>
+    <ID>MagicNumber:MyListActivity.kt$MyListActivity$3</ID>
+    <ID>MagicNumber:MyListFragment.kt$MyListFragment$3</ID>
+    <ID>MagicNumber:MyListPagerAdapter.kt$MyListPagerAdapter$3</ID>
+    <ID>MagicNumber:SearchActivity.kt$SearchActivity$3</ID>
+    <ID>MagicNumber:SearchViewModel.kt$SearchViewModel$300</ID>
+    <ID>MagicNumber:SeasonEpisodeAdapter.kt$SeasonEpisodeAdapter.EpisodeViewHolder$60</ID>
+    <ID>MagicNumber:SeasonEpisodeAdapter.kt$SeasonEpisodeAdapter.SeasonHeaderViewHolder$0.5f</ID>
+    <ID>MagicNumber:SeasonEpisodeAdapter.kt$SeasonEpisodeAdapter.SeasonHeaderViewHolder$180f</ID>
+    <ID>MagicNumber:SeasonEpisodeAdapter.kt$SeasonEpisodeAdapter.SeasonHeaderViewHolder$200</ID>
+    <ID>MagicNumber:SeriesDetailActivity.kt$SeriesDetailActivity$4</ID>
+    <ID>MagicNumber:SeriesFragment.kt$SeriesFragment$3</ID>
+    <ID>MagicNumber:SettingsActivity.kt$SettingsActivity$12L</ID>
+    <ID>MagicNumber:SettingsActivity.kt$SettingsActivity$2000</ID>
+    <ID>MagicNumber:SettingsActivity.kt$SettingsActivity$24</ID>
+    <ID>MagicNumber:SettingsActivity.kt$SettingsActivity$24L</ID>
+    <ID>MagicNumber:SettingsActivity.kt$SettingsActivity$60</ID>
+    <ID>MagicNumber:SettingsActivity.kt$SettingsActivity$6L</ID>
+    <ID>MagicNumber:StreamingJsonParser.kt$StreamingJsonParser$10000</ID>
+    <ID>MagicNumber:SyncPreferencesManager.kt$SyncPreferencesManager$60</ID>
+    <ID>MaxLineLength:CategoryGrouper.kt$CategoryGrouper$"Input: ${categories.size} categories, grouping=$groupingEnabled, hiddenGroups=${hiddenGroups.size}, hiddenCategories=${hiddenCategories.size}"</ID>
+    <ID>MaxLineLength:CategoryGrouper.kt$CategoryGrouper$"[filterNavigationTreeHierarchical] Output: ${fullyFilteredGroups.size} groups, $totalCategoriesFiltered categories"</ID>
+    <ID>MaxLineLength:ContentRepositoryImpl.kt$ContentRepositoryImpl$"[DEBUG getSeries] Category ${cat.categoryName} (${cat.categoryId}): $count items in DB"</ID>
+    <ID>MaxLineLength:ContentRepositoryImpl.kt$ContentRepositoryImpl$"[DEBUG getSeries] First series: id=${sample.seriesId}, name=${sample.name}, categoryId=${sample.categoryId}, mapped='$categoryName'"</ID>
+    <ID>MaxLineLength:ContentRepositoryImpl.kt$ContentRepositoryImpl$"[DEBUG getSeries] UNMAPPED categoryId=${s.categoryId} for series=${s.name}"</ID>
+    <ID>MaxLineLength:ContentRepositoryImpl.kt$ContentRepositoryImpl$"loadMovies: Partial success - ${writeResult.successCount} succeeded, ${writeResult.failedCount} failed"</ID>
+    <ID>MaxLineLength:ContentRepositoryImpl.kt$ContentRepositoryImpl$"loadMovies: Progress $lastProgressPercent% ($successCount/$totalParsed)"</ID>
+    <ID>MaxLineLength:DownloadDao.kt$DownloadDao$"UPDATE downloads SET status = :status, downloadUri = :downloadUri, progress = 1.0, completedAt = :completedAt WHERE contentId = :contentId"</ID>
+    <ID>MaxLineLength:DownloadDao.kt$DownloadDao$"UPDATE downloads SET status = :status, progress = :progress, bytesDownloaded = :bytesDownloaded WHERE contentId = :contentId"</ID>
+    <ID>MaxLineLength:ManageSourcesActivity.kt$ManageSourcesActivity$"Are you sure you want to delete '${source.nickname}'? All cached data for this source will be removed."</ID>
+    <ID>MaxLineLength:MovieDao.kt$MovieDao$"SELECT * FROM movies WHERE rating5Based IS NOT NULL AND rating5Based &gt; 0 ORDER BY rating5Based DESC LIMIT :limit"</ID>
+    <ID>MaxLineLength:OptimizedBulkInsert.kt$OptimizedBulkInsert$"CREATE UNIQUE INDEX IF NOT EXISTS index_live_channels_sourceId_streamId ON live_channels(sourceId, streamId)"</ID>
+    <ID>MaxLineLength:SeriesDao.kt$SeriesDao$"SELECT * FROM series WHERE rating5Based IS NOT NULL AND rating5Based &gt; 0 ORDER BY rating5Based DESC LIMIT :limit"</ID>
+    <ID>MaxLineLength:WatchHistoryDao.kt$WatchHistoryDao$"SELECT * FROM watch_history WHERE sourceId = :sourceId AND contentId = :contentId AND contentType = :contentType"</ID>
+    <ID>MaxLineLength:WatchHistoryDao.kt$WatchHistoryDao$"SELECT * FROM watch_history WHERE sourceId = :sourceId AND isCompleted = 0 ORDER BY lastWatched DESC LIMIT :limit"</ID>
+    <ID>MaxLineLength:WatchHistoryDao.kt$WatchHistoryDao$"UPDATE watch_history SET resumePosition = :position, lastWatched = :timestamp, isCompleted = :isCompleted WHERE sourceId = :sourceId AND contentId = :id AND contentType = :type"</ID>
+    <ID>MaximumLineLength:CategoryGrouper.kt$CategoryGrouper$ </ID>
+    <ID>MaximumLineLength:ContentRepositoryImpl.kt$ContentRepositoryImpl$ </ID>
+    <ID>MaximumLineLength:DownloadDao.kt$DownloadDao$ </ID>
+    <ID>MaximumLineLength:ManageSourcesActivity.kt$ManageSourcesActivity$ </ID>
+    <ID>MaximumLineLength:MovieDao.kt$MovieDao$ </ID>
+    <ID>MaximumLineLength:OptimizedBulkInsert.kt$OptimizedBulkInsert$ </ID>
+    <ID>MaximumLineLength:SeriesDao.kt$SeriesDao$ </ID>
+    <ID>MaximumLineLength:WatchHistoryDao.kt$WatchHistoryDao$ </ID>
+    <ID>MultiLineIfElse:OptimizedBulkInsert.kt$OptimizedBulkInsert$statement.bindNull(bindIndex++)</ID>
+    <ID>MultiLineIfElse:OptimizedBulkInsert.kt$OptimizedBulkInsert$statement.bindString(bindIndex++, s.cast)</ID>
+    <ID>MultiLineIfElse:OptimizedBulkInsert.kt$OptimizedBulkInsert$statement.bindString(bindIndex++, s.cover)</ID>
+    <ID>MultiLineIfElse:OptimizedBulkInsert.kt$OptimizedBulkInsert$statement.bindString(bindIndex++, s.genre)</ID>
+    <ID>MultiLineIfElse:OptimizedBulkInsert.kt$OptimizedBulkInsert$statement.bindString(bindIndex++, s.plot)</ID>
+    <ID>MultiLineIfElse:OptimizedBulkInsert.kt$OptimizedBulkInsert$statement.bindString(bindIndex++, s.rating)</ID>
+    <ID>MultiLineIfElse:SyncCoordinator.kt$SyncCoordinator$System.currentTimeMillis()</ID>
+    <ID>MultiLineIfElse:SyncCoordinator.kt$SyncCoordinator$metadata.lastSyncSuccess</ID>
+    <ID>NoWildcardImports:AppDatabase.kt$import com.cactuvi.app.data.db.dao.*</ID>
+    <ID>NoWildcardImports:AppDatabase.kt$import com.cactuvi.app.data.db.entities.*</ID>
+    <ID>NoWildcardImports:CacheMetadataDao.kt$import androidx.room.*</ID>
+    <ID>NoWildcardImports:CategoryDao.kt$import androidx.room.*</ID>
+    <ID>NoWildcardImports:ContentRepositoryImpl.kt$import com.cactuvi.app.data.db.entities.*</ID>
+    <ID>NoWildcardImports:ContentRepositoryImpl.kt$import com.cactuvi.app.data.db.mappers.*</ID>
+    <ID>NoWildcardImports:ContentRepositoryImpl.kt$import com.cactuvi.app.data.models.*</ID>
+    <ID>NoWildcardImports:DownloadDao.kt$import androidx.room.*</ID>
+    <ID>NoWildcardImports:FavoriteDao.kt$import androidx.room.*</ID>
+    <ID>NoWildcardImports:LiveChannelDao.kt$import androidx.room.*</ID>
+    <ID>NoWildcardImports:MovieDao.kt$import androidx.room.*</ID>
+    <ID>NoWildcardImports:SeriesDao.kt$import androidx.room.*</ID>
+    <ID>NoWildcardImports:StreamSourceDao.kt$import androidx.room.*</ID>
+    <ID>NoWildcardImports:WatchHistoryDao.kt$import androidx.room.*</ID>
+    <ID>NoWildcardImports:XtreamApiService.kt$import com.cactuvi.app.data.models.*</ID>
+    <ID>RethrowCaughtException:ContentRepositoryImpl.kt$ContentRepositoryImpl$throw e</ID>
+    <ID>ReturnCount:ContinueWatchingActivity.kt$ContinueWatchingActivity$private fun resumePlayback(item: com.cactuvi.app.data.db.entities.WatchHistoryEntity)</ID>
+    <ID>ReturnCount:VPNDetector.kt$VPNDetector$fun isVpnActive(context: Context): Boolean</ID>
+    <ID>StringLiteralDuplication:Cactuvi.kt$Cactuvi$"FAILED"</ID>
+    <ID>StringLiteralDuplication:CategoryGrouper.kt$CategoryGrouper$"All Categories"</ID>
+    <ID>StringLiteralDuplication:CategoryGrouper.kt$CategoryGrouper$"CategoryGrouper.buildVodNavigationTree"</ID>
+    <ID>StringLiteralDuplication:CategoryGrouper.kt$CategoryGrouper$"FIRST_WORD"</ID>
+    <ID>StringLiteralDuplication:CategoryGrouper.kt$CategoryGrouper$"Other"</ID>
+    <ID>StringLiteralDuplication:ContentRepositoryImpl.kt$ContentRepositoryImpl$"${contentType}_$contentId"</ID>
+    <ID>StringLiteralDuplication:ContentRepositoryImpl.kt$ContentRepositoryImpl$"API fetch"</ID>
+    <ID>StringLiteralDuplication:ContentRepositoryImpl.kt$ContentRepositoryImpl$"ContentRepository"</ID>
+    <ID>StringLiteralDuplication:ContentRepositoryImpl.kt$ContentRepositoryImpl$"Failed to build navigation tree"</ID>
+    <ID>StringLiteralDuplication:ContentRepositoryImpl.kt$ContentRepositoryImpl$"IPTV_DEBUG"</ID>
+    <ID>StringLiteralDuplication:ContentRepositoryImpl.kt$ContentRepositoryImpl$"No active source configured"</ID>
+    <ID>StringLiteralDuplication:ContentRepositoryImpl.kt$ContentRepositoryImpl$"PARTIAL"</ID>
+    <ID>StringLiteralDuplication:ContentRepositoryImpl.kt$ContentRepositoryImpl$"Repository.getCachedVodNavigationTree"</ID>
+    <ID>StringLiteralDuplication:ContentRepositoryImpl.kt$ContentRepositoryImpl$"Repository.getMovieCategories"</ID>
+    <ID>StringLiteralDuplication:ContentRepositoryImpl.kt$ContentRepositoryImpl$"Repository.getMovies"</ID>
+    <ID>StringLiteralDuplication:ContentRepositoryImpl.kt$ContentRepositoryImpl$"Unknown error"</ID>
+    <ID>StringLiteralDuplication:ContentRepositoryImpl.kt$ContentRepositoryImpl$"getCachedVodNavigationTree"</ID>
+    <ID>StringLiteralDuplication:ContentRepositoryImpl.kt$ContentRepositoryImpl$"getMovieCategories"</ID>
+    <ID>StringLiteralDuplication:ContentRepositoryImpl.kt$ContentRepositoryImpl$"getMovies"</ID>
+    <ID>StringLiteralDuplication:ContentRepositoryImpl.kt$ContentRepositoryImpl$"live_channel"</ID>
+    <ID>StringLiteralDuplication:ContentRepositoryImpl.kt$ContentRepositoryImpl$"movie"</ID>
+    <ID>StringLiteralDuplication:ContentRepositoryImpl.kt$ContentRepositoryImpl$"movies"</ID>
+    <ID>StringLiteralDuplication:ContentRepositoryImpl.kt$ContentRepositoryImpl$"navigationTree"</ID>
+    <ID>StringLiteralDuplication:ContentRepositoryImpl.kt$ContentRepositoryImpl$"series"</ID>
+    <ID>StringLiteralDuplication:MovieDetailActivity.kt$MovieDetailActivity$"movie_$streamId"</ID>
+    <ID>StringLiteralDuplication:MovieDetailViewModel.kt$MovieDetailViewModel$"movie"</ID>
+    <ID>StringLiteralDuplication:MyListFragment.kt$MyListFragment$"TITLE"</ID>
+    <ID>StringLiteralDuplication:MyListFragment.kt$MyListFragment$"live_channel"</ID>
+    <ID>StringLiteralDuplication:MyListFragment.kt$MyListFragment$"movie"</ID>
+    <ID>StringLiteralDuplication:OptimizedBulkInsert.kt$OptimizedBulkInsert$") VALUES "</ID>
+    <ID>StringLiteralDuplication:SeasonEpisodeAdapter.kt$SeasonEpisodeAdapter$"SeasonEpisodeAdapter"</ID>
+    <ID>StringLiteralDuplication:SeriesDetailActivity.kt$SeriesDetailActivity$"S${seasonNumber}E${episode.episodeNum}: ${episode.title}"</ID>
+    <ID>StringLiteralDuplication:SeriesDetailActivity.kt$SeriesDetailActivity$"SeriesDetail"</ID>
+    <ID>StringLiteralDuplication:SeriesDetailViewModel.kt$SeriesDetailViewModel$"series"</ID>
+    <ID>StringLiteralDuplication:SyncCoordinator.kt$SyncCoordinator$"FAILED"</ID>
+    <ID>StringLiteralDuplication:SyncCoordinator.kt$SyncCoordinator$"SUCCESS"</ID>
+    <ID>StringLiteralDuplication:SyncCoordinator.kt$SyncCoordinator$"movies"</ID>
+    <ID>StringLiteralDuplication:SyncCoordinator.kt$SyncCoordinator$"series"</ID>
+    <ID>SwallowedException:AddEditSourceActivity.kt$AddEditSourceActivity$e: Exception</ID>
+    <ID>SwallowedException:BackgroundSyncWorker.kt$BackgroundSyncWorker$e: Exception</ID>
+    <ID>SwallowedException:Cactuvi.kt$Cactuvi$e: Exception</ID>
+    <ID>SwallowedException:ContentRepositoryImpl.kt$ContentRepositoryImpl$e: Exception</ID>
+    <ID>SwallowedException:DownloadUtil.kt$DownloadUtil$e: Exception</ID>
+    <ID>SwallowedException:PlayerActivity.kt$PlayerActivity$e: Exception</ID>
+    <ID>SwallowedException:PreferencesManager.kt$PreferencesManager$e: Exception</ID>
+    <ID>SwallowedException:PreferencesManager.kt$PreferencesManager$e: IllegalArgumentException</ID>
+    <ID>SwallowedException:StreamingJsonParser.kt$StreamingJsonParser$e: Exception</ID>
+    <ID>SwallowedException:VPNDetector.kt$VPNDetector$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:ActiveDownloadsFragment.kt$ActiveDownloadsFragment$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:AddEditSourceActivity.kt$AddEditSourceActivity$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:BackgroundSyncWorker.kt$BackgroundSyncWorker$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:Cactuvi.kt$Cactuvi$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:CompletedDownloadsFragment.kt$CompletedDownloadsFragment$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:ContentRepositoryImpl.kt$ContentRepositoryImpl$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:DbWriter.kt$DbWriter$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:DownloadUtil.kt$DownloadUtil$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:DownloadsActivity.kt$DownloadsActivity$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:LoadingActivity.kt$LoadingActivity$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:ManageFoldersActivity.kt$ManageFoldersActivity$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:ManageSourcesActivity.kt$ManageSourcesActivity$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:MovieDetailActivity.kt$MovieDetailActivity$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:PlayerActivity.kt$PlayerActivity$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:PreferencesManager.kt$PreferencesManager$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:SeriesDetailActivity.kt$SeriesDetailActivity$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:StreamingJsonParser.kt$StreamingJsonParser$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:SyncCoordinator.kt$SyncCoordinator$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:VPNDetector.kt$VPNDetector$e: Exception</ID>
+    <ID>TooManyFunctions:ContentRepository.kt$ContentRepository</ID>
+    <ID>TooManyFunctions:ContentRepositoryImpl.kt$ContentRepositoryImpl : ContentRepository</ID>
+    <ID>TooManyFunctions:DownloadDao.kt$DownloadDao</ID>
+    <ID>TooManyFunctions:DownloadRepository.kt$DownloadRepository</ID>
+    <ID>TooManyFunctions:LiveChannelDao.kt$LiveChannelDao</ID>
+    <ID>TooManyFunctions:MovieDao.kt$MovieDao</ID>
+    <ID>TooManyFunctions:PreferencesManager.kt$PreferencesManager</ID>
+    <ID>TooManyFunctions:SeriesDao.kt$SeriesDao</ID>
+    <ID>UnnecessaryParentheses:Cactuvi.kt$Cactuvi$(database.cacheMetadataDao().get("live")?.itemCount ?: 0)</ID>
+    <ID>UnnecessaryParentheses:Cactuvi.kt$Cactuvi$(database.cacheMetadataDao().get("movies")?.itemCount ?: 0)</ID>
+    <ID>UnnecessaryParentheses:Cactuvi.kt$Cactuvi$(database.cacheMetadataDao().get("series")?.itemCount ?: 0)</ID>
+    <ID>UnnecessaryParentheses:ContentRepositoryImpl.kt$ContentRepositoryImpl$(System.currentTimeMillis() - lastUpdated)</ID>
+    <ID>UnnecessaryParentheses:ContentRepositoryImpl.kt$ContentRepositoryImpl$(progressPercent / 10)</ID>
+    <ID>UnnecessaryParentheses:ContentRepositoryImpl.kt$ContentRepositoryImpl$(resumePosition.toDouble() / duration)</ID>
+    <ID>UnnecessaryParentheses:ContentRepositoryImpl.kt$ContentRepositoryImpl$(successCount * 100)</ID>
+    <ID>UnnecessaryParentheses:ContinueWatchingActivity.kt$ContinueWatchingActivity$(milliseconds / (1000 * 60))</ID>
+    <ID>UnnecessaryParentheses:ContinueWatchingActivity.kt$ContinueWatchingActivity$(milliseconds / 1000)</ID>
+    <ID>UnnecessaryParentheses:ContinueWatchingAdapter.kt$ContinueWatchingAdapter.ViewHolder$(item.resumePosition.toDouble() / item.duration)</ID>
+    <ID>UnnecessaryParentheses:DbWriter.kt$DbWriter$(entities.size * 1000L)</ID>
+    <ID>UnnecessaryParentheses:DownloadTracker.kt$DownloadTracker.DownloadListener$(download.bytesDownloaded.toFloat() / download.contentLength.toFloat())</ID>
+    <ID>UnnecessaryParentheses:MovieDetailActivity.kt$MovieDetailActivity$(milliseconds / (1000 * 60))</ID>
+    <ID>UnnecessaryParentheses:MovieDetailActivity.kt$MovieDetailActivity$(milliseconds / 1000)</ID>
+    <ID>UnnecessaryParentheses:PlayerActivity.kt$PlayerActivity$(View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or View.SYSTEM_UI_FLAG_LAYOUT_STABLE or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_FULLSCREEN)</ID>
+    <ID>UnusedParameter:LiveTvFragment.kt$LiveTvFragment$categoryId: String</ID>
+    <ID>UnusedParameter:MoviesFragment.kt$MoviesFragment$categoryId: String</ID>
+    <ID>UnusedParameter:SeriesFragment.kt$SeriesFragment$categoryId: String</ID>
+    <ID>UnusedPrivateMember:ContentRepositoryImpl.kt$ContentRepositoryImpl$private suspend fun &lt;T&gt; bulkInsertBatch( items: List&lt;T&gt;, insertBatch: suspend (List&lt;T&gt;) -&gt; Unit )</ID>
+    <ID>UnusedPrivateMember:ContinueWatchingActivity.kt$ContinueWatchingActivity$private fun formatTime(milliseconds: Long): String</ID>
+    <ID>UnusedPrivateMember:LoadingActivity.kt$LoadingActivity$private fun showNoSourcesError()</ID>
+    <ID>UnusedPrivateProperty:DownloadRepository.kt$DownloadRepository$private val downloadManager = DownloadService.getDownloadManager(context)</ID>
+    <ID>UnusedPrivateProperty:OptimizedBulkInsert.kt$OptimizedBulkInsert$private const val ROWS_PER_INSERT = 50 // Balance between statement size and performance</ID>
+    <ID>UseCheckOrError:ContentRepositoryImpl.kt$ContentRepositoryImpl$throw IllegalStateException("No active source configured")</ID>
+    <ID>Wrapping:DownloadTracker.kt$DownloadTracker.DownloadListener$(</ID>
+    <ID>Wrapping:PlayerActivity.kt$PlayerActivity$(</ID>
+  </CurrentIssues>
+</SmellBaseline>

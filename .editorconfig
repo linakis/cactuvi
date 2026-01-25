@@ -1,0 +1,63 @@
+# Root EditorConfig file
+root = true
+
+# All files
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# Kotlin files
+[*.{kt,kts}]
+# Code style (android_studio for Android projects)
+ktlint_code_style = android_studio
+
+# Indentation (4 spaces for Android)
+indent_size = 4
+indent_style = space
+continuation_indent_size = 4
+
+# Max line length
+max_line_length = 120
+
+# Trailing commas
+ij_kotlin_allow_trailing_comma = true
+ij_kotlin_allow_trailing_comma_on_call_site = true
+
+# Import ordering (Android convention)
+ij_kotlin_imports_layout = *,java.**,javax.**,kotlin.**,^
+ij_kotlin_packages_to_use_import_on_demand = unset
+ij_kotlin_name_count_to_use_star_import = 999
+ij_kotlin_name_count_to_use_star_import_for_members = 999
+
+# ktlint rules
+# Disable wildcard import rule for now (too many existing imports to fix)
+ktlint_standard_no-wildcard-imports = disabled
+ktlint_standard_trailing-comma-on-call-site = enabled
+ktlint_standard_trailing-comma-on-declaration-site = enabled
+ktlint_standard_import-ordering = enabled
+ktlint_standard_no-unused-imports = enabled
+ktlint_standard_final-newline = enabled
+ktlint_standard_indent = enabled
+ktlint_standard_max-line-length = enabled
+ktlint_standard_chain-method-continuation = enabled
+
+# Allow PascalCase for Composable functions (if using Compose in future)
+ktlint_function_naming_ignore_when_annotated_with = Composable
+
+# XML files (layouts)
+[*.xml]
+indent_size = 4
+indent_style = space
+
+# Gradle files
+[*.gradle,*.gradle.kts]
+indent_size = 4
+indent_style = space
+
+# JSON files
+[*.json]
+indent_size = 2
+indent_style = space
+
