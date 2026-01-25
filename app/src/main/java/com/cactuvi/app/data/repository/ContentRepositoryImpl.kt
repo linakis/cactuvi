@@ -332,7 +332,7 @@ private constructor(
 
                     try {
                         // Trigger legacy load (reuses existing implementation)
-                        loadMovies(forceRefresh = true)
+                        loadMovies(forceRefresh = false)
 
                         // Build navigation tree
                         val tree = getCachedVodNavigationTree()
@@ -424,7 +424,7 @@ private constructor(
                     }
 
                     try {
-                        loadSeries(forceRefresh = true)
+                        loadSeries(forceRefresh = false)
 
                         val tree = getCachedSeriesNavigationTree()
                         if (tree != null) {
@@ -517,7 +517,7 @@ private constructor(
 
                     try {
                         // Trigger legacy load (reuses existing implementation)
-                        loadLive(forceRefresh = true)
+                        loadLive(forceRefresh = false)
 
                         // Build navigation tree
                         val tree = getCachedLiveNavigationTree()
