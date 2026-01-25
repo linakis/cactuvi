@@ -11,9 +11,13 @@ import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
+import androidx.core.view.isVisible
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.DefaultItemAnimator
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -21,19 +25,19 @@ import com.bumptech.glide.Glide
 import com.google.android.material.appbar.CollapsingToolbarLayout
 import com.cactuvi.app.R
 import com.cactuvi.app.data.models.Episode
-import com.cactuvi.app.data.repository.ContentRepository
 import com.cactuvi.app.data.repository.DownloadRepository
 import com.cactuvi.app.ui.player.PlayerActivity
 import com.cactuvi.app.utils.CredentialsManager
-import com.cactuvi.app.utils.SourceManager
 import com.cactuvi.app.utils.StreamUrlBuilder
+import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
+@AndroidEntryPoint
 class SeriesDetailActivity : AppCompatActivity() {
     
-    private lateinit var repository: ContentRepository
+    private val viewModel: SeriesDetailViewModel by viewModels()
     private lateinit var downloadRepository: DownloadRepository
-    private lateinit var credentialsManager: CredentialsManager
     
     private lateinit var collapsingToolbar: CollapsingToolbarLayout
     private lateinit var toolbar: Toolbar
@@ -61,9 +65,7 @@ class SeriesDetailActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_series_detail)
         
-        // Initialize repositories
-        credentialsManager = CredentialsManager.getInstance(this)
-        repository = ContentRepository.getInstance(this)
+        // Initialize download repository
         downloadRepository = DownloadRepository(this)
         
         // Get data from intent
@@ -81,7 +83,7 @@ class SeriesDetailActivity : AppCompatActivity() {
         setupToolbar()
         setupRecyclerView()
         setupClickListeners()
-        loadSeriesDetails()
+        observeUiState()
     }
     
     private fun initViews() {
@@ -126,7 +128,7 @@ class SeriesDetailActivity : AppCompatActivity() {
     
     private fun setupClickListeners() {
         favoriteButton.setOnClickListener {
-            toggleFavorite()
+            viewModel.toggleFavorite()
         }
         
         downloadButton.setOnClickListener {
@@ -134,38 +136,33 @@ class SeriesDetailActivity : AppCompatActivity() {
         }
     }
     
-    private fun loadSeriesDetails() {
-        showLoading(true)
-        
+    private fun observeUiState() {
         lifecycleScope.launch {
-            try {
-                // Load series info from API
-                val result = repository.getSeriesInfo(seriesId)
-                
-                if (result.isSuccess) {
-                    val seriesInfo = result.getOrNull()
-                    seriesInfo?.let { displaySeriesInfo(it) }
-                } else {
-                    Toast.makeText(
-                        this@SeriesDetailActivity,
-                        "Failed to load series details",
-                        Toast.LENGTH_SHORT
-                    ).show()
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.uiState.collectLatest { state ->
+                    renderUiState(state)
                 }
-                
-                // Check if series is in favorites
-                checkFavoriteStatus()
-                
-            } catch (e: Exception) {
-                Toast.makeText(
-                    this@SeriesDetailActivity,
-                    "Error: ${e.message}",
-                    Toast.LENGTH_SHORT
-                ).show()
-            } finally {
-                showLoading(false)
             }
         }
+    }
+    
+    private fun renderUiState(state: SeriesDetailUiState) {
+        // Loading state
+        progressBar.isVisible = state.isLoading
+        infoContainer.isVisible = state.showContent
+        
+        // Error state
+        state.error?.let { errorMsg ->
+            Toast.makeText(this, errorMsg, Toast.LENGTH_SHORT).show()
+        }
+        
+        // Series info
+        state.seriesInfo?.let { seriesInfo ->
+            displaySeriesInfo(seriesInfo)
+        }
+        
+        // Favorite state
+        updateFavoriteButton(state.isFavorite)
     }
     
     private fun displaySeriesInfo(seriesInfo: com.cactuvi.app.data.models.SeriesInfo) {
@@ -236,15 +233,7 @@ class SeriesDetailActivity : AppCompatActivity() {
         }
     }
     
-    private suspend fun checkFavoriteStatus() {
-        val result = repository.isFavorite(seriesId.toString(), "series")
-        if (result.isSuccess) {
-            isFavorite = result.getOrNull() ?: false
-            updateFavoriteButton()
-        }
-    }
-    
-    private fun updateFavoriteButton() {
+    private fun updateFavoriteButton(isFavorite: Boolean) {
         if (isFavorite) {
             favoriteButton.setImageResource(R.drawable.ic_favorite)
             favoriteButton.setBackgroundResource(R.drawable.bg_icon_button_circular)
@@ -256,50 +245,8 @@ class SeriesDetailActivity : AppCompatActivity() {
         }
     }
     
-    private fun toggleFavorite() {
-        lifecycleScope.launch {
-            try {
-                if (isFavorite) {
-                    val result = repository.removeFromFavorites(seriesId.toString(), "series")
-                    if (result.isSuccess) {
-                        isFavorite = false
-                        updateFavoriteButton()
-                        Toast.makeText(
-                            this@SeriesDetailActivity,
-                            "Removed from My List",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                    }
-                } else {
-                    val result = repository.addToFavorites(
-                        contentId = seriesId.toString(),
-                        contentType = "series",
-                        contentName = seriesTitle,
-                        posterUrl = coverUrl,
-                        rating = metadataText.text.toString(),
-                        categoryName = ""
-                    )
-                    if (result.isSuccess) {
-                        isFavorite = true
-                        updateFavoriteButton()
-                        Toast.makeText(
-                            this@SeriesDetailActivity,
-                            "Added to My List",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                    }
-                }
-            } catch (e: Exception) {
-                Toast.makeText(
-                    this@SeriesDetailActivity,
-                    "Error: ${e.message}",
-                    Toast.LENGTH_SHORT
-                ).show()
-            }
-        }
-    }
-    
     private fun playEpisode(episode: Episode, seasonNumber: Int) {
+        val credentialsManager = CredentialsManager.getInstance(this)
         val server = credentialsManager.getServer()
         val username = credentialsManager.getUsername()
         val password = credentialsManager.getPassword()
@@ -325,11 +272,7 @@ class SeriesDetailActivity : AppCompatActivity() {
         startActivity(intent)
     }
     
-    private fun showLoading(show: Boolean) {
-        progressBar.visibility = if (show) View.VISIBLE else View.GONE
-        infoContainer.visibility = if (show) View.GONE else View.VISIBLE
-        // Don't hide episodesContainer here - it's managed in displaySeriesInfo()
-    }
+
     
     private fun showDownloadOptions() {
         val options = mutableListOf<String>()
@@ -444,6 +387,7 @@ class SeriesDetailActivity : AppCompatActivity() {
     }
     
     private suspend fun downloadEpisodeInternal(episode: Episode, seasonNumber: Int) {
+        val credentialsManager = CredentialsManager.getInstance(this)
         val server = credentialsManager.getServer()
         val username = credentialsManager.getUsername()
         val password = credentialsManager.getPassword()
