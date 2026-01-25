@@ -45,10 +45,7 @@ class PlayerActivity : AppCompatActivity() {
         playerView = findViewById(R.id.playerView)
         
         // Initialize repository
-        repository = ContentRepository(
-            SourceManager.getInstance(this),
-            this
-        )
+        repository = ContentRepository.getInstance(this)
         
         // Get data from intent
         streamUrl = intent.getStringExtra("STREAM_URL") ?: ""

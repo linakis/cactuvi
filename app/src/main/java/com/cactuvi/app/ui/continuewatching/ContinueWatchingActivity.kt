@@ -31,10 +31,7 @@ class ContinueWatchingActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_continue_watching)
         
-        repository = ContentRepository(
-            SourceManager.getInstance(this),
-            this
-        )
+        repository = ContentRepository.getInstance(this)
         
         setupToolbar()
         setupRecyclerView()

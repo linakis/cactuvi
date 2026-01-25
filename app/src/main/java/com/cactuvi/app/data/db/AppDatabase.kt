@@ -22,7 +22,7 @@ import com.cactuvi.app.data.db.entities.*
         CacheMetadataEntity::class,
         StreamSourceEntity::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

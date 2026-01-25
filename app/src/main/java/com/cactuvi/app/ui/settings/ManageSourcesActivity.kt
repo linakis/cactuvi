@@ -35,7 +35,7 @@ class ManageSourcesActivity : AppCompatActivity() {
         setContentView(R.layout.activity_manage_sources)
         
         sourceManager = SourceManager.getInstance(this)
-        repository = ContentRepository(sourceManager, this)
+        repository = ContentRepository.getInstance(this)
         
         setupToolbar()
         setupViews()

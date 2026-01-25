@@ -2,15 +2,23 @@ package com.cactuvi.app.ui.movies
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.paging.PagingData
+import androidx.paging.cachedIn
+import com.cactuvi.app.data.models.Movie
 import com.cactuvi.app.domain.model.Resource
+import com.cactuvi.app.domain.repository.ContentRepository
 import com.cactuvi.app.domain.usecase.ObserveMoviesUseCase
 import com.cactuvi.app.domain.usecase.RefreshMoviesUseCase
 import com.cactuvi.app.utils.CategoryGrouper
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -22,11 +30,29 @@ import javax.inject.Inject
 @HiltViewModel
 class MoviesViewModel @Inject constructor(
     private val observeMoviesUseCase: ObserveMoviesUseCase,
-    private val refreshMoviesUseCase: RefreshMoviesUseCase
+    private val refreshMoviesUseCase: RefreshMoviesUseCase,
+    private val contentRepository: ContentRepository
 ) : ViewModel() {
     
     private val _uiState = MutableStateFlow(MoviesUiState())
     val uiState: StateFlow<MoviesUiState> = _uiState.asStateFlow()
+    
+    /**
+     * Paged movies for the selected category.
+     * Automatically updates when selectedCategoryId changes.
+     */
+    val pagedMovies: StateFlow<PagingData<Movie>> = uiState
+        .flatMapLatest { state ->
+            state.selectedCategoryId?.let { categoryId ->
+                contentRepository.getMoviesPaged(categoryId)
+            } ?: flowOf(PagingData.empty())
+        }
+        .cachedIn(viewModelScope)
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Lazily,
+            initialValue = PagingData.empty()
+        )
     
     init {
         observeMovies()

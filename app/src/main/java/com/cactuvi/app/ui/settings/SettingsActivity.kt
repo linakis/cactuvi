@@ -38,10 +38,7 @@ class SettingsActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_settings)
         
-        repository = ContentRepository(
-            SourceManager.getInstance(this),
-            this
-        )
+        repository = ContentRepository.getInstance(this)
         syncPrefs = SyncPreferencesManager.getInstance(this)
         prefsManager = PreferencesManager.getInstance(this)
         

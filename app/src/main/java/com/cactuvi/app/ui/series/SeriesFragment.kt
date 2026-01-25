@@ -21,8 +21,8 @@ import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
 import com.cactuvi.app.R
+import com.cactuvi.app.data.models.Category
 import com.cactuvi.app.data.models.Series
-import com.cactuvi.app.data.repository.ContentRepository
 import com.cactuvi.app.ui.common.CategoryTreeAdapter
 import com.cactuvi.app.ui.common.GroupAdapter
 import com.cactuvi.app.ui.common.ModernToolbar
@@ -40,9 +40,6 @@ import javax.inject.Inject
 class SeriesFragment : Fragment() {
     
     private val viewModel: SeriesViewModel by viewModels()
-    
-    @Inject
-    lateinit var repository: com.cactuvi.app.domain.repository.ContentRepository
     
     @Inject
     lateinit var database: com.cactuvi.app.data.db.AppDatabase
@@ -88,6 +85,7 @@ class SeriesFragment : Fragment() {
         
         // Observe ViewModel state
         observeUiState()
+        observePagedSeries()
     }
     
     private fun setupToolbar() {
@@ -145,6 +143,16 @@ class SeriesFragment : Fragment() {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.uiState.collectLatest { state ->
                     renderUiState(state)
+                }
+            }
+        }
+    }
+    
+    private fun observePagedSeries() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.pagedSeries.collectLatest { pagingData ->
+                    contentAdapter.submitData(pagingData)
                 }
             }
         }
@@ -217,14 +225,7 @@ class SeriesFragment : Fragment() {
     private fun showContentView(categoryId: String) {
         recyclerView.layoutManager = GridLayoutManager(requireContext(), 3)
         recyclerView.adapter = contentAdapter
-        
-        // Load paged series for this category
-        lifecycleScope.launch {
-            repository.getSeriesPaged(categoryId = categoryId)
-                .collectLatest { pagingData ->
-                    contentAdapter.submitData(pagingData)
-                }
-        }
+        // Paged data is automatically loaded via observePagedSeries()
     }
     
     private fun updateBreadcrumb(state: SeriesUiState) {

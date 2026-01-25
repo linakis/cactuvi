@@ -51,10 +51,7 @@ class MyListFragment : Fragment() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         contentType = arguments?.getString(ARG_CONTENT_TYPE)
-        repository = ContentRepository(
-            SourceManager.getInstance(requireContext()),
-            requireContext()
-        )
+        repository = ContentRepository.getInstance(requireContext())
     }
     
     override fun onCreateView(

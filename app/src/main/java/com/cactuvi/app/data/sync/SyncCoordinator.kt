@@ -25,10 +25,7 @@ import kotlinx.coroutines.coroutineScope
  */
 class SyncCoordinator(context: Context) {
     
-    private val repository = ContentRepository(
-        SourceManager.getInstance(context),
-        context
-    )
+    private val repository = ContentRepository.getInstance(context)
     private val database = AppDatabase.getInstance(context)
     private val syncPrefs = SyncPreferencesManager.getInstance(context)
     private val reactiveUpdateManager = ReactiveUpdateManager.getInstance()

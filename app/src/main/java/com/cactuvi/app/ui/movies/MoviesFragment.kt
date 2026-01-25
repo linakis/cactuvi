@@ -23,7 +23,6 @@ import com.google.android.material.chip.ChipGroup
 import com.cactuvi.app.R
 import com.cactuvi.app.data.models.Category
 import com.cactuvi.app.data.models.Movie
-import com.cactuvi.app.data.repository.ContentRepository
 import com.cactuvi.app.ui.common.CategoryTreeAdapter
 import com.cactuvi.app.ui.common.GroupAdapter
 import com.cactuvi.app.ui.common.ModernToolbar
@@ -41,9 +40,6 @@ import javax.inject.Inject
 class MoviesFragment : Fragment() {
     
     private val viewModel: MoviesViewModel by viewModels()
-    
-    @Inject
-    lateinit var repository: com.cactuvi.app.domain.repository.ContentRepository
     
     @Inject
     lateinit var database: com.cactuvi.app.data.db.AppDatabase
@@ -89,6 +85,7 @@ class MoviesFragment : Fragment() {
         
         // Observe ViewModel state
         observeUiState()
+        observePagedMovies()
     }
     
     private fun setupToolbar() {
@@ -146,6 +143,16 @@ class MoviesFragment : Fragment() {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.uiState.collectLatest { state ->
                     renderUiState(state)
+                }
+            }
+        }
+    }
+    
+    private fun observePagedMovies() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.pagedMovies.collectLatest { pagingData ->
+                    contentAdapter.submitData(pagingData)
                 }
             }
         }
@@ -218,14 +225,7 @@ class MoviesFragment : Fragment() {
     private fun showContentView(categoryId: String) {
         recyclerView.layoutManager = GridLayoutManager(requireContext(), 3)
         recyclerView.adapter = contentAdapter
-        
-        // Load paged movies for this category
-        lifecycleScope.launch {
-            repository.getMoviesPaged(categoryId = categoryId)
-                .collectLatest { pagingData ->
-                    contentAdapter.submitData(pagingData)
-                }
-        }
+        // Paged data is automatically loaded via observePagedMovies()
     }
     
     private fun updateBreadcrumb(state: MoviesUiState) {

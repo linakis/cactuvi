@@ -49,5 +49,11 @@ data class CacheMetadataEntity(
     /**
      * Error message from last failed sync (null if no error)
      */
-    val lastSyncError: String? = null
+    val lastSyncError: String? = null,
+    
+    /**
+     * Current load status for async write tracking: "IDLE", "LOADING", "SUCCESS", "PARTIAL", "ERROR"
+     * Used to track foreground data loads and enable cache merge on retry.
+     */
+    val loadStatus: String = "IDLE"
 )

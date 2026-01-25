@@ -60,7 +60,7 @@ class MovieDetailActivity : AppCompatActivity() {
         
         // Initialize repositories
         credentialsManager = CredentialsManager.getInstance(this)
-        repository = ContentRepository(SourceManager.getInstance(this), this)
+        repository = ContentRepository.getInstance(this)
         downloadRepository = DownloadRepository(this)
         
         // Get data from intent

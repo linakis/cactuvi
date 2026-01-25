@@ -21,8 +21,8 @@ import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
 import com.cactuvi.app.R
+import com.cactuvi.app.data.models.Category
 import com.cactuvi.app.data.models.LiveChannel
-import com.cactuvi.app.data.repository.ContentRepository
 import com.cactuvi.app.ui.common.CategoryTreeAdapter
 import com.cactuvi.app.ui.common.LiveChannelPagingAdapter
 import com.cactuvi.app.ui.common.ModernToolbar
@@ -37,9 +37,6 @@ import javax.inject.Inject
 class LiveTvFragment : Fragment() {
     
     private val viewModel: LiveTvViewModel by viewModels()
-    
-    @Inject
-    lateinit var repository: com.cactuvi.app.domain.repository.ContentRepository
     
     @Inject
     lateinit var database: com.cactuvi.app.data.db.AppDatabase
@@ -84,6 +81,7 @@ class LiveTvFragment : Fragment() {
         
         // Observe ViewModel state
         observeUiState()
+        observePagedChannels()
     }
     
     private fun setupToolbar() {
@@ -142,6 +140,16 @@ class LiveTvFragment : Fragment() {
         }
     }
     
+    private fun observePagedChannels() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.pagedChannels.collectLatest { pagingData ->
+                    contentAdapter.submitData(pagingData)
+                }
+            }
+        }
+    }
+    
     /**
      * Render UI based on current state.
      * Pure UI rendering - no business logic.
@@ -190,14 +198,7 @@ class LiveTvFragment : Fragment() {
     private fun showChannelsView(categoryId: String) {
         recyclerView.layoutManager = GridLayoutManager(requireContext(), 3)
         recyclerView.adapter = contentAdapter
-        
-        // Load paged channels for this category
-        lifecycleScope.launch {
-            repository.getLiveStreamsPaged(categoryId = categoryId)
-                .collectLatest { pagingData ->
-                    contentAdapter.submitData(pagingData)
-                }
-        }
+        // Paged data is automatically loaded via observePagedChannels()
     }
     
     private fun updateBreadcrumb(state: LiveTvUiState) {

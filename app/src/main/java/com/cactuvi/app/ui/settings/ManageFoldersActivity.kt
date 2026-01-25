@@ -56,10 +56,7 @@ class ManageFoldersActivity : AppCompatActivity() {
         
         contentType = ContentFilterSettings.ContentType.valueOf(contentTypeString)
         
-        repository = ContentRepository(
-            SourceManager.getInstance(this),
-            this
-        )
+        repository = ContentRepository.getInstance(this)
         preferencesManager = PreferencesManager.getInstance(this)
         
         setupToolbar()

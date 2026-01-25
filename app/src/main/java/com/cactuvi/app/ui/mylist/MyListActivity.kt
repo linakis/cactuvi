@@ -29,10 +29,7 @@ class MyListActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_my_list)
         
-        repository = ContentRepository(
-            SourceManager.getInstance(this),
-            this
-        )
+        repository = ContentRepository.getInstance(this)
         
         setupToolbar()
         setupViewPager()
