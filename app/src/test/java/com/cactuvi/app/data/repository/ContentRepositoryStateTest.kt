@@ -22,7 +22,7 @@ class ContentRepositoryStateTest {
      */
     @Test
     fun `DataState Loading state is correctly identified`() {
-        val state: DataState<Unit> = DataState.Loading
+        val state: DataState<Unit> = DataState.Loading()
         
         assertTrue(state.isLoading())
         assertFalse(state.isSuccess())
@@ -79,7 +79,7 @@ class ContentRepositoryStateTest {
     
     @Test
     fun `DataState Loading returns null`() {
-        val state: DataState<String> = DataState.Loading
+        val state: DataState<String> = DataState.Loading()
         
         assertNull(state.getDataOrNull())
     }
@@ -137,7 +137,7 @@ class ContentRepositoryStateTest {
     
     @Test
     fun `State transition Loading to Success`() = runTest {
-        var state: DataState<Unit> = DataState.Loading
+        var state: DataState<Unit> = DataState.Loading()
         assertTrue(state.isLoading())
         
         // Simulate successful load
@@ -148,7 +148,7 @@ class ContentRepositoryStateTest {
     
     @Test
     fun `State transition Loading to Error without cache`() = runTest {
-        var state: DataState<Unit> = DataState.Loading
+        var state: DataState<Unit> = DataState.Loading()
         assertTrue(state.isLoading())
         
         // Simulate failed load without cache
@@ -162,7 +162,7 @@ class ContentRepositoryStateTest {
     
     @Test
     fun `State transition Loading to Error with cache`() = runTest {
-        var state: DataState<Unit> = DataState.Loading
+        var state: DataState<Unit> = DataState.Loading()
         assertTrue(state.isLoading())
         
         // Simulate failed load but cache exists
@@ -191,7 +191,7 @@ class ContentRepositoryStateTest {
         assertFalse("Initial state should not be loading", isLoadingBeforeFirstCall)
         
         // First call proceeds, sets Loading
-        state = DataState.Loading
+        state = DataState.Loading()
         
         // Simulate second concurrent call
         val isLoadingBeforeSecondCall = state.isLoading()
@@ -263,7 +263,7 @@ class ContentRepositoryStateTest {
         
         if (!hasCachedData) {
             // Should proceed to API fetch
-            val state: DataState<Unit> = DataState.Loading
+            val state: DataState<Unit> = DataState.Loading()
             assertTrue("Should emit Loading for API call", state.isLoading())
         }
     }
