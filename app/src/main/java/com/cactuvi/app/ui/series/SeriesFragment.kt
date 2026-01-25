@@ -35,6 +35,8 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import com.cactuvi.app.ui.common.ContentUiState
+import com.cactuvi.app.ui.common.NavigationLevel
 
 @AndroidEntryPoint
 class SeriesFragment : Fragment() {
@@ -151,7 +153,7 @@ class SeriesFragment : Fragment() {
     private fun observePagedSeries() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                viewModel.pagedSeries.collectLatest { pagingData ->
+                viewModel.pagedContent.collectLatest { pagingData ->
                     contentAdapter.submitData(pagingData)
                 }
             }
@@ -162,7 +164,7 @@ class SeriesFragment : Fragment() {
      * Render UI based on current state.
      * Pure UI rendering - no business logic.
      */
-    private fun renderUiState(state: SeriesUiState) {
+    private fun renderUiState(state: ContentUiState) {
         // Update loading/error visibility
         progressBar.isVisible = state.showLoading
         errorText.isVisible = state.showError
@@ -228,7 +230,7 @@ class SeriesFragment : Fragment() {
         // Paged data is automatically loaded via observePagedSeries()
     }
     
-    private fun updateBreadcrumb(state: SeriesUiState) {
+    private fun updateBreadcrumb(state: ContentUiState) {
         when (state.currentLevel) {
             NavigationLevel.GROUPS -> {
                 breadcrumbScroll.visibility = View.GONE

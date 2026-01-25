@@ -447,40 +447,64 @@ class ContentRepositoryImpl private constructor(
     /**
      * Observe live categories reactively.
      */
-    override fun observeLive(): Flow<com.cactuvi.app.domain.model.Resource<List<Category>>> =
+    override fun observeLive(): Flow<com.cactuvi.app.domain.model.Resource<com.cactuvi.app.domain.model.NavigationTree>> =
         liveRefreshTrigger
-            .onStart { emit(Unit) }
+            .onStart { emit(Unit) }  // Auto-trigger on subscribe
             .flatMapLatest {
                 flow {
                     // Emit loading with cached data
-                    val cachedResult = getLiveCategories(forceRefresh = false)
-                    if (cachedResult.isSuccess) {
-                        val categories = cachedResult.getOrNull() ?: emptyList()
-                        emit(com.cactuvi.app.domain.model.Resource.Loading(data = categories))
+                    val cached = getCachedLiveNavigationTree()
+                    if (cached != null) {
+                        emit(com.cactuvi.app.domain.model.Resource.Loading(
+                            data = com.cactuvi.app.domain.model.NavigationTree(
+                                groups = cached.groups.map { group ->
+                                    com.cactuvi.app.domain.model.GroupNode(
+                                        name = group.name,
+                                        categories = group.categories.map { it.toDomain() }
+                                    )
+                                }
+                            )
+                        ))
                     } else {
                         emit(com.cactuvi.app.domain.model.Resource.Loading())
                     }
                     
                     try {
+                        // Trigger legacy load (reuses existing implementation)
                         loadLive(forceRefresh = true)
                         
-                        val result = getLiveCategories(forceRefresh = false)
-                        if (result.isSuccess) {
+                        // Build navigation tree
+                        val tree = getCachedLiveNavigationTree()
+                        if (tree != null) {
                             emit(com.cactuvi.app.domain.model.Resource.Success(
-                                data = result.getOrNull() ?: emptyList(),
+                                data = com.cactuvi.app.domain.model.NavigationTree(
+                                    groups = tree.groups.map { group ->
+                                        com.cactuvi.app.domain.model.GroupNode(
+                                            name = group.name,
+                                            categories = group.categories.map { it.toDomain() }
+                                        )
+                                    }
+                                ),
                                 source = com.cactuvi.app.domain.model.DataSource.NETWORK
                             ))
                         } else {
                             emit(com.cactuvi.app.domain.model.Resource.Error(
-                                error = result.exceptionOrNull() ?: Exception("Unknown error")
+                                error = Exception("Failed to build navigation tree")
                             ))
                         }
                     } catch (e: Exception) {
-                        val cachedResult = getLiveCategories(forceRefresh = false)
-                        if (cachedResult.isSuccess) {
+                        val cachedTree = getCachedLiveNavigationTree()
+                        if (cachedTree != null) {
                             emit(com.cactuvi.app.domain.model.Resource.Error(
                                 error = e,
-                                data = cachedResult.getOrNull() ?: emptyList()
+                                data = com.cactuvi.app.domain.model.NavigationTree(
+                                    groups = cachedTree.groups.map { group ->
+                                        com.cactuvi.app.domain.model.GroupNode(
+                                            name = group.name,
+                                            categories = group.categories.map { it.toDomain() }
+                                        )
+                                    }
+                                )
                             ))
                         } else {
                             emit(com.cactuvi.app.domain.model.Resource.Error(error = e))

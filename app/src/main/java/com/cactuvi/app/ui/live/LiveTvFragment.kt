@@ -21,11 +21,14 @@ import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
 import com.cactuvi.app.R
-import com.cactuvi.app.data.models.Category
 import com.cactuvi.app.data.models.LiveChannel
 import com.cactuvi.app.ui.common.CategoryTreeAdapter
+import com.cactuvi.app.ui.common.ContentUiState
+import com.cactuvi.app.ui.common.GroupAdapter
 import com.cactuvi.app.ui.common.LiveChannelPagingAdapter
 import com.cactuvi.app.ui.common.ModernToolbar
+import com.cactuvi.app.ui.common.NavigationLevel
+import com.cactuvi.app.utils.CategoryGrouper.GroupNode
 import com.cactuvi.app.utils.IdleDetectionHelper
 import com.cactuvi.app.utils.SourceManager
 import dagger.hilt.android.AndroidEntryPoint
@@ -51,6 +54,7 @@ class LiveTvFragment : Fragment() {
     private lateinit var breadcrumbChips: ChipGroup
     
     // Adapters
+    private lateinit var groupAdapter: GroupAdapter
     private lateinit var categoryAdapter: CategoryTreeAdapter
     private val contentAdapter: LiveChannelPagingAdapter by lazy {
         LiveChannelPagingAdapter { channel -> playChannel(channel) }
@@ -113,15 +117,18 @@ class LiveTvFragment : Fragment() {
     
     private fun setupRecyclerView() {
         // Initialize adapters
+        groupAdapter = GroupAdapter { group ->
+            viewModel.selectGroup(group.name)
+        }
         categoryAdapter = CategoryTreeAdapter { category ->
             viewModel.selectCategory(category.categoryId)
         }
         
         // contentAdapter is already initialized as lazy property
         
-        // Start with categories (linear layout)
+        // Start with groups (linear layout)
         recyclerView.layoutManager = LinearLayoutManager(requireContext())
-        recyclerView.adapter = categoryAdapter
+        recyclerView.adapter = groupAdapter
         
         // Attach idle detection
         IdleDetectionHelper.attach(recyclerView)
@@ -143,7 +150,7 @@ class LiveTvFragment : Fragment() {
     private fun observePagedChannels() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                viewModel.pagedChannels.collectLatest { pagingData ->
+                viewModel.pagedContent.collectLatest { pagingData ->
                     contentAdapter.submitData(pagingData)
                 }
             }
@@ -154,7 +161,7 @@ class LiveTvFragment : Fragment() {
      * Render UI based on current state.
      * Pure UI rendering - no business logic.
      */
-    private fun renderUiState(state: LiveTvUiState) {
+    private fun renderUiState(state: ContentUiState) {
         // Update loading/error visibility
         progressBar.isVisible = state.showLoading
         errorText.isVisible = state.showError
@@ -168,26 +175,42 @@ class LiveTvFragment : Fragment() {
             return
         }
         
-        // Render content based on whether category is selected
-        if (state.isViewingCategory) {
-            state.selectedCategoryId?.let { categoryId ->
-                showChannelsView(categoryId)
+        // Render content based on navigation level
+        when (state.currentLevel) {
+            NavigationLevel.GROUPS -> {
+                showGroupsView(state.navigationTree)
             }
-        } else {
-            showCategoriesView(state.categories)
+            NavigationLevel.CATEGORIES -> {
+                state.selectedGroup?.let { group ->
+                    showCategoriesView(group)
+                }
+            }
+            NavigationLevel.CONTENT -> {
+                state.selectedCategoryId?.let { categoryId ->
+                    showChannelsView(categoryId)
+                }
+            }
         }
         
         // Update breadcrumb
         updateBreadcrumb(state)
     }
     
-    private fun showCategoriesView(categories: List<com.cactuvi.app.data.models.Category>) {
+    private fun showGroupsView(navigationTree: com.cactuvi.app.utils.CategoryGrouper.NavigationTree?) {
+        recyclerView.layoutManager = LinearLayoutManager(requireContext())
+        recyclerView.adapter = groupAdapter
+        
+        val groups = navigationTree?.groups ?: emptyList()
+        groupAdapter.updateGroups(groups)
+    }
+    
+    private fun showCategoriesView(group: GroupNode) {
         recyclerView.layoutManager = LinearLayoutManager(requireContext())
         recyclerView.adapter = categoryAdapter
         
         // Get counts from DB
         lifecycleScope.launch {
-            val categoriesWithCounts = categories.map { category ->
+            val categoriesWithCounts = group.categories.map { category ->
                 val count = database.liveChannelDao().getCountByCategory(category.categoryId)
                 Pair(category, count)
             }
@@ -201,14 +224,24 @@ class LiveTvFragment : Fragment() {
         // Paged data is automatically loaded via observePagedChannels()
     }
     
-    private fun updateBreadcrumb(state: LiveTvUiState) {
-        if (state.isViewingCategory) {
-            breadcrumbScroll.visibility = View.VISIBLE
-            breadcrumbChips.removeAllViews()
-            addBreadcrumbChip(state.selectedCategory?.categoryName ?: "")
-        } else {
-            breadcrumbScroll.visibility = View.GONE
-            breadcrumbChips.removeAllViews()
+    private fun updateBreadcrumb(state: ContentUiState) {
+        when (state.currentLevel) {
+            NavigationLevel.GROUPS -> {
+                breadcrumbScroll.visibility = View.GONE
+                breadcrumbChips.removeAllViews()
+            }
+            NavigationLevel.CATEGORIES -> {
+                breadcrumbScroll.visibility = View.VISIBLE
+                breadcrumbChips.removeAllViews()
+                addBreadcrumbChip(state.selectedGroupName ?: "")
+            }
+            NavigationLevel.CONTENT -> {
+                breadcrumbScroll.visibility = View.VISIBLE
+                breadcrumbChips.removeAllViews()
+                state.breadcrumbPath.forEach { crumb ->
+                    addBreadcrumbChip(crumb)
+                }
+            }
         }
     }
     

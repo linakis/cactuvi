@@ -27,6 +27,8 @@ import com.cactuvi.app.ui.common.CategoryTreeAdapter
 import com.cactuvi.app.ui.common.GroupAdapter
 import com.cactuvi.app.ui.common.ModernToolbar
 import com.cactuvi.app.ui.common.MoviePagingAdapter
+import com.cactuvi.app.ui.common.ContentUiState
+import com.cactuvi.app.ui.common.NavigationLevel
 import com.cactuvi.app.utils.CategoryGrouper.GroupNode
 import com.cactuvi.app.utils.IdleDetectionHelper
 import com.cactuvi.app.utils.PerformanceLogger
@@ -151,7 +153,7 @@ class MoviesFragment : Fragment() {
     private fun observePagedMovies() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                viewModel.pagedMovies.collectLatest { pagingData ->
+                viewModel.pagedContent.collectLatest { pagingData ->
                     contentAdapter.submitData(pagingData)
                 }
             }
@@ -162,7 +164,7 @@ class MoviesFragment : Fragment() {
      * Render UI based on current state.
      * Pure UI rendering - no business logic.
      */
-    private fun renderUiState(state: MoviesUiState) {
+    private fun renderUiState(state: ContentUiState) {
         // Update loading/error visibility
         progressBar.isVisible = state.showLoading
         errorText.isVisible = state.showError
@@ -228,7 +230,7 @@ class MoviesFragment : Fragment() {
         // Paged data is automatically loaded via observePagedMovies()
     }
     
-    private fun updateBreadcrumb(state: MoviesUiState) {
+    private fun updateBreadcrumb(state: ContentUiState) {
         when (state.currentLevel) {
             NavigationLevel.GROUPS -> {
                 breadcrumbScroll.visibility = View.GONE

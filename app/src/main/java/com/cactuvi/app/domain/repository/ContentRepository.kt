@@ -32,7 +32,7 @@ interface ContentRepository {
     suspend fun refreshSeries()
     
     // Live
-    fun observeLive(): Flow<Resource<List<Category>>>
+    fun observeLive(): Flow<Resource<NavigationTree>>
     suspend fun refreshLive()
     
     // Paging methods (temporary - will be removed after full migration)

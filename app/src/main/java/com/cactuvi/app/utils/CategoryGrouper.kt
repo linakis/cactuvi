@@ -17,6 +17,42 @@ object CategoryGrouper {
         fun findGroup(groupName: String): GroupNode? {
             return groups.find { it.name == groupName }
         }
+        
+        /**
+         * Check if navigation should skip groups level (only 1 group exists)
+         */
+        val shouldSkipGroups: Boolean
+            get() = groups.size == 1
+        
+        /**
+         * Check if navigation should skip categories level within a group
+         * (only 1 category in the group)
+         */
+        fun shouldSkipCategories(groupName: String): Boolean {
+            val group = findGroup(groupName) ?: return false
+            return group.categories.size == 1
+        }
+        
+        /**
+         * Check if navigation should skip both groups and categories levels
+         * (only 1 group with only 1 category)
+         */
+        val shouldSkipBothLevels: Boolean
+            get() = groups.size == 1 && groups.firstOrNull()?.categories?.size == 1
+        
+        /**
+         * Get the single group if only one exists, null otherwise
+         */
+        val singleGroup: GroupNode?
+            get() = if (groups.size == 1) groups.first() else null
+        
+        /**
+         * Get the single category from a group if only one exists, null otherwise
+         */
+        fun getSingleCategory(groupName: String): Category? {
+            val group = findGroup(groupName) ?: return null
+            return if (group.categories.size == 1) group.categories.first() else null
+        }
     }
     
     data class GroupNode(
