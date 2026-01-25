@@ -42,7 +42,7 @@ class SeriesFragment : Fragment() {
     private val viewModel: SeriesViewModel by viewModels()
     
     @Inject
-    lateinit var repository: ContentRepository
+    lateinit var repository: com.cactuvi.app.domain.repository.ContentRepository
     
     @Inject
     lateinit var database: com.cactuvi.app.data.db.AppDatabase

@@ -2029,7 +2029,7 @@ class ContentRepositoryImpl private constructor(
     
     // ========== PAGING METHODS ==========
     
-    fun getLiveStreamsPaged(categoryId: String? = null): Flow<PagingData<LiveChannel>> {
+    override fun getLiveStreamsPaged(categoryId: String?): Flow<PagingData<LiveChannel>> {
         val pagingSourceFactory = {
             if (categoryId != null) {
                 database.liveChannelDao().getByCategoryIdPaged(categoryId)
@@ -2050,7 +2050,7 @@ class ContentRepositoryImpl private constructor(
         }
     }
     
-    fun getMoviesPaged(categoryId: String? = null): Flow<PagingData<Movie>> {
+    override fun getMoviesPaged(categoryId: String?): Flow<PagingData<Movie>> {
         val pagingSourceFactory = {
             if (categoryId != null) {
                 database.movieDao().getByCategoryIdPaged(categoryId)
@@ -2071,7 +2071,7 @@ class ContentRepositoryImpl private constructor(
         }
     }
     
-    fun getSeriesPaged(categoryId: String? = null): Flow<PagingData<Series>> {
+    override fun getSeriesPaged(categoryId: String?): Flow<PagingData<Series>> {
         val pagingSourceFactory = {
             if (categoryId != null) {
                 database.seriesDao().getByCategoryIdPaged(categoryId)
