@@ -13,6 +13,7 @@ import com.google.gson.reflect.TypeToken
 import com.cactuvi.app.data.db.entities.*
 import com.cactuvi.app.data.db.mappers.*
 import com.cactuvi.app.data.models.*
+import com.cactuvi.app.data.mappers.toDomain
 import com.cactuvi.app.utils.CategoryGrouper
 import com.cactuvi.app.utils.PreferencesManager
 import com.cactuvi.app.utils.SourceManager
@@ -21,6 +22,7 @@ import com.cactuvi.app.utils.VPNDetector
 import com.cactuvi.app.utils.StreamingJsonParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -30,13 +32,21 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.map as flowMap
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlin.time.Duration.Companion.minutes
+
+// Type alias for backward compatibility with existing code
+typealias ContentRepository = ContentRepositoryImpl
 
 /**
  * ContentRepository - Data layer for IPTV content
@@ -129,6 +139,18 @@ sealed class SeriesEffect {
     ) : SeriesEffect()
     
     /**
+     * Load partially succeeded - some batches written, some failed.
+     * @param successCount Number of items successfully written
+     * @param failedCount Number of items that failed to write
+     * @param message Error message from failures
+     */
+    data class LoadPartialSuccess(
+        val successCount: Int,
+        val failedCount: Int,
+        val message: String
+    ) : SeriesEffect()
+    
+    /**
      * Load failed.
      * @param message Error message
      * @param hasCachedData True if cached data is available
@@ -152,6 +174,18 @@ sealed class MoviesEffect {
         val fromCache: Boolean = false
     ) : MoviesEffect()
     
+    /**
+     * Load partially succeeded - some batches written, some failed.
+     * @param successCount Number of items successfully written
+     * @param failedCount Number of items that failed to write
+     * @param message Error message from failures
+     */
+    data class LoadPartialSuccess(
+        val successCount: Int,
+        val failedCount: Int,
+        val message: String
+    ) : MoviesEffect()
+    
     data class LoadError(
         val message: String,
         val hasCachedData: Boolean,
@@ -170,6 +204,18 @@ sealed class LiveEffect {
         val fromCache: Boolean = false
     ) : LiveEffect()
     
+    /**
+     * Load partially succeeded - some batches written, some failed.
+     * @param successCount Number of items successfully written
+     * @param failedCount Number of items that failed to write
+     * @param message Error message from failures
+     */
+    data class LoadPartialSuccess(
+        val successCount: Int,
+        val failedCount: Int,
+        val message: String
+    ) : LiveEffect()
+    
     data class LoadError(
         val message: String,
         val hasCachedData: Boolean,
@@ -177,16 +223,49 @@ sealed class LiveEffect {
     ) : LiveEffect()
 }
 
-class ContentRepository(
-    private val sourceManager: SourceManager,
+class ContentRepositoryImpl private constructor(
     private val context: Context
-) {
+) : com.cactuvi.app.domain.repository.ContentRepository {
     
+    private val sourceManager = SourceManager.getInstance(context)
     private var apiService: XtreamApiService? = null
     private val database = AppDatabase.getInstance(context)
     private val dbWriter = database.getDbWriter()
     private val gson = Gson()
     private var currentSourceId: String? = null
+    
+    companion object {
+        @Volatile
+        private var INSTANCE: ContentRepositoryImpl? = null
+        
+        fun getInstance(context: Context): ContentRepositoryImpl {
+            return INSTANCE ?: synchronized(this) {
+                INSTANCE ?: ContentRepositoryImpl(context.applicationContext).also { INSTANCE = it }
+            }
+        }
+        
+        // Cache Time-To-Live (TTL) in milliseconds
+        // NOTE: TTL only used for fallback safety check (7 days) - background sync handles freshness
+        private const val CACHE_TTL_FALLBACK = 7 * 24 * 60 * 60 * 1000L  // 7 days
+        private const val CACHE_TTL_CATEGORIES = 7 * 24 * 60 * 60 * 1000L  // 7 days
+        
+        // Batch size for bulk inserts - optimized for performance
+        // Phase 1: 500 (initial)
+        // Phase 2: 999 (reduced transactions, stayed under SQLite variable limit)
+        // Phase 3: 2500 (optimal transaction size per expert recommendations: 2k-5k)
+        // Note: Multi-value INSERT uses 50-item chunks internally (unaffected by this)
+        // This controls transaction boundaries and context switching frequency
+        private const val BATCH_SIZE = 2500
+        
+        // TODO: Future optimization - implement parallel batch writes
+        // With WAL mode enabled, SQLite supports concurrent writes from multiple threads
+        // Could potentially achieve 2-3x speedup by processing batches in parallel queue
+        // Implementation considerations:
+        // - Use semaphore to limit concurrent writes (e.g., 3-4 concurrent batches)
+        // - Monitor for database lock contention
+        // - Test on low-end devices to ensure no memory pressure
+        // - Example approach: coroutineScope { batches.chunked(3).map { async { insert(it) } }.awaitAll() }
+    }
     
     // ========== REACTIVE STATE MANAGEMENT ==========
     
@@ -225,29 +304,209 @@ class ContentRepository(
     private val seriesMutex = Mutex()
     private val liveMutex = Mutex()
     
-    companion object {
-        // Cache Time-To-Live (TTL) in milliseconds
-        // NOTE: TTL only used for fallback safety check (7 days) - background sync handles freshness
-        private const val CACHE_TTL_FALLBACK = 7 * 24 * 60 * 60 * 1000L  // 7 days
-        private const val CACHE_TTL_CATEGORIES = 7 * 24 * 60 * 60 * 1000L  // 7 days
-        
-        // Batch size for bulk inserts - optimized for performance
-        // Phase 1: 500 (initial)
-        // Phase 2: 999 (reduced transactions, stayed under SQLite variable limit)
-        // Phase 3: 2500 (optimal transaction size per expert recommendations: 2k-5k)
-        // Note: Multi-value INSERT uses 50-item chunks internally (unaffected by this)
-        // This controls transaction boundaries and context switching frequency
-        private const val BATCH_SIZE = 2500
-        
-        // TODO: Future optimization - implement parallel batch writes
-        // With WAL mode enabled, SQLite supports concurrent writes from multiple threads
-        // Could potentially achieve 2-3x speedup by processing batches in parallel queue
-        // Implementation considerations:
-        // - Use semaphore to limit concurrent writes (e.g., 3-4 concurrent batches)
-        // - Monitor for database lock contention
-        // - Test on low-end devices to ensure no memory pressure
-        // - Example approach: coroutineScope { batches.chunked(3).map { async { insert(it) } }.awaitAll() }
+    // ========== NEW REACTIVE API (Domain Layer Interface) ==========
+    
+    private val movieRefreshTrigger = MutableSharedFlow<Unit>(replay = 1)
+    private val seriesRefreshTrigger = MutableSharedFlow<Unit>(replay = 1)
+    private val liveRefreshTrigger = MutableSharedFlow<Unit>(replay = 1)
+    
+    /**
+     * Observe movies navigation tree reactively.
+     * Automatically fetches on first subscription, then responds to manual refreshes.
+     */
+    override fun observeMovies(): Flow<com.cactuvi.app.domain.model.Resource<com.cactuvi.app.domain.model.NavigationTree>> =
+        movieRefreshTrigger
+            .onStart { emit(Unit) }  // Auto-trigger on subscribe
+            .flatMapLatest {
+                flow {
+                    // Emit loading with cached data
+                    val cached = getCachedVodNavigationTree()
+                    if (cached != null) {
+                        emit(com.cactuvi.app.domain.model.Resource.Loading(
+                            data = com.cactuvi.app.domain.model.NavigationTree(
+                                groups = cached.groups.map { group ->
+                                    com.cactuvi.app.domain.model.GroupNode(
+                                        name = group.name,
+                                        categories = group.categories.map { it.toDomain() }
+                                    )
+                                }
+                            )
+                        ))
+                    } else {
+                        emit(com.cactuvi.app.domain.model.Resource.Loading())
+                    }
+                    
+                    try {
+                        // Trigger legacy load (reuses existing implementation)
+                        loadMovies(forceRefresh = true)
+                        
+                        // Build navigation tree
+                        val tree = getCachedVodNavigationTree()
+                        if (tree != null) {
+                            emit(com.cactuvi.app.domain.model.Resource.Success(
+                                data = com.cactuvi.app.domain.model.NavigationTree(
+                                    groups = tree.groups.map { group ->
+                                        com.cactuvi.app.domain.model.GroupNode(
+                                            name = group.name,
+                                            categories = group.categories.map { it.toDomain() }
+                                        )
+                                    }
+                                ),
+                                source = com.cactuvi.app.domain.model.DataSource.NETWORK
+                            ))
+                        } else {
+                            emit(com.cactuvi.app.domain.model.Resource.Error(
+                                error = Exception("Failed to build navigation tree")
+                            ))
+                        }
+                    } catch (e: Exception) {
+                        val cachedTree = getCachedVodNavigationTree()
+                        if (cachedTree != null) {
+                            emit(com.cactuvi.app.domain.model.Resource.Error(
+                                error = e,
+                                data = com.cactuvi.app.domain.model.NavigationTree(
+                                    groups = cachedTree.groups.map { group ->
+                                        com.cactuvi.app.domain.model.GroupNode(
+                                            name = group.name,
+                                            categories = group.categories.map { it.toDomain() }
+                                        )
+                                    }
+                                )
+                            ))
+                        } else {
+                            emit(com.cactuvi.app.domain.model.Resource.Error(error = e))
+                        }
+                    }
+                }
+            }
+            .flowOn(Dispatchers.IO)
+    
+    override suspend fun refreshMovies() {
+        movieRefreshTrigger.emit(Unit)
     }
+    
+    /**
+     * Observe series navigation tree reactively.
+     */
+    override fun observeSeries(): Flow<com.cactuvi.app.domain.model.Resource<com.cactuvi.app.domain.model.NavigationTree>> =
+        seriesRefreshTrigger
+            .onStart { emit(Unit) }
+            .flatMapLatest {
+                flow {
+                    val cached = getCachedSeriesNavigationTree()
+                    if (cached != null) {
+                        emit(com.cactuvi.app.domain.model.Resource.Loading(
+                            data = com.cactuvi.app.domain.model.NavigationTree(
+                                groups = cached.groups.map { group ->
+                                    com.cactuvi.app.domain.model.GroupNode(
+                                        name = group.name,
+                                        categories = group.categories.map { it.toDomain() }
+                                    )
+                                }
+                            )
+                        ))
+                    } else {
+                        emit(com.cactuvi.app.domain.model.Resource.Loading())
+                    }
+                    
+                    try {
+                        loadSeries(forceRefresh = true)
+                        
+                        val tree = getCachedSeriesNavigationTree()
+                        if (tree != null) {
+                            emit(com.cactuvi.app.domain.model.Resource.Success(
+                                data = com.cactuvi.app.domain.model.NavigationTree(
+                                    groups = tree.groups.map { group ->
+                                        com.cactuvi.app.domain.model.GroupNode(
+                                            name = group.name,
+                                            categories = group.categories.map { it.toDomain() }
+                                        )
+                                    }
+                                ),
+                                source = com.cactuvi.app.domain.model.DataSource.NETWORK
+                            ))
+                        } else {
+                            emit(com.cactuvi.app.domain.model.Resource.Error(
+                                error = Exception("Failed to build navigation tree")
+                            ))
+                        }
+                    } catch (e: Exception) {
+                        val cachedTree = getCachedSeriesNavigationTree()
+                        if (cachedTree != null) {
+                            emit(com.cactuvi.app.domain.model.Resource.Error(
+                                error = e,
+                                data = com.cactuvi.app.domain.model.NavigationTree(
+                                    groups = cachedTree.groups.map { group ->
+                                        com.cactuvi.app.domain.model.GroupNode(
+                                            name = group.name,
+                                            categories = group.categories.map { it.toDomain() }
+                                        )
+                                    }
+                                )
+                            ))
+                        } else {
+                            emit(com.cactuvi.app.domain.model.Resource.Error(error = e))
+                        }
+                    }
+                }
+            }
+            .flowOn(Dispatchers.IO)
+    
+    override suspend fun refreshSeries() {
+        seriesRefreshTrigger.emit(Unit)
+    }
+    
+    /**
+     * Observe live categories reactively.
+     */
+    override fun observeLive(): Flow<com.cactuvi.app.domain.model.Resource<List<Category>>> =
+        liveRefreshTrigger
+            .onStart { emit(Unit) }
+            .flatMapLatest {
+                flow {
+                    // Emit loading with cached data
+                    val cachedResult = getLiveCategories(forceRefresh = false)
+                    if (cachedResult.isSuccess) {
+                        val categories = cachedResult.getOrNull() ?: emptyList()
+                        emit(com.cactuvi.app.domain.model.Resource.Loading(data = categories))
+                    } else {
+                        emit(com.cactuvi.app.domain.model.Resource.Loading())
+                    }
+                    
+                    try {
+                        loadLive(forceRefresh = true)
+                        
+                        val result = getLiveCategories(forceRefresh = false)
+                        if (result.isSuccess) {
+                            emit(com.cactuvi.app.domain.model.Resource.Success(
+                                data = result.getOrNull() ?: emptyList(),
+                                source = com.cactuvi.app.domain.model.DataSource.NETWORK
+                            ))
+                        } else {
+                            emit(com.cactuvi.app.domain.model.Resource.Error(
+                                error = result.exceptionOrNull() ?: Exception("Unknown error")
+                            ))
+                        }
+                    } catch (e: Exception) {
+                        val cachedResult = getLiveCategories(forceRefresh = false)
+                        if (cachedResult.isSuccess) {
+                            emit(com.cactuvi.app.domain.model.Resource.Error(
+                                error = e,
+                                data = cachedResult.getOrNull() ?: emptyList()
+                            ))
+                        } else {
+                            emit(com.cactuvi.app.domain.model.Resource.Error(error = e))
+                        }
+                    }
+                }
+            }
+            .flowOn(Dispatchers.IO)
+    
+    override suspend fun refreshLive() {
+        liveRefreshTrigger.emit(Unit)
+    }
+    
+    // ========== END NEW REACTIVE API ==========
     
     /**
      * Optimized bulk insert with batching and transaction wrapping.
@@ -422,7 +681,7 @@ class ContentRepository(
                 }
                 
                 // Emit Loading state
-                _liveState.value = DataState.Loading
+                _liveState.value = DataState.Loading(progress = null)
                 
                 // Check cache first (unless forcing refresh)
                 if (!forceRefresh) {
@@ -702,15 +961,38 @@ class ContentRepository(
     // ========== MOVIES ==========
     
     /**
-     * Load movies data from API with reactive state management.
-     * Emits state changes to moviesState StateFlow.
+     * Result of async write operations.
+     * Tracks success/failure counts for partial success handling.
+     */
+    private data class AsyncWriteResult(
+        val successCount: Int,
+        val failedCount: Int,
+        val errors: List<Exception>
+    )
+    
+    /**
+     * Load movies data from API with async write queue for network timeout prevention.
+     * Emits state changes to moviesState StateFlow with progress updates.
      * Thread-safe: Uses mutex to prevent concurrent loads.
+     * 
+     * **Async Write Pattern**:
+     * - Parses JSON and sends batches to background write queue
+     * - HTTP connection closes quickly (~10-20 seconds)
+     * - Database writes continue asynchronously without blocking network
+     * - Progress updates emitted every 10% (0%, 10%, 20%, ..., 100%)
+     * - Partial success preserved if some batches fail
+     * 
+     * **Cache Merge Strategy**:
+     * - Checks loadStatus in cache metadata
+     * - If status="PARTIAL", merges new data with existing instead of deleting
+     * - Room's REPLACE strategy handles deduplication automatically
      * 
      * @param forceRefresh If true, bypass cache and force API fetch
      */
     suspend fun loadMovies(forceRefresh: Boolean = false) = withContext(Dispatchers.IO) {
         // Race condition check - BEFORE mutex acquisition
-        if (_moviesState.value.isLoading() && !forceRefresh) {
+        val currentState = _moviesState.value
+        if (currentState is DataState.Loading && !forceRefresh) {
             PerformanceLogger.log("loadMovies: Already loading, skipping duplicate call")
             return@withContext
         }
@@ -718,21 +1000,24 @@ class ContentRepository(
         try {
             moviesMutex.withLock {
                 // Double-check inside mutex
-                if (_moviesState.value.isLoading() && !forceRefresh) {
+                val stateInsideMutex = _moviesState.value
+                if (stateInsideMutex is DataState.Loading && !forceRefresh) {
                     return@withLock
                 }
                 
-                // Emit Loading state
-                _moviesState.value = DataState.Loading
+                // Emit Loading state with indeterminate progress
+                _moviesState.value = DataState.Loading(progress = null)
+                android.util.Log.d("IPTV_DEBUG", "ContentRepository.loadMovies: Emitted Loading state")
                 
                 // Check cache first (unless forcing refresh)
                 if (!forceRefresh) {
                     val metadata = database.cacheMetadataDao().get("movies")
-                    if (metadata != null && metadata.itemCount > 0) {
+                    if (metadata != null && metadata.itemCount > 0 && metadata.loadStatus != "PARTIAL") {
                         val isExtremelyStale = !isCacheValid(metadata.lastUpdated, CACHE_TTL_FALLBACK)
                         if (!isExtremelyStale) {
                             PerformanceLogger.log("loadMovies: Cache valid, skipping API fetch")
                             _moviesState.value = DataState.Success(Unit)
+                            android.util.Log.d("IPTV_DEBUG", "ContentRepository.loadMovies: Emitted Success (cache valid)")
                             return@withLock
                         }
                     }
@@ -753,18 +1038,82 @@ class ContentRepository(
                 val categories = getMovieCategories().getOrNull() ?: emptyList()
                 val categoryMap = categories.associateBy { it.categoryId }
                 
-                // Clear old data for this source
-                database.movieDao().deleteBySourceId(sourceId)
+                // Check for partial cache - merge if present
+                val existingMetadata = database.cacheMetadataDao().get("movies")
+                val shouldMerge = existingMetadata != null && existingMetadata.loadStatus == "PARTIAL"
+                
+                if (shouldMerge) {
+                    PerformanceLogger.log("loadMovies: Merging with partial cache (${existingMetadata?.itemCount} existing items)")
+                    android.util.Log.d("IPTV_DEBUG", "ContentRepository.loadMovies: Detected PARTIAL cache, will merge")
+                } else {
+                    // Fresh load - clear old data
+                    database.movieDao().deleteBySourceId(sourceId)
+                }
                 
                 // Drop indices before batch inserts
                 com.cactuvi.app.data.db.OptimizedBulkInsert.beginMoviesInsert(database.getSqliteDatabase())
                 
-                // Accumulator for batching writes through DbWriter
+                // Create write channel with capacity 10 (~100MB max memory)
+                val writeChannel = Channel<List<MovieEntity>>(capacity = 10)
                 val accumulator = mutableListOf<MovieEntity>()
-                var totalInserted = 0
+                var totalParsed = 0
+                var parseException: Exception? = null
                 
+                // Launch background writer coroutine
+                val writerJob = async(Dispatchers.IO) {
+                    var successCount = 0
+                    var failedCount = 0
+                    var lastProgressPercent = 0
+                    val errors = mutableListOf<Exception>()
+                    
+                    try {
+                        for (batch in writeChannel) {
+                            try {
+                                // Write batch to database
+                                dbWriter.writeMovies(batch)
+                                successCount += batch.size
+                                
+                                // Update cache metadata incrementally (for crash recovery)
+                                database.cacheMetadataDao().insert(
+                                    CacheMetadataEntity(
+                                        contentType = "movies",
+                                        lastUpdated = System.currentTimeMillis(),
+                                        itemCount = successCount,
+                                        categoryCount = categories.size,
+                                        loadStatus = "LOADING"
+                                    )
+                                )
+                                
+                                // Emit progress every 10%
+                                if (totalParsed > 0) {
+                                    val progressPercent = (successCount * 100) / totalParsed
+                                    if (progressPercent >= lastProgressPercent + 10 && progressPercent <= 100) {
+                                        lastProgressPercent = (progressPercent / 10) * 10  // Round to 10%
+                                        _moviesState.value = DataState.Loading(progress = lastProgressPercent)
+                                        PerformanceLogger.log("loadMovies: Progress ${lastProgressPercent}% ($successCount/$totalParsed)")
+                                    }
+                                }
+                                
+                            } catch (e: Exception) {
+                                PerformanceLogger.log("loadMovies: Batch write failed - ${e.message}")
+                                android.util.Log.e("ContentRepository", "Batch write failed", e)
+                                failedCount += batch.size
+                                errors.add(e)
+                                // Continue processing remaining batches
+                            }
+                        }
+                    } catch (e: Exception) {
+                        PerformanceLogger.log("loadMovies: Writer coroutine failed - ${e.message}")
+                        android.util.Log.e("ContentRepository", "Writer coroutine failed", e)
+                        errors.add(e)
+                    }
+                    
+                    AsyncWriteResult(successCount, failedCount, errors)
+                }
+                
+                // Parse JSON and enqueue batches (fast, non-blocking)
                 try {
-                    totalInserted = StreamingJsonParser.parseArrayInBatches(
+                    totalParsed = StreamingJsonParser.parseArrayInBatches(
                         responseBody = responseBody,
                         itemClass = Movie::class.java,
                         batchSize = BATCH_SIZE,
@@ -774,52 +1123,107 @@ class ContentRepository(
                                 movie.categoryName = categoryName
                                 movie.toEntity(sourceId, categoryName)
                             }
-                            
-                            // Accumulate entities
                             accumulator.addAll(entities)
                             
-                            // Write in 5k chunks through DbWriter
                             if (accumulator.size >= 5000) {
-                                dbWriter.writeMovies(accumulator.toList())
+                                // Non-blocking send with backpressure
+                                runBlocking {
+                                    writeChannel.send(accumulator.toList())
+                                }
                                 accumulator.clear()
                             }
                         },
                         onProgress = { count ->
-                            PerformanceLogger.log("Progress: $count movies parsed and inserted")
+                            PerformanceLogger.log("Progress: $count movies parsed")
                         }
                     )
                     
-                    // Flush remaining items
+                    // Flush remaining
                     if (accumulator.isNotEmpty()) {
-                        dbWriter.writeMovies(accumulator)
-                        accumulator.clear()
+                        writeChannel.send(accumulator.toList())
                     }
+                    
+                    PerformanceLogger.log("loadMovies: Parsing complete - $totalParsed items")
+                    PerformanceLogger.log("loadMovies: HTTP connection closed")
+                    
                 } catch (e: Exception) {
-                    throw e
+                    parseException = e
+                    PerformanceLogger.log("loadMovies: Parsing failed - ${e.message}")
+                    android.util.Log.e("ContentRepository", "Parsing failed", e)
                 } finally {
-                    com.cactuvi.app.data.db.OptimizedBulkInsert.endMoviesInsert(database.getSqliteDatabase())
+                    writeChannel.close()  // Signal writer to stop
                 }
                 
-                // Update cache metadata
-                val newMetadata = CacheMetadataEntity(
-                    contentType = "movies",
-                    lastUpdated = System.currentTimeMillis(),
-                    itemCount = totalInserted,
-                    categoryCount = categories.size
-                )
-                database.cacheMetadataDao().insert(newMetadata)
+                // Wait for background writes to complete
+                val writeResult = writerJob.await()
                 
-                PerformanceLogger.log("loadMovies: Successfully inserted $totalInserted movies")
+                // Rebuild indices
+                com.cactuvi.app.data.db.OptimizedBulkInsert.endMoviesInsert(database.getSqliteDatabase())
                 
-                // Verify database count
-                val dbCount = database.movieDao().getCount()
-                PerformanceLogger.log("loadMovies: DB count verification: $dbCount")
-                
-                // Emit Success state
-                _moviesState.value = DataState.Success(Unit)
-                
-                // Emit success effect
-                _moviesEffects.emit(MoviesEffect.LoadSuccess(totalInserted))
+                // Handle results based on parse + write status
+                when {
+                    // Parse failed - entire operation failed
+                    parseException != null -> {
+                        throw parseException
+                    }
+                    
+                    // No items written - complete failure
+                    writeResult.successCount == 0 && writeResult.failedCount > 0 -> {
+                        throw writeResult.errors.first()
+                    }
+                    
+                    // Partial success - some batches failed
+                    writeResult.failedCount > 0 -> {
+                        android.util.Log.w(
+                            "ContentRepository",
+                            "loadMovies: Partial success - ${writeResult.successCount} succeeded, ${writeResult.failedCount} failed"
+                        )
+                        
+                        // Mark cache as partial
+                        database.cacheMetadataDao().insert(
+                            CacheMetadataEntity(
+                                contentType = "movies",
+                                lastUpdated = System.currentTimeMillis(),
+                                itemCount = writeResult.successCount,
+                                categoryCount = categories.size,
+                                loadStatus = "PARTIAL"
+                            )
+                        )
+                        
+                        // Emit PartialSuccess state (silent to user, logged)
+                        _moviesState.value = DataState.PartialSuccess(
+                            data = Unit,
+                            successCount = writeResult.successCount,
+                            failedCount = writeResult.failedCount,
+                            error = writeResult.errors.first()
+                        )
+                        
+                        _moviesEffects.emit(MoviesEffect.LoadPartialSuccess(
+                            successCount = writeResult.successCount,
+                            failedCount = writeResult.failedCount,
+                            message = writeResult.errors.first().message ?: "Unknown error"
+                        ))
+                    }
+                    
+                    // Complete success
+                    else -> {
+                        database.cacheMetadataDao().insert(
+                            CacheMetadataEntity(
+                                contentType = "movies",
+                                lastUpdated = System.currentTimeMillis(),
+                                itemCount = writeResult.successCount,
+                                categoryCount = categories.size,
+                                loadStatus = "SUCCESS"
+                            )
+                        )
+                        
+                        _moviesState.value = DataState.Success(Unit)
+                        _moviesEffects.emit(MoviesEffect.LoadSuccess(writeResult.successCount))
+                        
+                        PerformanceLogger.log("loadMovies: Complete success - ${writeResult.successCount} items")
+                        android.util.Log.d("IPTV_DEBUG", "ContentRepository.loadMovies: Emitted Success (${writeResult.successCount} items)")
+                    }
+                }
             }
         } catch (e: Exception) {
             android.util.Log.e("ContentRepository", "loadMovies failed", e)
@@ -833,6 +1237,7 @@ class ContentRepository(
                 error = e,
                 cachedData = if (hasCache) Unit else null
             )
+            android.util.Log.d("IPTV_DEBUG", "ContentRepository.loadMovies: Emitted Error state (hasCache=$hasCache)")
             
             // Emit error effect
             _moviesEffects.emit(MoviesEffect.LoadError(
@@ -1114,7 +1519,7 @@ class ContentRepository(
                 }
                 
                 // Emit Loading state
-                _seriesState.value = DataState.Loading
+                _seriesState.value = DataState.Loading(progress = null)
                 
                 // Check cache first (unless forcing refresh)
                 if (!forceRefresh) {
