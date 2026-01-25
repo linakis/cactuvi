@@ -111,6 +111,8 @@ object DataModule {
         return LiveLocalDataSource(database)
     }
     
+    // ========== REPOSITORY ==========
+    
     // ========== REMOTE DATA SOURCES ==========
     
     @Provides
@@ -137,8 +139,20 @@ object DataModule {
         return LiveRemoteDataSource(apiService)
     }
     
-    // Note: ContentRepository will be added in Phase 2 after it's refactored to implement
-    // the domain layer interface and use DataSources
+    // ========== REPOSITORY ==========
+    
+    /**
+     * Provide ContentRepository implementation.
+     * Returns singleton instance for now (Phase 2.1).
+     * TODO Phase 3: Refactor to proper constructor injection when Repository no longer uses singleton pattern.
+     */
+    @Provides
+    @Singleton
+    fun provideContentRepository(
+        @ApplicationContext context: Context
+    ): com.cactuvi.app.domain.repository.ContentRepository {
+        return com.cactuvi.app.data.repository.ContentRepositoryImpl.getInstance(context)
+    }
 }
 
 
