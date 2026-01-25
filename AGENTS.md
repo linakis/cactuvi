@@ -25,8 +25,11 @@ This file contains essential information for AI coding agents working on this co
 
 2. **During work:**
    ```bash
-   bd start <task-id>   # Mark task as started
-   bd update <task-id> --description "Progress update"
+   # Update task with progress (BD doesn't have a 'start' command)
+   bd update <task-id> --description "Started: [what you're working on]"
+   
+   # Update task with ongoing progress
+   bd update <task-id> --description "Progress: [update details]"
    ```
 
 3. **Creating subtasks:**
@@ -88,11 +91,18 @@ bd create --parent <id> --title "Subtask"
 # Update tasks
 bd update <task-id> --description "Updated description"
 bd update <task-id> --priority P0
-bd start <task-id>               # Mark as started
 bd close <task-id>               # Mark as completed
+
+# Reopen tasks if needed
+bd reopen <task-id>
 
 # Search tasks
 bd list --json | jq '.[] | select(.title | test("search term"; "i"))'
+
+# Set operational state (creates event + updates label)
+bd set-state <task-id> --state in_progress  # Mark as started
+bd set-state <task-id> --state blocked      # Mark as blocked
+bd set-state <task-id> --state completed    # Mark as done
 ```
 
 ### Integration with Git Commits
@@ -107,6 +117,98 @@ git commit -m "Optimize: Implement streaming parser (iptv-app-q7q.1)
 
 Refs: iptv-app-q7q"
 ```
+
+## ⚠️ CRITICAL: Documentation Policy
+
+**ONLY keep these MD files:**
+1. **README.md** - Project overview, build instructions, usage guide
+2. **AGENTS.md** - AI agent guidelines (this file)
+3. **ARCHITECTURE.md** - Architecture patterns, layer diagrams, code examples
+
+**NEVER create:**
+- ❌ Summary documents (use BD task descriptions instead)
+- ❌ Session notes (use BD task updates)
+- ❌ Implementation plans (use BD subtasks with acceptance criteria)
+- ❌ Validation reports (add to BD task description as completion proof)
+- ❌ Test reports (update BD task with results)
+- ❌ Checklists (use BD task acceptance criteria)
+- ❌ Build instructions as separate MD (put in README)
+
+**Golden Rule:** Everything you do should be documented in BD tasks for posterity. 
+Markdown files are ONLY for ongoing reference and patterns, not historical records.
+
+**Why this matters:**
+- BD tasks are searchable, filterable, and trackable
+- MD files proliferate and become outdated
+- One source of truth prevents conflicting information
+- Future developers find work history in BD, not scattered MD files
+
+## Architecture Guidelines
+
+**See ARCHITECTURE.md for detailed patterns and diagrams.**
+
+### MVVM + UDF Pattern (Mandatory)
+The app follows **MVVM (Model-View-ViewModel) with Unidirectional Data Flow**:
+
+```
+Fragment → ViewModel → UseCase → Repository → DataSource → API/DB
+   ↓          ↓          ↓           ↓            ↓
+  UI      UiState   Business    Resource     Remote/Local
+```
+
+**Key Principles:**
+- **UI Layer:** Fragments observe single `UiState` from ViewModels
+- **Domain Layer:** UseCases encapsulate business logic, injected into ViewModels
+- **Data Layer:** Repository exposes `Flow<Resource<T>>` (single source of truth)
+- **DI:** Hilt for dependency injection throughout
+
+### State Management Rules
+
+**✅ DO:**
+1. Use `Resource<T>` sealed class for all async operations (Loading/Success/Error)
+2. Expose single `UiState` data class per screen from ViewModel
+3. Derive UI state from data streams (no manual flags)
+4. ViewModels survive configuration changes via `viewModelScope`
+5. Use `StateFlow` for state, `SharedFlow` for one-time events
+6. Inject dependencies via Hilt (@Inject constructors, @HiltViewModel)
+
+**❌ DON'T:**
+1. Use imperative state flags (isLoading, hasCache, forceRefresh)
+2. Put business logic in Fragments (use ViewModels + UseCases)
+3. Expose mutable state (expose `StateFlow`, not `MutableStateFlow`)
+4. Call Repository directly from Fragments (use UseCases)
+5. Use `GlobalScope` or `runBlocking` on main thread
+6. Mix reactive and imperative patterns
+
+### Testing Requirements
+
+**Minimum Coverage:**
+- ViewModel tests: 80% coverage required for all new screens
+- UseCase tests: Required for complex business logic
+- Repository tests: Required for data transformations
+- Integration tests: For critical user flows
+
+**Test Stack:**
+- JUnit 4 for test framework
+- MockK for mocking
+- Turbine for Flow testing
+- Coroutines Test for suspend functions
+
+**Example:**
+```kotlin
+@Test
+fun `should emit loading then success when movies load`() = runTest {
+    viewModel.uiState.test {
+        val loading = awaitItem()
+        assertTrue(loading.isLoading)
+        
+        val success = awaitItem()
+        assertNotNull(success.navigationTree)
+    }
+}
+```
+
+See ARCHITECTURE.md for complete testing patterns.
 
 ## Project Overview
 
@@ -331,8 +433,9 @@ grep "inserted=" perf_test.log
 adb shell uiautomator dump /sdcard/hierarchy.xml
 adb pull /sdcard/hierarchy.xml .
 
-# 10. Verify database content
-adb shell "run-as com.cactuvi.app sqlite3 /data/data/com.cactuvi.app/databases/iptv_database 'SELECT COUNT(*) FROM movies;'"
+# 10. Verify database content (pull database first - see "Database Debugging & Inspection" section)
+adb shell "run-as com.cactuvi.app cat /data/user/0/com.cactuvi.app/databases/iptv_database" > /tmp/iptv_database.db
+sqlite3 /tmp/iptv_database.db "SELECT COUNT(*) FROM movies;"
 ```
 
 #### TV D-Pad Navigation Testing
@@ -360,6 +463,28 @@ adb shell "dumpsys package com.cactuvi.app | grep -A 5 'Network'"
 
 # Database size
 adb shell "run-as com.cactuvi.app du -h /data/data/com.cactuvi.app/databases/"
+```
+
+#### Database Debugging & Inspection
+```bash
+# Pull database for local inspection (sqlite3 not available on device)
+# Use run-as to copy db to a world-readable location
+adb shell "run-as com.cactuvi.app cp /data/user/0/com.cactuvi.app/databases/iptv_database /sdcard/iptv_database.db"
+
+# Then pull it to local machine
+adb pull /sdcard/iptv_database.db /tmp/iptv_database.db
+
+# Query locally with sqlite3
+sqlite3 /tmp/iptv_database.db ".tables"
+sqlite3 /tmp/iptv_database.db "SELECT COUNT(*) FROM movies;"
+sqlite3 /tmp/iptv_database.db "SELECT * FROM cache_metadata;"
+sqlite3 /tmp/iptv_database.db "SELECT categoryId, COUNT(*) as count FROM movies GROUP BY categoryId LIMIT 10;"
+
+# Alternative: Use cat to pull (if cp fails)
+adb shell "run-as com.cactuvi.app cat /data/user/0/com.cactuvi.app/databases/iptv_database" > /tmp/iptv_database.db
+
+# Clean up
+adb shell rm /sdcard/iptv_database.db
 ```
 
 ## Code Style Guidelines
