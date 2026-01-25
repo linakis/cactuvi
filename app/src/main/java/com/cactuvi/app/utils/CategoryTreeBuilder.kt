@@ -285,7 +285,7 @@ object CategoryTreeBuilder {
      * @param separator Group separator
      * @return Name with group prefix stripped, or original if invalid
      */
-    private fun stripGroupPrefix(categoryName: String, separator: String): String {
+    internal fun stripGroupPrefix(categoryName: String, separator: String): String {
         val stripped =
             when (separator) {
                 "FIRST_WORD" -> {

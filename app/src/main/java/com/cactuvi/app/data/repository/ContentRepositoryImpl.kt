@@ -2580,7 +2580,20 @@ private constructor(
                         val type = object : TypeToken<List<String>>() {}.type
                         val categoryIds: List<String> = gson.fromJson(entity.categoryIdsJson, type)
                         val groupCategories = allCategories.filter { it.categoryId in categoryIds }
-                        CategoryGrouper.GroupNode(entity.groupName, groupCategories)
+
+                        // Strip group prefix from category names (using the separator from cache)
+                        val strippedCategories =
+                            groupCategories.map { category ->
+                                category.copy(
+                                    categoryName =
+                                        CategoryTreeBuilder.stripGroupPrefix(
+                                            category.categoryName,
+                                            entity.separator
+                                        )
+                                )
+                            }
+
+                        CategoryGrouper.GroupNode(entity.groupName, strippedCategories)
                     }
                 PerformanceLogger.end(
                     "Deserialize and build tree",
@@ -2625,7 +2638,20 @@ private constructor(
                         val type = object : TypeToken<List<String>>() {}.type
                         val categoryIds: List<String> = gson.fromJson(entity.categoryIdsJson, type)
                         val groupCategories = allCategories.filter { it.categoryId in categoryIds }
-                        CategoryGrouper.GroupNode(entity.groupName, groupCategories)
+
+                        // Strip group prefix from category names (using the separator from cache)
+                        val strippedCategories =
+                            groupCategories.map { category ->
+                                category.copy(
+                                    categoryName =
+                                        CategoryTreeBuilder.stripGroupPrefix(
+                                            category.categoryName,
+                                            entity.separator
+                                        )
+                                )
+                            }
+
+                        CategoryGrouper.GroupNode(entity.groupName, strippedCategories)
                     }
 
                 CategoryGrouper.NavigationTree(groups)
@@ -2655,7 +2681,20 @@ private constructor(
                         val type = object : TypeToken<List<String>>() {}.type
                         val categoryIds: List<String> = gson.fromJson(entity.categoryIdsJson, type)
                         val groupCategories = allCategories.filter { it.categoryId in categoryIds }
-                        CategoryGrouper.GroupNode(entity.groupName, groupCategories)
+
+                        // Strip group prefix from category names (using the separator from cache)
+                        val strippedCategories =
+                            groupCategories.map { category ->
+                                category.copy(
+                                    categoryName =
+                                        CategoryTreeBuilder.stripGroupPrefix(
+                                            category.categoryName,
+                                            entity.separator
+                                        )
+                                )
+                            }
+
+                        CategoryGrouper.GroupNode(entity.groupName, strippedCategories)
                     }
 
                 CategoryGrouper.NavigationTree(groups)
