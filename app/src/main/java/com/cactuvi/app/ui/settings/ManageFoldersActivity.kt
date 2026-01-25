@@ -19,7 +19,7 @@ import com.cactuvi.app.ui.common.HierarchicalFolderAdapter
 import com.cactuvi.app.ui.common.HierarchicalItem
 import com.cactuvi.app.ui.common.HierarchicalItemHelper
 import com.cactuvi.app.ui.common.ModernToolbar
-import com.cactuvi.app.utils.CategoryGrouper
+import com.cactuvi.app.utils.CategoryTreeBuilder
 import com.cactuvi.app.utils.PreferencesManager
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.switchmaterial.SwitchMaterial
@@ -141,33 +141,15 @@ class ManageFoldersActivity : AppCompatActivity() {
 
                 // Build navigation tree to get groups with categories
                 val separator = preferencesManager.getCustomSeparator(contentType)
-                val tree =
-                    when (contentType) {
-                        ContentFilterSettings.ContentType.MOVIES ->
-                            CategoryGrouper.buildVodNavigationTree(
-                                categories,
-                                true,
-                                separator,
-                                emptySet(),
-                                ContentFilterSettings.FilterMode.BLACKLIST,
-                            )
-                        ContentFilterSettings.ContentType.SERIES ->
-                            CategoryGrouper.buildSeriesNavigationTree(
-                                categories,
-                                true,
-                                separator,
-                                emptySet(),
-                                ContentFilterSettings.FilterMode.BLACKLIST,
-                            )
-                        ContentFilterSettings.ContentType.LIVE_TV ->
-                            CategoryGrouper.buildLiveNavigationTree(
-                                categories,
-                                true,
-                                separator,
-                                emptySet(),
-                                ContentFilterSettings.FilterMode.BLACKLIST,
-                            )
-                    }
+                val newTree =
+                    CategoryTreeBuilder.buildNavigationTree(
+                        categories = categories,
+                        groupingEnabled = true,
+                        separator = separator,
+                        hiddenCategories = emptySet(),
+                        filterMode = ContentFilterSettings.FilterMode.BLACKLIST,
+                    )
+                val tree = CategoryTreeBuilder.toGroupedNavigationTree(newTree)
 
                 // Convert to hierarchical items
                 groups =

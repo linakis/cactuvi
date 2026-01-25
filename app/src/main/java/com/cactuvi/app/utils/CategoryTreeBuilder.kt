@@ -324,4 +324,35 @@ object CategoryTreeBuilder {
         }
         return tree.roots.flatMap { flatten(it) }
     }
+
+    /**
+     * Convert CategoryTreeBuilder.NavigationTree to CategoryGrouper.NavigationTree for backward
+     * compatibility. Assumes the tree has a grouping layer (groups at root level with categories as
+     * children).
+     *
+     * This is a temporary bridge method to allow incremental migration from CategoryGrouper to
+     * CategoryTreeBuilder.
+     *
+     * @param tree CategoryTreeBuilder navigation tree (with grouping enabled)
+     * @return CategoryGrouper-compatible NavigationTree
+     */
+    fun toGroupedNavigationTree(tree: NavigationTree): CategoryGrouper.NavigationTree {
+        val groups =
+            tree.roots.map { groupNode ->
+                // Extract group name from virtual category
+                val groupName = groupNode.category.categoryName
+
+                // Get all leaf categories from this group's subtree
+                val categories =
+                    groupNode.children.map { categoryNode ->
+                        // For now, just take the immediate children as categories
+                        // (assuming 2-level hierarchy: Group -> Category)
+                        categoryNode.category
+                    }
+
+                CategoryGrouper.GroupNode(name = groupName, categories = categories)
+            }
+
+        return CategoryGrouper.NavigationTree(groups)
+    }
 }

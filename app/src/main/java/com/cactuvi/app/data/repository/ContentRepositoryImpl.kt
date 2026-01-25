@@ -13,6 +13,7 @@ import com.cactuvi.app.data.db.mappers.*
 import com.cactuvi.app.data.mappers.toDomain
 import com.cactuvi.app.data.models.*
 import com.cactuvi.app.utils.CategoryGrouper
+import com.cactuvi.app.utils.CategoryTreeBuilder
 import com.cactuvi.app.utils.PerformanceLogger
 import com.cactuvi.app.utils.PreferencesManager
 import com.cactuvi.app.utils.SourceManager
@@ -2438,7 +2439,13 @@ private constructor(
         categories: List<Category>,
         separator: String = "-"
     ) {
-        val tree = CategoryGrouper.buildVodNavigationTree(categories)
+        val newTree =
+            CategoryTreeBuilder.buildNavigationTree(
+                categories = categories,
+                groupingEnabled = true,
+                separator = separator,
+            )
+        val tree = CategoryTreeBuilder.toGroupedNavigationTree(newTree)
         val sourceId = getActiveSourceId()
 
         val entities =
@@ -2460,7 +2467,13 @@ private constructor(
         categories: List<Category>,
         separator: String = "FIRST_WORD"
     ) {
-        val tree = CategoryGrouper.buildSeriesNavigationTree(categories)
+        val newTree =
+            CategoryTreeBuilder.buildNavigationTree(
+                categories = categories,
+                groupingEnabled = true,
+                separator = separator,
+            )
+        val tree = CategoryTreeBuilder.toGroupedNavigationTree(newTree)
         val sourceId = getActiveSourceId()
 
         val entities =
@@ -2482,7 +2495,13 @@ private constructor(
         categories: List<Category>,
         separator: String = "|"
     ) {
-        val tree = CategoryGrouper.buildLiveNavigationTree(categories)
+        val newTree =
+            CategoryTreeBuilder.buildNavigationTree(
+                categories = categories,
+                groupingEnabled = true,
+                separator = separator,
+            )
+        val tree = CategoryTreeBuilder.toGroupedNavigationTree(newTree)
         val sourceId = getActiveSourceId()
 
         val entities =
