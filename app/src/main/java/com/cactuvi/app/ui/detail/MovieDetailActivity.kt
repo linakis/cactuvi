@@ -10,25 +10,29 @@ import android.widget.ImageView
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.isVisible
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.media3.common.util.UnstableApi
 import com.bumptech.glide.Glide
 import com.cactuvi.app.R
-import com.cactuvi.app.data.repository.ContentRepository
 import com.cactuvi.app.data.repository.DownloadRepository
 import com.cactuvi.app.ui.player.PlayerActivity
 import com.cactuvi.app.utils.CredentialsManager
-import com.cactuvi.app.utils.SourceManager
 import com.cactuvi.app.utils.StreamUrlBuilder
+import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 @UnstableApi
+@AndroidEntryPoint
 class MovieDetailActivity : AppCompatActivity() {
     
-    private lateinit var repository: ContentRepository
+    private val viewModel: MovieDetailViewModel by viewModels()
     private lateinit var downloadRepository: DownloadRepository
-    private lateinit var credentialsManager: CredentialsManager
     
     private lateinit var backdropImage: ImageView
     private lateinit var posterImage: ImageView
@@ -58,9 +62,7 @@ class MovieDetailActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_movie_detail)
         
-        // Initialize repositories
-        credentialsManager = CredentialsManager.getInstance(this)
-        repository = ContentRepository.getInstance(this)
+        // Initialize download repository
         downloadRepository = DownloadRepository(this)
         
         // Get data from intent
@@ -78,7 +80,7 @@ class MovieDetailActivity : AppCompatActivity() {
         
         initViews()
         setupClickListeners()
-        loadMovieDetails()
+        observeUiState()
     }
     
     private fun initViews() {
@@ -108,7 +110,7 @@ class MovieDetailActivity : AppCompatActivity() {
         }
         
         favoriteButton.setOnClickListener {
-            toggleFavorite()
+            viewModel.toggleFavorite()
         }
         
         downloadButton.setOnClickListener {
@@ -120,43 +122,55 @@ class MovieDetailActivity : AppCompatActivity() {
         }
     }
     
-    private fun loadMovieDetails() {
-        showLoading(true)
-        
+    private fun observeUiState() {
         lifecycleScope.launch {
-            try {
-                // Load movie info from API
-                val result = repository.getMovieInfo(vodId)
-                
-                if (result.isSuccess) {
-                    val movieInfo = result.getOrNull()
-                    movieInfo?.let { displayMovieInfo(it) }
-                } else {
-                    Toast.makeText(
-                        this@MovieDetailActivity,
-                        "Failed to load movie details",
-                        Toast.LENGTH_SHORT
-                    ).show()
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.uiState.collectLatest { state ->
+                    renderUiState(state)
                 }
-                
-                // Check if movie is in favorites
-                checkFavoriteStatus()
-                
-                // Check for resume position
-                checkResumePosition()
-                
-                // Check download status
-                checkDownloadStatus()
-                
-            } catch (e: Exception) {
-                Toast.makeText(
-                    this@MovieDetailActivity,
-                    "Error: ${e.message}",
-                    Toast.LENGTH_SHORT
-                ).show()
-            } finally {
-                showLoading(false)
             }
+        }
+        
+        // Check download status (still uses DownloadRepository directly)
+        checkDownloadStatus()
+    }
+    
+    private fun renderUiState(state: MovieDetailUiState) {
+        // Loading state
+        progressBar.isVisible = state.isLoading
+        infoContainer.isVisible = state.showContent
+        
+        // Error state
+        state.error?.let { errorMsg ->
+            Toast.makeText(this, errorMsg, Toast.LENGTH_SHORT).show()
+        }
+        
+        // Movie info
+        state.movieInfo?.let { movieInfo ->
+            displayMovieInfo(movieInfo)
+        }
+        
+        // Favorite state
+        updateFavoriteButton(state.isFavorite)
+        
+        // Resume position
+        if (state.showResumeButton) {
+            resumePosition = state.resumePosition
+            duration = state.duration
+            
+            val timeString = formatTime(state.resumePosition)
+            resumeButton.text = getString(R.string.resume_from, timeString)
+            resumeButton.isVisible = true
+        } else {
+            resumeButton.isVisible = false
+        }
+        
+        // Update container extension and streamId from movie data
+        state.movieInfo?.movieData?.containerExtension?.let {
+            containerExtension = it
+        }
+        state.movieInfo?.movieData?.streamId?.let {
+            streamId = it
         }
     }
     
@@ -240,37 +254,7 @@ class MovieDetailActivity : AppCompatActivity() {
         infoContainer.visibility = View.VISIBLE
     }
     
-    private suspend fun checkFavoriteStatus() {
-        val result = repository.isFavorite(streamId.toString(), "movie")
-        if (result.isSuccess) {
-            isFavorite = result.getOrNull() ?: false
-            updateFavoriteButton()
-        }
-    }
-    
-    private suspend fun checkResumePosition() {
-        val result = repository.getWatchHistory(limit = 100)
-        if (result.isSuccess) {
-            val history = result.getOrNull() ?: emptyList()
-            val movieHistory = history.find { 
-                it.contentId == streamId.toString() && it.contentType == "movie" 
-            }
-            
-            movieHistory?.let {
-                if (!it.isCompleted) {
-                    resumePosition = it.resumePosition
-                    duration = it.duration
-                    
-                    // Show resume button
-                    val timeString = formatTime(resumePosition)
-                    resumeButton.text = getString(R.string.resume_from, timeString)
-                    resumeButton.visibility = View.VISIBLE
-                }
-            }
-        }
-    }
-    
-    private fun updateFavoriteButton() {
+    private fun updateFavoriteButton(isFavorite: Boolean) {
         if (isFavorite) {
             favoriteButton.setImageResource(R.drawable.ic_favorite)
             favoriteButton.setBackgroundResource(R.drawable.bg_icon_button_circular)
@@ -282,50 +266,8 @@ class MovieDetailActivity : AppCompatActivity() {
         }
     }
     
-    private fun toggleFavorite() {
-        lifecycleScope.launch {
-            try {
-                if (isFavorite) {
-                    val result = repository.removeFromFavorites(streamId.toString(), "movie")
-                    if (result.isSuccess) {
-                        isFavorite = false
-                        updateFavoriteButton()
-                        Toast.makeText(
-                            this@MovieDetailActivity,
-                            "Removed from My List",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                    }
-                } else {
-                    val result = repository.addToFavorites(
-                        contentId = streamId.toString(),
-                        contentType = "movie",
-                        contentName = movieTitle,
-                        posterUrl = posterUrl,
-                        rating = metadataText.text.toString(),
-                        categoryName = ""
-                    )
-                    if (result.isSuccess) {
-                        isFavorite = true
-                        updateFavoriteButton()
-                        Toast.makeText(
-                            this@MovieDetailActivity,
-                            "Added to My List",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                    }
-                }
-            } catch (e: Exception) {
-                Toast.makeText(
-                    this@MovieDetailActivity,
-                    "Error: ${e.message}",
-                    Toast.LENGTH_SHORT
-                ).show()
-            }
-        }
-    }
-    
     private fun playMovie(startPosition: Long) {
+        val credentialsManager = CredentialsManager.getInstance(this)
         val server = credentialsManager.getServer()
         val username = credentialsManager.getUsername()
         val password = credentialsManager.getPassword()
@@ -361,10 +303,7 @@ class MovieDetailActivity : AppCompatActivity() {
         }
     }
     
-    private fun showLoading(show: Boolean) {
-        progressBar.visibility = if (show) View.VISIBLE else View.GONE
-        infoContainer.visibility = if (show) View.GONE else View.VISIBLE
-    }
+
     
     private fun checkDownloadStatus() {
         lifecycleScope.launch {
@@ -416,6 +355,7 @@ class MovieDetailActivity : AppCompatActivity() {
     private fun startDownload() {
         lifecycleScope.launch {
             try {
+                val credentialsManager = CredentialsManager.getInstance(this@MovieDetailActivity)
                 val server = credentialsManager.getServer()
                 val username = credentialsManager.getUsername()
                 val password = credentialsManager.getPassword()
