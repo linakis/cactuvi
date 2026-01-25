@@ -8,6 +8,7 @@ import com.cactuvi.app.domain.model.Resource
 import com.cactuvi.app.domain.repository.ContentRepository
 import com.cactuvi.app.domain.usecase.ObserveMoviesUseCase
 import com.cactuvi.app.domain.usecase.RefreshMoviesUseCase
+import com.cactuvi.app.ui.common.NavigationLevel
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
