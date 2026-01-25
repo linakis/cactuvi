@@ -276,6 +276,42 @@ This app is designed for TV screens and MUST support D-pad navigation. All UI el
 ./gradlew dependencyUpdates
 ```
 
+### Code Quality Tools (ktlint, ktfmt, Spotless, Detekt)
+```bash
+# Quick commands (recommended)
+./gradlew codeQualityCheck    # Run all checks (formatting + static analysis)
+./gradlew codeQualityFix       # Auto-fix formatting and linting issues
+./gradlew check                # Run quality checks + tests
+
+# Formatting (Spotless + ktfmt)
+./gradlew spotlessCheck        # Check code formatting
+./gradlew spotlessApply        # Fix formatting issues automatically
+./gradlew :app:spotlessKotlin  # Format Kotlin files only
+
+# Style checking (ktlint)
+./gradlew ktlintCheck          # Check Kotlin code style
+./gradlew ktlintFormat         # Fix style issues
+
+# Static analysis (Detekt)
+./gradlew detekt               # Run static code analysis
+./gradlew detektBaseline       # Generate/update baseline (suppress existing issues)
+
+# View Detekt reports
+open app/build/reports/detekt/detekt.html  # HTML report (best for browsing)
+cat app/build/reports/detekt/detekt.md     # Markdown report
+cat app/build/reports/detekt/detekt.xml    # XML report (for CI/CD)
+
+# Pre-commit hook
+# Automatically runs: BD sync + Spotless check on staged Kotlin files
+# Skip hook (use sparingly): git commit --no-verify
+```
+
+**Code Quality Configuration Files:**
+- `.editorconfig` - IDE settings (4 spaces, 120 chars, trailing commas)
+- `config/detekt/detekt.yml` - Detekt rules and thresholds
+- `config/detekt/baseline.xml` - Suppressed existing issues
+- `build.gradle.kts` - Tool configuration and Gradle tasks
+
 ### Debugging Commands
 ```bash
 # Build and check for Kotlin compile errors
