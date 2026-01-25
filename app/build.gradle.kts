@@ -124,6 +124,18 @@ dependencies {
     testImplementation("io.mockk:mockk:1.13.9")
     testImplementation("app.cash.turbine:turbine:1.0.0")
     testImplementation("androidx.arch.core:core-testing:2.2.0") // InstantTaskExecutorRule
+    
+    // Robolectric for Android unit tests (with Context)
+    testImplementation("org.robolectric:robolectric:4.11.1")
+    
+    // MockWebServer for API mocking
+    testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
+    
+    // AndroidX Test for Robolectric
+    testImplementation("androidx.test:core:1.5.0")
+    testImplementation("androidx.test:core-ktx:1.5.0")
+    testImplementation("androidx.test.ext:junit-ktx:1.1.5")
+    
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
 }
