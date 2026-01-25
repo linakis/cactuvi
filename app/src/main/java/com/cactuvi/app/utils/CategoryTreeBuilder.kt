@@ -199,11 +199,14 @@ object CategoryTreeBuilder {
 
     /**
      * Apply grouping layer on top of existing tree (for backward compatibility). Creates virtual
-     * "group" categories by splitting category names.
+     * "group" categories by splitting category names. When grouping is enabled, category names are
+     * automatically stripped of their group prefix for cleaner display.
+     *
+     * Example: "UK | Sports" becomes "Sports" under the "UK" group.
      *
      * @param roots Existing root nodes
      * @param separator Group separator
-     * @return NavigationTree with group layer added
+     * @return NavigationTree with group layer added and prefixes stripped
      */
     private fun applyGroupingLayer(roots: List<CategoryNode>, separator: String): NavigationTree {
         // Group roots by extracted group name
@@ -220,7 +223,20 @@ object CategoryTreeBuilder {
                             categoryName = groupName,
                             parentId = 0,
                         )
-                    CategoryNode(virtualCategory, nodes, depth = 0)
+
+                    // Strip group prefix from child category names (root level only)
+                    val strippedNodes =
+                        nodes.map { node ->
+                            val strippedCategory =
+                                node.category.copy(
+                                    categoryName =
+                                        stripGroupPrefix(node.category.categoryName, separator)
+                                )
+                            // Copy node with updated category, preserving all children as-is
+                            node.copy(category = strippedCategory)
+                        }
+
+                    CategoryNode(virtualCategory, strippedNodes, depth = 0)
                 }
                 .sortedBy { it.category.categoryName }
 
@@ -251,6 +267,49 @@ object CategoryTreeBuilder {
                 categoryName.split(" ").firstOrNull()?.trim() ?: "Other"
             }
         }
+    }
+
+    /**
+     * Strip group prefix from category name using separator. Only strips the first occurrence
+     * (group prefix), keeping any additional separators in the name.
+     *
+     * Examples:
+     * - "UK | Sports" with "|" → "Sports"
+     * - "UK | Sports | Football" with "|" → "Sports | Football" (keeps rest)
+     * - "Action - Thriller" with "-" → "Thriller"
+     * - "Action Movies" with "FIRST_WORD" → "Movies"
+     * - "Standalone" (no separator) → "Standalone" (unchanged)
+     * - "UK | " (empty after strip) → "UK | " (fallback to original)
+     *
+     * @param categoryName Original category name
+     * @param separator Group separator
+     * @return Name with group prefix stripped, or original if invalid
+     */
+    private fun stripGroupPrefix(categoryName: String, separator: String): String {
+        val stripped =
+            when (separator) {
+                "FIRST_WORD" -> {
+                    // Remove first word only
+                    val parts = categoryName.split(" ", limit = 2)
+                    if (parts.size > 1) parts[1].trim() else categoryName
+                }
+                "|",
+                "-",
+                "/" -> {
+                    // Remove prefix before first separator occurrence
+                    val parts = categoryName.split(separator, limit = 2)
+                    if (parts.size > 1) {
+                        parts[1].trim()
+                    } else {
+                        // No separator found, return original
+                        categoryName
+                    }
+                }
+                else -> categoryName // Unknown separator, don't strip
+            }
+
+        // Fallback: if result is empty/whitespace, return original
+        return if (stripped.isBlank()) categoryName else stripped
     }
 
     /**

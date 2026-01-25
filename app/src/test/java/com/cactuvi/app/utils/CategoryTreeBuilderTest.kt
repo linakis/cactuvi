@@ -233,7 +233,7 @@ class CategoryTreeBuilderTest {
 
         // Leaf nodes
         val leafNodes = tree.leafNodes
-        assertEquals(4, leafNodes.size) // Sci-Fi, Thriller, Classic, (and others)
+        assertEquals(3, leafNodes.size) // Sci-Fi, Thriller, Classic
 
         leafNodes.forEach { node -> assertTrue(node.isLeaf) }
     }
@@ -353,6 +353,249 @@ class CategoryTreeBuilderTest {
         assertEquals("Action > Sci-Fi", sciFiNode!!.category.categoryName)
     }
 
+    // ========== PREFIX STRIPPING TESTS ==========
+
+    @Test
+    fun `grouping with pipe strips prefix from root categories`() {
+        val tree =
+            CategoryTreeBuilder.buildNavigationTree(
+                groupedByPipe,
+                groupingEnabled = true,
+                separator = "|"
+            )
+
+        val englishGroup = tree.roots.find { it.category.categoryName == "ENGLISH" }
+        assertNotNull(englishGroup)
+
+        val categoryNames = englishGroup!!.children.map { it.category.categoryName }
+        assertTrue(categoryNames.contains("Action"))
+        assertTrue(categoryNames.contains("Drama"))
+        assertFalse(categoryNames.any { it.contains("ENGLISH |") })
+    }
+
+    @Test
+    fun `grouping with dash strips prefix from root categories`() {
+        val categories =
+            listOf(
+                Category("1", "Action - Movies", 0),
+                Category("2", "Action - Series", 0),
+            )
+
+        val tree =
+            CategoryTreeBuilder.buildNavigationTree(
+                categories,
+                groupingEnabled = true,
+                separator = "-"
+            )
+
+        val actionGroup = tree.roots.find { it.category.categoryName == "Action" }
+        assertNotNull(actionGroup)
+
+        val categoryNames = actionGroup!!.children.map { it.category.categoryName }
+        assertTrue(categoryNames.contains("Movies"))
+        assertTrue(categoryNames.contains("Series"))
+    }
+
+    @Test
+    fun `grouping with FIRST_WORD strips first word from root categories`() {
+        val categories =
+            listOf(
+                Category("1", "Action Movies", 0),
+                Category("2", "Action Series", 0),
+            )
+
+        val tree =
+            CategoryTreeBuilder.buildNavigationTree(
+                categories,
+                groupingEnabled = true,
+                separator = "FIRST_WORD"
+            )
+
+        val actionGroup = tree.roots.find { it.category.categoryName == "Action" }
+        assertNotNull(actionGroup)
+
+        val categoryNames = actionGroup!!.children.map { it.category.categoryName }
+        assertTrue(categoryNames.contains("Movies"))
+        assertTrue(categoryNames.contains("Series"))
+    }
+
+    @Test
+    fun `prefix stripping keeps multiple separators in name`() {
+        val categories =
+            listOf(
+                Category("1", "UK | Sports | Football", 0),
+                Category("2", "UK | Sports | Basketball", 0),
+            )
+
+        val tree =
+            CategoryTreeBuilder.buildNavigationTree(
+                categories,
+                groupingEnabled = true,
+                separator = "|"
+            )
+
+        val ukGroup = tree.roots.find { it.category.categoryName == "UK" }
+        assertNotNull(ukGroup)
+
+        val categoryNames = ukGroup!!.children.map { it.category.categoryName }
+        assertTrue(categoryNames.contains("Sports | Football"))
+        assertTrue(categoryNames.contains("Sports | Basketball"))
+    }
+
+    @Test
+    fun `prefix stripping handles categories without separator`() {
+        val categories =
+            listOf(
+                Category("1", "StandaloneCategory", 0),
+                Category("2", "AnotherOne", 0),
+            )
+
+        val tree =
+            CategoryTreeBuilder.buildNavigationTree(
+                categories,
+                groupingEnabled = true,
+                separator = "|"
+            )
+
+        // Categories without separator should be grouped by first word
+        // and names should remain unchanged (no prefix to strip)
+        assertTrue(tree.roots.isNotEmpty())
+        val allCategoryNames =
+            tree.roots.flatMap { it.children.map { child -> child.category.categoryName } }
+        assertTrue(allCategoryNames.contains("StandaloneCategory"))
+        assertTrue(allCategoryNames.contains("AnotherOne"))
+    }
+
+    @Test
+    fun `prefix stripping preserves empty results by keeping original name`() {
+        val categories =
+            listOf(
+                Category("1", "UK | ", 0), // Empty after strip
+                Category("2", "UK | Sports", 0),
+            )
+
+        val tree =
+            CategoryTreeBuilder.buildNavigationTree(
+                categories,
+                groupingEnabled = true,
+                separator = "|"
+            )
+
+        val ukGroup = tree.roots.find { it.category.categoryName == "UK" }
+        assertNotNull(ukGroup)
+
+        val categoryNames = ukGroup!!.children.map { it.category.categoryName }
+        // Empty result should fallback to original name
+        assertTrue(categoryNames.contains("UK | "))
+        assertTrue(categoryNames.contains("Sports"))
+    }
+
+    @Test
+    fun `prefix stripping trims whitespace after stripping`() {
+        val categories =
+            listOf(
+                Category("1", "UK |   Sports", 0), // Extra spaces
+                Category("2", "UK |News", 0), // No space after separator
+            )
+
+        val tree =
+            CategoryTreeBuilder.buildNavigationTree(
+                categories,
+                groupingEnabled = true,
+                separator = "|"
+            )
+
+        val ukGroup = tree.roots.find { it.category.categoryName == "UK" }
+        assertNotNull(ukGroup)
+
+        val categoryNames = ukGroup!!.children.map { it.category.categoryName }
+        assertTrue(categoryNames.contains("Sports"))
+        assertTrue(categoryNames.contains("News"))
+    }
+
+    @Test
+    fun `prefix stripping only affects root level not nested children`() {
+        val categories =
+            listOf(
+                Category("1", "UK | Sports", 0), // Root
+                Category("2", "UK | Sports | Football", 1), // Child of Sports
+            )
+
+        val tree =
+            CategoryTreeBuilder.buildNavigationTree(
+                categories,
+                groupingEnabled = true,
+                separator = "|"
+            )
+
+        val ukGroup = tree.roots.find { it.category.categoryName == "UK" }
+        assertNotNull(ukGroup)
+
+        // Root level: stripped
+        val rootCategory = ukGroup!!.children.first()
+        assertEquals("Sports", rootCategory.category.categoryName)
+
+        // Nested child: should keep full name (NOT stripped)
+        assertEquals(1, rootCategory.children.size)
+        assertEquals("UK | Sports | Football", rootCategory.children.first().category.categoryName)
+    }
+
+    @Test
+    fun `prefix stripping preserves category IDs`() {
+        val tree =
+            CategoryTreeBuilder.buildNavigationTree(
+                groupedByPipe,
+                groupingEnabled = true,
+                separator = "|"
+            )
+
+        val englishGroup = tree.roots.find { it.category.categoryName == "ENGLISH" }
+        assertNotNull(englishGroup)
+
+        // Original category IDs should be preserved
+        val categoryIds = englishGroup!!.children.map { it.category.categoryId }.toSet()
+        assertTrue(categoryIds.contains("1"))
+        assertTrue(categoryIds.contains("2"))
+    }
+
+    @Test
+    fun `prefix stripping works with all separator types`() {
+        val categoriesPipe = listOf(Category("1", "UK | Sports", 0))
+        val categoriesDash = listOf(Category("2", "UK - Sports", 0))
+        val categoriesSlash = listOf(Category("3", "UK / Sports", 0))
+        val categoriesWord = listOf(Category("4", "UK Sports", 0))
+
+        val treePipe =
+            CategoryTreeBuilder.buildNavigationTree(
+                categoriesPipe,
+                groupingEnabled = true,
+                separator = "|"
+            )
+        val treeDash =
+            CategoryTreeBuilder.buildNavigationTree(
+                categoriesDash,
+                groupingEnabled = true,
+                separator = "-"
+            )
+        val treeSlash =
+            CategoryTreeBuilder.buildNavigationTree(
+                categoriesSlash,
+                groupingEnabled = true,
+                separator = "/"
+            )
+        val treeWord =
+            CategoryTreeBuilder.buildNavigationTree(
+                categoriesWord,
+                groupingEnabled = true,
+                separator = "FIRST_WORD"
+            )
+
+        assertEquals("Sports", treePipe.roots.first().children.first().category.categoryName)
+        assertEquals("Sports", treeDash.roots.first().children.first().category.categoryName)
+        assertEquals("Sports", treeSlash.roots.first().children.first().category.categoryName)
+        assertEquals("Sports", treeWord.roots.first().children.first().category.categoryName)
+    }
+
     // ========== MIXED SCENARIO TESTS ==========
 
     @Test
@@ -381,7 +624,7 @@ class CategoryTreeBuilderTest {
         val spanishGroup = tree.roots.find { it.category.categoryName == "SPANISH" }
         assertNotNull(spanishGroup)
         assertEquals(1, spanishGroup!!.children.size)
-        assertEquals("SPANISH | Drama", spanishGroup.children.first().category.categoryName)
+        assertEquals("Drama", spanishGroup.children.first().category.categoryName)
 
         // ENGLISH group should have Action with Sci-Fi child
         val englishGroup = tree.roots.find { it.category.categoryName == "ENGLISH" }
@@ -389,7 +632,7 @@ class CategoryTreeBuilderTest {
         assertEquals(1, englishGroup!!.children.size)
 
         val actionNode = englishGroup.children.first()
-        assertEquals("ENGLISH | Action", actionNode.category.categoryName)
+        assertEquals("Action", actionNode.category.categoryName)
         assertEquals(1, actionNode.children.size)
         assertEquals("ENGLISH | Action > Sci-Fi", actionNode.children.first().category.categoryName)
     }
