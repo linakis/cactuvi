@@ -765,7 +765,11 @@ private constructor(
                     // Check cache first (unless forcing refresh)
                     if (!forceRefresh) {
                         val metadata = database.cacheMetadataDao().get("live")
-                        if (metadata != null && metadata.itemCount > 0) {
+                        if (
+                            metadata != null &&
+                                metadata.itemCount > 0 &&
+                                metadata.loadStatus == "SUCCESS"
+                        ) {
                             val isExtremelyStale =
                                 !isCacheValid(metadata.lastUpdated, CACHE_TTL_FALLBACK)
                             if (!isExtremelyStale) {
@@ -847,6 +851,18 @@ private constructor(
                         )
                     }
 
+                    // Verify database count
+                    val dbCount = database.liveChannelDao().getCount()
+                    PerformanceLogger.log(
+                        "loadLive: Verification - expected: $totalInserted, actualDB: $dbCount"
+                    )
+                    if (dbCount == 0 || kotlin.math.abs(dbCount - totalInserted) > 100) {
+                        val errorMsg =
+                            "Database verification failed: reported $totalInserted, actual $dbCount"
+                        android.util.Log.e("ContentRepository", "loadLive: $errorMsg")
+                        throw Exception(errorMsg)
+                    }
+
                     // Update cache metadata
                     val newMetadata =
                         CacheMetadataEntity(
@@ -854,16 +870,13 @@ private constructor(
                             lastUpdated = System.currentTimeMillis(),
                             itemCount = totalInserted,
                             categoryCount = categories.size,
+                            loadStatus = "SUCCESS",
                         )
                     database.cacheMetadataDao().insert(newMetadata)
 
                     PerformanceLogger.log(
                         "loadLive: Successfully inserted $totalInserted live channels"
                     )
-
-                    // Verify database count
-                    val dbCount = database.liveChannelDao().getCount()
-                    PerformanceLogger.log("loadLive: DB count verification: $dbCount")
 
                     // Emit Success state
                     _liveState.value = DataState.Success(Unit)
@@ -1117,7 +1130,7 @@ private constructor(
                         if (
                             metadata != null &&
                                 metadata.itemCount > 0 &&
-                                metadata.loadStatus != "PARTIAL"
+                                metadata.loadStatus == "SUCCESS"
                         ) {
                             val isExtremelyStale =
                                 !isCacheValid(metadata.lastUpdated, CACHE_TTL_FALLBACK)
@@ -1191,19 +1204,6 @@ private constructor(
                                         // Write batch to database
                                         dbWriter.writeMovies(batch)
                                         successCount += batch.size
-
-                                        // Update cache metadata incrementally (for crash recovery)
-                                        database
-                                            .cacheMetadataDao()
-                                            .insert(
-                                                CacheMetadataEntity(
-                                                    contentType = "movies",
-                                                    lastUpdated = System.currentTimeMillis(),
-                                                    itemCount = successCount,
-                                                    categoryCount = categories.size,
-                                                    loadStatus = "LOADING",
-                                                ),
-                                            )
 
                                         // Emit progress every 10%
                                         if (totalParsed > 0) {
@@ -1302,6 +1302,21 @@ private constructor(
                     com.cactuvi.app.data.db.OptimizedBulkInsert.endMoviesInsert(
                         database.getSqliteDatabase()
                     )
+
+                    // Verify actual database count matches write result
+                    val actualDbCount = database.movieDao().getCount()
+                    PerformanceLogger.log(
+                        "loadMovies: Verification - writeResult: ${writeResult.successCount}, actualDB: $actualDbCount"
+                    )
+                    if (
+                        actualDbCount == 0 ||
+                            kotlin.math.abs(actualDbCount - writeResult.successCount) > 100
+                    ) {
+                        val errorMsg =
+                            "Database verification failed: reported ${writeResult.successCount}, actual $actualDbCount"
+                        android.util.Log.e("ContentRepository", "loadMovies: $errorMsg")
+                        throw Exception(errorMsg)
+                    }
 
                     // Handle results based on parse + write status
                     when {
@@ -1764,7 +1779,11 @@ private constructor(
                     // Check cache first (unless forcing refresh)
                     if (!forceRefresh) {
                         val metadata = database.cacheMetadataDao().get("series")
-                        if (metadata != null && metadata.itemCount > 0) {
+                        if (
+                            metadata != null &&
+                                metadata.itemCount > 0 &&
+                                metadata.loadStatus == "SUCCESS"
+                        ) {
                             val isExtremelyStale =
                                 !isCacheValid(metadata.lastUpdated, CACHE_TTL_FALLBACK)
                             if (!isExtremelyStale) {
@@ -1857,6 +1876,18 @@ private constructor(
                         )
                     }
 
+                    // Verify database count
+                    val dbCount = database.seriesDao().getCount()
+                    PerformanceLogger.log(
+                        "loadSeries: Verification - expected: $totalInserted, actualDB: $dbCount"
+                    )
+                    if (dbCount == 0 || kotlin.math.abs(dbCount - totalInserted) > 100) {
+                        val errorMsg =
+                            "Database verification failed: reported $totalInserted, actual $dbCount"
+                        android.util.Log.e("ContentRepository", "loadSeries: $errorMsg")
+                        throw Exception(errorMsg)
+                    }
+
                     // Update cache metadata
                     val newMetadata =
                         CacheMetadataEntity(
@@ -1864,14 +1895,11 @@ private constructor(
                             lastUpdated = System.currentTimeMillis(),
                             itemCount = totalInserted,
                             categoryCount = categories.size,
+                            loadStatus = "SUCCESS",
                         )
                     database.cacheMetadataDao().insert(newMetadata)
 
                     PerformanceLogger.log("loadSeries: Successfully inserted $totalInserted series")
-
-                    // Verify database count
-                    val dbCount = database.seriesDao().getCount()
-                    PerformanceLogger.log("loadSeries: DB count verification: $dbCount")
 
                     val duration = System.currentTimeMillis() - startTime
                     PerformanceLogger.log("loadSeries: API fetch completed (${duration}ms)")

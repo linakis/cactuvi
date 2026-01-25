@@ -52,16 +52,14 @@ object OptimizedBulkInsert {
     private fun insertMovieBatch(database: SupportSQLiteDatabase, movies: List<MovieEntity>) {
         val sql = buildString {
             append("INSERT OR REPLACE INTO movies (")
-            append(
-                "id, sourceId, streamId, num, name, streamType, streamIcon, rating, rating5Based, "
-            )
+            append("sourceId, streamId, num, name, streamType, streamIcon, rating, rating5Based, ")
             append("added, categoryId, containerExtension, customSid, directSource, categoryName, ")
             append("isFavorite, resumePosition, lastUpdated")
             append(") VALUES ")
 
             movies.forEachIndexed { index, _ ->
                 if (index > 0) append(", ")
-                append("(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+                append("(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
             }
         }
 
@@ -69,7 +67,6 @@ object OptimizedBulkInsert {
         try {
             var bindIndex = 1
             movies.forEach { movie ->
-                statement.bindLong(bindIndex++, movie.id.toLong())
                 statement.bindString(bindIndex++, movie.sourceId)
                 statement.bindLong(bindIndex++, movie.streamId.toLong())
                 statement.bindLong(bindIndex++, movie.num.toLong())
@@ -163,7 +160,7 @@ object OptimizedBulkInsert {
     private fun insertSeriesBatch(database: SupportSQLiteDatabase, series: List<SeriesEntity>) {
         val sql = buildString {
             append("INSERT OR REPLACE INTO series (")
-            append("id, sourceId, seriesId, num, name, cover, plot, cast, director, genre, ")
+            append("sourceId, seriesId, num, name, cover, plot, cast, director, genre, ")
             append(
                 "releaseDate, lastModified, rating, rating5Based, backdropPath, youtubeTrailer, "
             )
@@ -172,7 +169,7 @@ object OptimizedBulkInsert {
 
             series.forEachIndexed { index, _ ->
                 if (index > 0) append(", ")
-                append("(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+                append("(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
             }
         }
 
@@ -180,7 +177,6 @@ object OptimizedBulkInsert {
         try {
             var bindIndex = 1
             series.forEach { s ->
-                statement.bindLong(bindIndex++, s.id.toLong())
                 statement.bindString(bindIndex++, s.sourceId)
                 statement.bindLong(bindIndex++, s.seriesId.toLong())
                 statement.bindLong(bindIndex++, s.num.toLong())
@@ -291,9 +287,7 @@ object OptimizedBulkInsert {
     ) {
         val sql = buildString {
             append("INSERT OR REPLACE INTO live_channels (")
-            append(
-                "id, sourceId, streamId, num, name, streamType, streamIcon, epgChannelId, added, "
-            )
+            append("sourceId, streamId, num, name, streamType, streamIcon, epgChannelId, added, ")
             append(
                 "categoryId, customSid, tvArchive, directSource, tvArchiveDuration, categoryName, "
             )
@@ -302,7 +296,7 @@ object OptimizedBulkInsert {
 
             channels.forEachIndexed { index, _ ->
                 if (index > 0) append(", ")
-                append("(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+                append("(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
             }
         }
 
@@ -310,7 +304,6 @@ object OptimizedBulkInsert {
         try {
             var bindIndex = 1
             channels.forEach { channel ->
-                statement.bindLong(bindIndex++, channel.id.toLong())
                 statement.bindString(bindIndex++, channel.sourceId)
                 statement.bindLong(bindIndex++, channel.streamId.toLong())
                 statement.bindLong(bindIndex++, channel.num.toLong())
