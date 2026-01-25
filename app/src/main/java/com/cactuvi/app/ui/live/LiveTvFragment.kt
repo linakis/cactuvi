@@ -98,10 +98,7 @@ class LiveTvFragment : Fragment() {
         breadcrumbScroll = view.findViewById(R.id.breadcrumbScroll)
         breadcrumbChips = view.findViewById(R.id.breadcrumbChips)
         
-        repository = ContentRepository(
-            SourceManager.getInstance(requireContext()),
-            requireContext()
-        )
+        repository = ContentRepository.getInstance(requireContext())
         
         database = com.cactuvi.app.data.db.AppDatabase.getInstance(requireContext())
         
@@ -201,10 +198,25 @@ class LiveTvFragment : Fragment() {
                         showLoadingWithMessage("Loading live channels for the first time...")
                     } else {
                         progressBar.visibility = View.VISIBLE
+                        state.progress?.let { percent ->
+                            progressBar.isIndeterminate = false
+                            progressBar.progress = percent
+                        } ?: run {
+                            progressBar.isIndeterminate = true
+                        }
                     }
                 }
             }
             is com.cactuvi.app.data.models.DataState.Success -> {
+                refreshUIFromCache()
+            }
+            is com.cactuvi.app.data.models.DataState.PartialSuccess -> {
+                // Silent partial success - just show the data we got
+                android.util.Log.w(
+                    "LiveTvFragment",
+                    "Partial success: ${state.successCount} items loaded, ${state.failedCount} failed - ${state.error.message}"
+                )
+                progressBar.visibility = View.GONE
                 refreshUIFromCache()
             }
             is com.cactuvi.app.data.models.DataState.Error -> {
@@ -227,6 +239,13 @@ class LiveTvFragment : Fragment() {
                     when (effect) {
                         is LiveEffect.LoadSuccess -> {
                             android.util.Log.d("LiveTvFragment", "Live channels loaded successfully: ${effect.itemCount} items")
+                        }
+                        is LiveEffect.LoadPartialSuccess -> {
+                            android.util.Log.w(
+                                "LiveTvFragment",
+                                "Partial load: ${effect.successCount} items loaded, ${effect.failedCount} failed - ${effect.message}"
+                            )
+                            // Silent - no user notification
                         }
                         is LiveEffect.LoadError -> {
                             if (effect.hasCachedData) {
@@ -256,6 +275,8 @@ class LiveTvFragment : Fragment() {
     private fun refreshUIFromCache() {
         progressBar.visibility = View.GONE
         errorText.visibility = View.GONE
+        emptyText.visibility = View.GONE
+        recyclerView.visibility = View.VISIBLE
         
         lifecycleScope.launch {
             loadCategoriesFromCache()
@@ -418,6 +439,8 @@ class LiveTvFragment : Fragment() {
         
         // Update adapter data - get counts from DB instead of loading all channels
         lifecycleScope.launch {
+            // Small delay to ensure database has flushed all pending writes
+            kotlinx.coroutines.delay(100)
             val categoriesWithCounts = group.categories.map { category ->
                 val count = database.liveChannelDao().getCountByCategory(category.categoryId)
                 Pair(category, count)

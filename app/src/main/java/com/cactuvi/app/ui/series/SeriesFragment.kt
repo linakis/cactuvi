@@ -97,10 +97,7 @@ class SeriesFragment : Fragment() {
         breadcrumbScroll = view.findViewById(R.id.breadcrumbScroll)
         breadcrumbChips = view.findViewById(R.id.breadcrumbChips)
         
-        repository = ContentRepository(
-            SourceManager.getInstance(requireContext()),
-            requireContext()
-        )
+        repository = ContentRepository.getInstance(requireContext())
         
         database = com.cactuvi.app.data.db.AppDatabase.getInstance(requireContext())
         
@@ -204,13 +201,28 @@ class SeriesFragment : Fragment() {
                         // First load - show full-screen spinner
                         showLoadingWithMessage("Loading series for the first time...")
                     } else {
-                        // Has data - show refresh indicator only
+                        // Has data - show refresh indicator with progress
                         progressBar.visibility = View.VISIBLE
+                        state.progress?.let { percent ->
+                            progressBar.isIndeterminate = false
+                            progressBar.progress = percent
+                        } ?: run {
+                            progressBar.isIndeterminate = true
+                        }
                     }
                 }
             }
             is com.cactuvi.app.data.models.DataState.Success -> {
                 // Data loaded - refresh UI from cache
+                refreshUIFromCache()
+            }
+            is com.cactuvi.app.data.models.DataState.PartialSuccess -> {
+                // Silent partial success - just show the data we got
+                android.util.Log.w(
+                    "SeriesFragment",
+                    "Partial success: ${state.successCount} items loaded, ${state.failedCount} failed - ${state.error.message}"
+                )
+                progressBar.visibility = View.GONE
                 refreshUIFromCache()
             }
             is com.cactuvi.app.data.models.DataState.Error -> {
@@ -252,6 +264,13 @@ class SeriesFragment : Fragment() {
                             //     "from_cache" to effect.fromCache
                             // ))
                         }
+                        is SeriesEffect.LoadPartialSuccess -> {
+                            android.util.Log.w(
+                                "SeriesFragment",
+                                "Partial load: ${effect.successCount} items loaded, ${effect.failedCount} failed - ${effect.message}"
+                            )
+                            // Silent - no user notification
+                        }
                         is SeriesEffect.LoadError -> {
                             if (effect.hasCachedData) {
                                 // Background refresh failed, cache exists - SILENT
@@ -292,6 +311,8 @@ class SeriesFragment : Fragment() {
     private fun refreshUIFromCache() {
         progressBar.visibility = View.GONE
         errorText.visibility = View.GONE
+        emptyText.visibility = View.GONE
+        recyclerView.visibility = View.VISIBLE
         
         // Load groups from cache (not API)
         lifecycleScope.launch {
@@ -477,6 +498,9 @@ class SeriesFragment : Fragment() {
         
         // Update adapter data - get counts from DB instead of loading all series
         lifecycleScope.launch {
+            // Small delay to ensure database has flushed all pending writes
+            kotlinx.coroutines.delay(100)
+            
             // DEBUG: Check total series count first
             val totalSeriesCount = database.seriesDao().getCount()
             android.util.Log.d("IPTV_PERF", "[DEBUG SeriesFragment.showCategories] Total series in DB: $totalSeriesCount")
