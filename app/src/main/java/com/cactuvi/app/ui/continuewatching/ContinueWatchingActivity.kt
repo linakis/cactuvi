@@ -5,37 +5,40 @@ import android.os.Bundle
 import android.view.View
 import android.widget.ProgressBar
 import android.widget.Toast
+import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.isVisible
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.cactuvi.app.R
-import com.cactuvi.app.data.repository.ContentRepository
 import com.cactuvi.app.ui.common.ModernToolbar
 import com.cactuvi.app.ui.player.PlayerActivity
 import com.cactuvi.app.utils.CredentialsManager
-import com.cactuvi.app.utils.SourceManager
 import com.cactuvi.app.utils.StreamUrlBuilder
+import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
+@AndroidEntryPoint
 class ContinueWatchingActivity : AppCompatActivity() {
     
+    private val viewModel: ContinueWatchingViewModel by viewModels()
     private lateinit var modernToolbar: ModernToolbar
     private lateinit var recyclerView: RecyclerView
     private lateinit var emptyState: View
     private lateinit var progressBar: ProgressBar
     private lateinit var adapter: ContinueWatchingAdapter
-    private lateinit var repository: ContentRepository
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_continue_watching)
         
-        repository = ContentRepository.getInstance(this)
-        
         setupToolbar()
         setupRecyclerView()
-        loadWatchHistory()
+        observeUiState()
     }
     
     private fun setupToolbar() {
@@ -58,33 +61,29 @@ class ContinueWatchingActivity : AppCompatActivity() {
         recyclerView.adapter = adapter
     }
     
-    private fun loadWatchHistory() {
-        showLoading(true)
-        
+    private fun observeUiState() {
         lifecycleScope.launch {
-            val result = repository.getWatchHistory(limit = 50)
-            
-            if (result.isSuccess) {
-                val history = result.getOrNull() ?: emptyList()
-                
-                if (history.isEmpty()) {
-                    showEmptyState()
-                } else {
-                    adapter.updateItems(history)
-                    recyclerView.visibility = View.VISIBLE
-                    emptyState.visibility = View.GONE
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.uiState.collectLatest { state ->
+                    renderUiState(state)
                 }
-            } else {
-                Toast.makeText(
-                    this@ContinueWatchingActivity,
-                    "Failed to load watch history",
-                    Toast.LENGTH_SHORT
-                ).show()
-                showEmptyState()
             }
-            
-            showLoading(false)
         }
+    }
+    
+    private fun renderUiState(state: ContinueWatchingUiState) {
+        // Loading state
+        progressBar.isVisible = state.isLoading
+        recyclerView.isVisible = !state.isLoading && state.watchHistory.isNotEmpty()
+        emptyState.isVisible = !state.isLoading && state.watchHistory.isEmpty()
+        
+        // Error state
+        state.error?.let { errorMsg ->
+            Toast.makeText(this, errorMsg, Toast.LENGTH_SHORT).show()
+        }
+        
+        // Watch history
+        adapter.updateItems(state.watchHistory)
     }
     
     private fun resumePlayback(item: com.cactuvi.app.data.db.entities.WatchHistoryEntity) {
@@ -156,17 +155,6 @@ class ContinueWatchingActivity : AppCompatActivity() {
         }
     }
     
-    private fun showLoading(show: Boolean) {
-        progressBar.visibility = if (show) View.VISIBLE else View.GONE
-        recyclerView.visibility = if (show) View.GONE else View.VISIBLE
-        emptyState.visibility = View.GONE
-    }
-    
-    private fun showEmptyState() {
-        emptyState.visibility = View.VISIBLE
-        recyclerView.visibility = View.GONE
-    }
-    
     private fun showDeleteConfirmation(item: com.cactuvi.app.data.db.entities.WatchHistoryEntity) {
         androidx.appcompat.app.AlertDialog.Builder(this)
             .setTitle("Remove from Continue Watching")
@@ -179,25 +167,11 @@ class ContinueWatchingActivity : AppCompatActivity() {
     }
     
     private fun deleteWatchHistoryItem(item: com.cactuvi.app.data.db.entities.WatchHistoryEntity) {
-        lifecycleScope.launch {
-            val result = repository.deleteWatchHistoryItem(item.contentId)
-            
-            if (result.isSuccess) {
-                Toast.makeText(
-                    this@ContinueWatchingActivity,
-                    "Removed from continue watching",
-                    Toast.LENGTH_SHORT
-                ).show()
-                
-                // Reload the list
-                loadWatchHistory()
-            } else {
-                Toast.makeText(
-                    this@ContinueWatchingActivity,
-                    "Failed to remove item",
-                    Toast.LENGTH_SHORT
-                ).show()
-            }
-        }
+        viewModel.deleteItem(item.contentId)
+        Toast.makeText(
+            this@ContinueWatchingActivity,
+            "Removed from continue watching",
+            Toast.LENGTH_SHORT
+        ).show()
     }
 }
