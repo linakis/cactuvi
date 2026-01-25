@@ -7,8 +7,12 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
 import android.widget.Toast
+import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.activityViewModels
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.cactuvi.app.R
@@ -16,7 +20,6 @@ import com.cactuvi.app.data.db.entities.FavoriteEntity
 import com.cactuvi.app.data.models.LiveChannel
 import com.cactuvi.app.data.models.Movie
 import com.cactuvi.app.data.models.Series
-import com.cactuvi.app.data.repository.ContentRepository
 import com.cactuvi.app.ui.common.LiveChannelAdapter
 import com.cactuvi.app.ui.common.MovieAdapter
 import com.cactuvi.app.ui.common.SeriesAdapter
@@ -24,14 +27,16 @@ import com.cactuvi.app.ui.detail.MovieDetailActivity
 import com.cactuvi.app.ui.detail.SeriesDetailActivity
 import com.cactuvi.app.ui.player.PlayerActivity
 import com.cactuvi.app.utils.CredentialsManager
-import com.cactuvi.app.utils.SourceManager
 import com.cactuvi.app.utils.StreamUrlBuilder
+import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
+@AndroidEntryPoint
 class MyListFragment : Fragment() {
     
+    private val viewModel: MyListViewModel by activityViewModels()
     private var contentType: String? = null
-    private lateinit var repository: ContentRepository
     
     private lateinit var recyclerView: RecyclerView
     private lateinit var emptyText: TextView
@@ -51,7 +56,6 @@ class MyListFragment : Fragment() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         contentType = arguments?.getString(ARG_CONTENT_TYPE)
-        repository = ContentRepository.getInstance(requireContext())
     }
     
     override fun onCreateView(
@@ -65,41 +69,49 @@ class MyListFragment : Fragment() {
         emptyText = view.findViewById(R.id.emptyText)
         
         setupRecyclerView()
-        loadFavorites()
+        observeUiState()
         
         return view
     }
     
     override fun onResume() {
         super.onResume()
-        // Reload favorites when returning to this fragment
-        loadFavorites()
+        // Load favorites for this content type
+        viewModel.loadFavorites(contentType)
     }
     
     private fun setupRecyclerView() {
         recyclerView.layoutManager = GridLayoutManager(requireContext(), 3)
     }
     
-    private fun loadFavorites() {
-        lifecycleScope.launch {
-            val result = repository.getFavorites(contentType)
-            
-            if (result.isSuccess) {
-                val favorites = result.getOrNull() ?: emptyList()
-                
-                if (favorites.isEmpty()) {
-                    showEmptyState()
-                } else {
-                    displayFavorites(favorites)
+    private fun observeUiState() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.uiState.collectLatest { state ->
+                    renderUiState(state)
                 }
-            } else {
-                Toast.makeText(
-                    requireContext(),
-                    "Failed to load favorites",
-                    Toast.LENGTH_SHORT
-                ).show()
-                showEmptyState()
             }
+        }
+    }
+    
+    private fun renderUiState(state: MyListUiState) {
+        // Error state
+        state.error?.let { errorMsg ->
+            Toast.makeText(requireContext(), errorMsg, Toast.LENGTH_SHORT).show()
+        }
+        
+        // Filter favorites by content type
+        val filteredFavorites = if (contentType != null) {
+            state.favorites.filter { it.contentType == contentType }
+        } else {
+            state.favorites
+        }
+        
+        // Show/hide UI
+        if (filteredFavorites.isEmpty()) {
+            showEmptyState()
+        } else {
+            displayFavorites(filteredFavorites)
         }
     }
     

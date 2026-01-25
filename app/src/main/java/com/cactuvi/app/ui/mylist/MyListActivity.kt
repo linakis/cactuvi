@@ -4,36 +4,38 @@ import android.os.Bundle
 import android.view.View
 import android.widget.ProgressBar
 import android.widget.Toast
+import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.isVisible
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.viewpager2.widget.ViewPager2
 import com.google.android.material.tabs.TabLayout
 import com.google.android.material.tabs.TabLayoutMediator
 import com.cactuvi.app.R
-import com.cactuvi.app.data.repository.ContentRepository
 import com.cactuvi.app.ui.common.ModernToolbar
-import com.cactuvi.app.utils.CredentialsManager
-import com.cactuvi.app.utils.SourceManager
+import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
+@AndroidEntryPoint
 class MyListActivity : AppCompatActivity() {
     
+    private val viewModel: MyListViewModel by viewModels()
     private lateinit var modernToolbar: ModernToolbar
     private lateinit var tabLayout: TabLayout
     private lateinit var viewPager: ViewPager2
     private lateinit var emptyState: View
     private lateinit var progressBar: ProgressBar
-    private lateinit var repository: ContentRepository
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_my_list)
         
-        repository = ContentRepository.getInstance(this)
-        
         setupToolbar()
         setupViewPager()
-        loadFavorites()
+        observeUiState()
     }
     
     private fun setupToolbar() {
@@ -61,48 +63,26 @@ class MyListActivity : AppCompatActivity() {
         }.attach()
     }
     
-    private fun loadFavorites() {
-        showLoading(true)
-        
+    private fun observeUiState() {
         lifecycleScope.launch {
-            val result = repository.getFavorites(contentType = null)
-            
-            if (result.isSuccess) {
-                val favorites = result.getOrNull() ?: emptyList()
-                
-                if (favorites.isEmpty()) {
-                    showEmptyState()
-                } else {
-                    viewPager.visibility = View.VISIBLE
-                    tabLayout.visibility = View.VISIBLE
-                    emptyState.visibility = View.GONE
-                    
-                    // Update fragments with data
-                    // TODO: Pass data to fragments
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.uiState.collectLatest { state ->
+                    renderUiState(state)
                 }
-            } else {
-                Toast.makeText(
-                    this@MyListActivity,
-                    "Failed to load favorites",
-                    Toast.LENGTH_SHORT
-                ).show()
-                showEmptyState()
             }
-            
-            showLoading(false)
         }
     }
     
-    private fun showLoading(show: Boolean) {
-        progressBar.visibility = if (show) View.VISIBLE else View.GONE
-        viewPager.visibility = if (show) View.GONE else View.VISIBLE
-        tabLayout.visibility = if (show) View.GONE else View.VISIBLE
-        emptyState.visibility = View.GONE
-    }
-    
-    private fun showEmptyState() {
-        emptyState.visibility = View.VISIBLE
-        viewPager.visibility = View.GONE
-        tabLayout.visibility = View.GONE
+    private fun renderUiState(state: MyListUiState) {
+        // Loading state
+        progressBar.isVisible = state.isLoading
+        viewPager.isVisible = !state.isLoading && state.favorites.isNotEmpty()
+        tabLayout.isVisible = !state.isLoading && state.favorites.isNotEmpty()
+        emptyState.isVisible = !state.isLoading && state.favorites.isEmpty()
+        
+        // Error state
+        state.error?.let { errorMsg ->
+            Toast.makeText(this, errorMsg, Toast.LENGTH_SHORT).show()
+        }
     }
 }
