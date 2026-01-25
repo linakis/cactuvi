@@ -9,7 +9,9 @@ import android.view.ViewGroup
 import android.widget.HorizontalScrollView
 import android.widget.ProgressBar
 import android.widget.TextView
+import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -22,29 +24,29 @@ import com.cactuvi.app.R
 import com.cactuvi.app.data.models.Category
 import com.cactuvi.app.data.models.Movie
 import com.cactuvi.app.data.repository.ContentRepository
-import com.cactuvi.app.data.repository.MoviesEffect
-import com.cactuvi.app.data.sync.ContentDiff
-import com.cactuvi.app.data.sync.ReactiveUpdateManager
 import com.cactuvi.app.ui.common.CategoryTreeAdapter
 import com.cactuvi.app.ui.common.GroupAdapter
 import com.cactuvi.app.ui.common.ModernToolbar
 import com.cactuvi.app.ui.common.MoviePagingAdapter
-import com.cactuvi.app.ui.player.PlayerActivity
-import com.cactuvi.app.data.models.ContentFilterSettings
-import com.cactuvi.app.utils.CategoryGrouper
 import com.cactuvi.app.utils.CategoryGrouper.GroupNode
-import com.cactuvi.app.utils.CategoryGrouper.NavigationTree
-import com.cactuvi.app.utils.CredentialsManager
-import com.cactuvi.app.utils.SourceManager
 import com.cactuvi.app.utils.IdleDetectionHelper
 import com.cactuvi.app.utils.PerformanceLogger
-import com.cactuvi.app.utils.PreferencesManager
-import com.cactuvi.app.utils.StreamUrlBuilder
+import com.cactuvi.app.utils.SourceManager
+import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
+@AndroidEntryPoint
 class MoviesFragment : Fragment() {
+    
+    private val viewModel: MoviesViewModel by viewModels()
+    
+    @Inject
+    lateinit var repository: ContentRepository
+    
+    @Inject
+    lateinit var database: com.cactuvi.app.data.db.AppDatabase
     
     // UI Components
     private lateinit var recyclerView: RecyclerView
@@ -60,23 +62,6 @@ class MoviesFragment : Fragment() {
     private lateinit var categoryAdapter: CategoryTreeAdapter
     private val contentAdapter: MoviePagingAdapter by lazy {
         MoviePagingAdapter { movie -> openMovieDetail(movie) }
-    }
-    
-    // Data
-    private lateinit var repository: ContentRepository
-    private lateinit var database: com.cactuvi.app.data.db.AppDatabase
-    private var navigationTree: NavigationTree? = null
-    private var categories: List<Category> = emptyList()
-    
-    // Navigation State
-    private var currentLevel: NavigationLevel = NavigationLevel.GROUPS
-    private var selectedGroup: GroupNode? = null
-    private var selectedCategory: Category? = null
-    
-    enum class NavigationLevel {
-        GROUPS,      // Show all groups
-        CATEGORIES,  // Show categories in group
-        CONTENT      // Show filtered content
     }
     
     override fun onCreateView(
@@ -99,31 +84,18 @@ class MoviesFragment : Fragment() {
         breadcrumbScroll = view.findViewById(R.id.breadcrumbScroll)
         breadcrumbChips = view.findViewById(R.id.breadcrumbChips)
         
-        repository = ContentRepository(
-            SourceManager.getInstance(requireContext()),
-            requireContext()
-        )
-        
-        database = com.cactuvi.app.data.db.AppDatabase.getInstance(requireContext())
-        
         setupToolbar()
         setupRecyclerView()
-        setupReactiveUpdates()
         
-        // NEW: Observe reactive state + effects
-        observeMoviesState()
-        observeMoviesEffects()
-        
-        // Trigger initial load ONCE
-        triggerDataLoad()
+        // Observe ViewModel state
+        observeUiState()
     }
     
     private fun setupToolbar() {
         modernToolbar.title = "Movies"
         modernToolbar.onBackClick = {
-            val handled = handleBackPress()
+            val handled = viewModel.navigateBack()
             if (!handled) {
-                // At top level, finish activity
                 requireActivity().finish()
             }
         }
@@ -149,11 +121,11 @@ class MoviesFragment : Fragment() {
     private fun setupRecyclerView() {
         // Initialize adapters
         groupAdapter = GroupAdapter { group ->
-            onGroupSelected(group)
+            viewModel.selectGroup(group.name)
         }
         
         categoryAdapter = CategoryTreeAdapter { category ->
-            onCategorySelected(category)
+            viewModel.selectCategory(category.categoryId)
         }
         
         // contentAdapter is already initialized as lazy property
@@ -167,280 +139,73 @@ class MoviesFragment : Fragment() {
     }
     
     /**
-     * Subscribe to ReactiveUpdateManager for background sync updates.
-     * Apply granular updates without full screen reload.
+     * Observe ViewModel UiState - single source of truth.
      */
-    private fun setupReactiveUpdates() {
+    private fun observeUiState() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                ReactiveUpdateManager.getInstance().contentDiffs.collect { diffs ->
-                    handleContentDiffs(diffs)
+                viewModel.uiState.collectLatest { state ->
+                    renderUiState(state)
                 }
             }
         }
     }
     
     /**
-     * Observe loading state from repository and show/hide progress indicator.
-     * Shows Material 3 progress bar at top of screen during background loading.
+     * Render UI based on current state.
+     * Pure UI rendering - no business logic.
      */
-    /**
-     * Observe movies state reactively (FRP pattern).
-     */
-    private fun observeMoviesState() {
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                repository.moviesState.collectLatest { state ->
-                    handleMoviesState(state)
-                }
-            }
-        }
-    }
-    
-    /**
-     * Handle movies state changes reactively.
-     */
-    private fun handleMoviesState(state: com.cactuvi.app.data.models.DataState<Unit>) {
-        when (state) {
-            is com.cactuvi.app.data.models.DataState.Loading -> {
-                lifecycleScope.launch {
-                    val hasCache = (database.cacheMetadataDao().get("movies")?.itemCount ?: 0) > 0
-                    if (!hasCache) {
-                        showLoadingWithMessage("Loading movies for the first time...")
-                    } else {
-                        progressBar.visibility = View.VISIBLE
-                    }
-                }
-            }
-            is com.cactuvi.app.data.models.DataState.Success -> {
-                refreshUIFromCache()
-            }
-            is com.cactuvi.app.data.models.DataState.Error -> {
-                if (state.cachedData != null) {
-                    refreshUIFromCache()
-                } else {
-                    showErrorWithRetry("Failed to load movies: ${state.error.message}")
-                }
-            }
-        }
-    }
-    
-    /**
-     * Observe movies effects (one-time actions).
-     */
-    private fun observeMoviesEffects() {
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                repository.moviesEffects.collect { effect ->
-                    when (effect) {
-                        is MoviesEffect.LoadSuccess -> {
-                            android.util.Log.d("MoviesFragment", "Movies loaded successfully: ${effect.itemCount} items")
-                        }
-                        is MoviesEffect.LoadError -> {
-                            if (effect.hasCachedData) {
-                                android.util.Log.w("MoviesFragment", "Background refresh failed (cache exists): ${effect.message}")
-                            } else {
-                                android.util.Log.e("MoviesFragment", "Initial load failed: ${effect.message}")
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-    
-    /**
-     * Trigger data load from repository.
-     */
-    private fun triggerDataLoad() {
-        lifecycleScope.launch {
-            repository.loadMovies(forceRefresh = false)
-        }
-    }
-    
-    /**
-     * Refresh UI from cached data.
-     */
-    private fun refreshUIFromCache() {
-        progressBar.visibility = View.GONE
-        errorText.visibility = View.GONE
+    private fun renderUiState(state: MoviesUiState) {
+        // Update loading/error visibility
+        progressBar.isVisible = state.showLoading
+        errorText.isVisible = state.showError
+        recyclerView.isVisible = state.showContent
         
-        lifecycleScope.launch {
-            loadGroupsFromCache()
-        }
-    }
-    
-    /**
-     * Show error with retry button.
-     */
-    private fun showErrorWithRetry(message: String) {
-        progressBar.visibility = View.GONE
-        errorText.visibility = View.VISIBLE
-        errorText.text = "$message\n\nTap to retry"
-        recyclerView.visibility = View.GONE
-        
-        errorText.setOnClickListener {
-            triggerDataLoad()
-        }
-    }
-    
-    /**
-     * Load groups from cache.
-     */
-    private suspend fun loadGroupsFromCache() {
-        android.util.Log.d("IPTV_PERF", "[DEBUG MoviesFragment.loadGroupsFromCache] START")
-        
-        val preferencesManager = PreferencesManager.getInstance(requireContext())
-        val groupingEnabled = preferencesManager.isGroupingEnabled(ContentFilterSettings.ContentType.MOVIES)
-        val separator = preferencesManager.getCustomSeparator(ContentFilterSettings.ContentType.MOVIES)
-        val hiddenGroups = preferencesManager.getHiddenGroups(ContentFilterSettings.ContentType.MOVIES)
-        val hiddenCategories = preferencesManager.getHiddenCategories(ContentFilterSettings.ContentType.MOVIES)
-        val filterMode = preferencesManager.getFilterMode(ContentFilterSettings.ContentType.MOVIES)
-        
-        navigationTree = repository.getCachedVodNavigationTree()
-        
-        val categoriesResult = repository.getMovieCategories()
-        if (categoriesResult.isSuccess) {
-            categories = categoriesResult.getOrNull() ?: emptyList()
-            
-            if (navigationTree == null) {
-                navigationTree = CategoryGrouper.buildVodNavigationTree(
-                    categories,
-                    groupingEnabled,
-                    separator,
-                    hiddenGroups,
-                    hiddenCategories,
-                    filterMode
-                )
+        if (state.showError) {
+            errorText.text = "${state.error}\n\nTap to retry"
+            errorText.setOnClickListener {
+                viewModel.refresh()
             }
+            return
         }
         
-        showGroups()
-        android.util.Log.d("IPTV_PERF", "[DEBUG MoviesFragment.loadGroupsFromCache] END")
-    }
-    
-    /**
-     * Handle diff events from background sync.
-     * Only process diffs for "movies" content type.
-     */
-    private fun handleContentDiffs(diffs: List<ContentDiff>) {
-        val movieDiffs = diffs.filter { diff ->
-            when (diff) {
-                is ContentDiff.GroupAdded -> diff.contentType == "movies"
-                is ContentDiff.GroupRemoved -> diff.contentType == "movies"
-                is ContentDiff.GroupCountChanged -> diff.contentType == "movies"
-                is ContentDiff.ItemsAddedToCategory -> diff.contentType == "movies"
-                is ContentDiff.ItemsRemovedFromCategory -> diff.contentType == "movies"
-            }
-        }
-        
-        if (movieDiffs.isEmpty()) return
-        
-        // Reload navigation tree to get updated state
-        lifecycleScope.launch {
-            val updatedTree = repository.getCachedVodNavigationTree()
-            if (updatedTree != null) {
-                navigationTree = updatedTree
-                applyDiffsToUI(movieDiffs)
-            }
-        }
-    }
-    
-    /**
-     * Apply diffs to current UI state without full reload.
-     */
-    private fun applyDiffsToUI(diffs: List<ContentDiff>) {
-        when (currentLevel) {
+        // Render content based on navigation level
+        when (state.currentLevel) {
             NavigationLevel.GROUPS -> {
-                // Update groups adapter with new navigation tree
-                navigationTree?.let { tree ->
-                    groupAdapter.updateGroups(tree.groups)
-                }
+                showGroupsView(state.navigationTree)
             }
             NavigationLevel.CATEGORIES -> {
-                // Update category count if current group changed
-                selectedGroup?.let { group ->
-                    val updatedGroup = navigationTree?.findGroup(group.name)
-                    if (updatedGroup != null && updatedGroup.count != group.count) {
-                        selectedGroup = updatedGroup
-                        // CategoryTreeAdapter expects List<Pair<Category, Int>> with depth
-                        val categoriesWithDepth = updatedGroup.categories.map { it to 0 }
-                        categoryAdapter.updateCategories(categoriesWithDepth)
-                    }
+                state.selectedGroup?.let { group ->
+                    showCategoriesView(group)
                 }
             }
             NavigationLevel.CONTENT -> {
-                // Content level - refresh paging adapter if items added/removed in current category
-                val hasRelevantChanges = diffs.any { diff ->
-                    when (diff) {
-                        is ContentDiff.ItemsAddedToCategory -> 
-                            diff.categoryId == selectedCategory?.categoryId
-                        is ContentDiff.ItemsRemovedFromCategory -> 
-                            diff.categoryId == selectedCategory?.categoryId
-                        else -> false
-                    }
-                }
-                
-                if (hasRelevantChanges) {
-                    contentAdapter.refresh()
+                state.selectedCategoryId?.let { categoryId ->
+                    showContentView(categoryId)
                 }
             }
         }
-    }
-    
-    @Deprecated("Replaced by reactive pattern - use triggerDataLoad() and observe moviesState")
-    private fun loadData() {
-        triggerDataLoad()
-    }
-    
-    private fun showLoadingWithMessage(message: String) {
-        progressBar.visibility = View.VISIBLE
-        emptyText.visibility = View.VISIBLE
-        emptyText.text = message
-        recyclerView.visibility = View.GONE
-        errorText.visibility = View.GONE
-    }
-    
-    private fun showError(message: String) {
-        progressBar.visibility = View.GONE
-        errorText.visibility = View.VISIBLE
-        errorText.text = message
-        recyclerView.visibility = View.GONE
-        emptyText.visibility = View.GONE
-    }
-    
-    private fun showGroups() {
-        currentLevel = NavigationLevel.GROUPS
-        selectedGroup = null
-        selectedCategory = null
         
-        // Update UI
-        updateBreadcrumb()
+        // Update breadcrumb
+        updateBreadcrumb(state)
+    }
+    
+    private fun showGroupsView(navigationTree: com.cactuvi.app.utils.CategoryGrouper.NavigationTree?) {
         recyclerView.layoutManager = LinearLayoutManager(requireContext())
         recyclerView.adapter = groupAdapter
         
-        // Update adapter data
         val groups = navigationTree?.groups ?: emptyList()
         groupAdapter.updateGroups(groups)
-        
-        // Update visibility
-        emptyText.visibility = View.GONE
-        recyclerView.visibility = View.VISIBLE
     }
     
-    private fun showCategories(group: GroupNode) {
-        currentLevel = NavigationLevel.CATEGORIES
-        selectedGroup = group
-        selectedCategory = null
-        
-        // Update UI
-        updateBreadcrumb()
+    private fun showCategoriesView(group: GroupNode) {
         recyclerView.layoutManager = LinearLayoutManager(requireContext())
         recyclerView.adapter = categoryAdapter
         
-        // Update adapter data - get counts from DB instead of loading all movies
+        // Get counts from DB
         lifecycleScope.launch {
             val countsStart = PerformanceLogger.start("Get category counts")
+            kotlinx.coroutines.delay(100)
             val categoriesWithCounts = group.categories.map { category ->
                 val count = database.movieDao().getCountByCategory(category.categoryId)
                 Pair(category, count)
@@ -448,53 +213,39 @@ class MoviesFragment : Fragment() {
             PerformanceLogger.end("Get category counts", countsStart, "categories=${categoriesWithCounts.size}")
             categoryAdapter.updateCategories(categoriesWithCounts)
         }
-        
-        // Update visibility
-        emptyText.visibility = View.GONE
-        recyclerView.visibility = View.VISIBLE
     }
     
-    private fun showContent(category: Category) {
-        currentLevel = NavigationLevel.CONTENT
-        selectedCategory = category
-        
-        // Update UI
-        updateBreadcrumb()
+    private fun showContentView(categoryId: String) {
         recyclerView.layoutManager = GridLayoutManager(requireContext(), 3)
         recyclerView.adapter = contentAdapter
         
         // Load paged movies for this category
         lifecycleScope.launch {
-            repository.getMoviesPaged(categoryId = category.categoryId)
+            repository.getMoviesPaged(categoryId = categoryId)
                 .collectLatest { pagingData ->
                     contentAdapter.submitData(pagingData)
                 }
         }
-        
-        // Show content area
-        emptyText.visibility = View.GONE
-        recyclerView.visibility = View.VISIBLE
     }
     
-    private fun updateBreadcrumb() {
-        when (currentLevel) {
+    private fun updateBreadcrumb(state: MoviesUiState) {
+        when (state.currentLevel) {
             NavigationLevel.GROUPS -> {
-                // Title updated by active source flow observer
                 breadcrumbScroll.visibility = View.GONE
                 breadcrumbChips.removeAllViews()
             }
             NavigationLevel.CATEGORIES -> {
-                // Title updated by active source flow observer
                 breadcrumbScroll.visibility = View.VISIBLE
                 breadcrumbChips.removeAllViews()
-                addBreadcrumbChip(selectedGroup?.name ?: "")
+                addBreadcrumbChip(state.selectedGroupName ?: "")
             }
             NavigationLevel.CONTENT -> {
-                // Title updated by active source flow observer
                 breadcrumbScroll.visibility = View.VISIBLE
                 breadcrumbChips.removeAllViews()
-                addBreadcrumbChip(selectedGroup?.name ?: "")
-                addBreadcrumbChip(selectedCategory?.categoryName ?: "")
+                addBreadcrumbChip(state.selectedGroupName ?: "")
+                // Find category name from navigationTree
+                val category = state.selectedGroup?.categories?.find { it.categoryId == state.selectedCategoryId }
+                addBreadcrumbChip(category?.categoryName ?: "")
             }
         }
     }
@@ -507,36 +258,9 @@ class MoviesFragment : Fragment() {
                 requireContext().getColor(R.color.surface_elevated)
             )
             setTextColor(requireContext().getColor(R.color.brand_green))
-            setOnClickListener { handleBackPress() }
+            setOnClickListener { viewModel.navigateBack() }
         }
         breadcrumbChips.addView(chip)
-    }
-    
-    private fun handleBackPress(): Boolean {
-        // Navigate back in tree
-        return when (currentLevel) {
-            NavigationLevel.GROUPS -> false // Let activity handle back
-            NavigationLevel.CATEGORIES -> {
-                showGroups()
-                true
-            }
-            NavigationLevel.CONTENT -> {
-                selectedGroup?.let { showCategories(it) }
-                true
-            }
-        }
-    }
-    
-    private fun onGroupSelected(group: GroupNode) {
-        showCategories(group)
-    }
-    
-    private fun onCategorySelected(category: Category) {
-        showContent(category)
-    }
-    
-    private fun playMovie(movie: Movie) {
-        openMovieDetail(movie)
     }
     
     private fun openMovieDetail(movie: Movie) {
@@ -551,20 +275,8 @@ class MoviesFragment : Fragment() {
         startActivity(intent)
     }
     
-    private fun showLoading(show: Boolean) {
-        progressBar.visibility = if (show) View.VISIBLE else View.GONE
-        recyclerView.visibility = if (show) View.GONE else View.VISIBLE
-        errorText.visibility = View.GONE
-    }
-    
-    private fun showError() {
-        progressBar.visibility = View.GONE
-        recyclerView.visibility = View.GONE
-        errorText.visibility = View.VISIBLE
-    }
-    
     // Handle back press from activity
     fun onBackPressed(): Boolean {
-        return handleBackPress()
+        return viewModel.navigateBack()
     }
 }

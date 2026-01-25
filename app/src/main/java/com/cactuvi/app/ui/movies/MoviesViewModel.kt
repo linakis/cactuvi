@@ -2,11 +2,10 @@ package com.cactuvi.app.ui.movies
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.cactuvi.app.domain.model.ContentCategory
-import com.cactuvi.app.domain.model.GroupNode
 import com.cactuvi.app.domain.model.Resource
 import com.cactuvi.app.domain.usecase.ObserveMoviesUseCase
 import com.cactuvi.app.domain.usecase.RefreshMoviesUseCase
+import com.cactuvi.app.utils.CategoryGrouper
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -41,17 +40,17 @@ class MoviesViewModel @Inject constructor(
                         when (resource) {
                             is Resource.Loading -> state.copy(
                                 isLoading = true,
-                                navigationTree = resource.data,
+                                navigationTree = resource.data?.toUtilNavigationTree(),
                                 error = null
                             )
                             is Resource.Success -> state.copy(
                                 isLoading = false,
-                                navigationTree = resource.data,
+                                navigationTree = resource.data.toUtilNavigationTree(),
                                 error = null
                             )
                             is Resource.Error -> state.copy(
                                 isLoading = false,
-                                navigationTree = resource.data,
+                                navigationTree = resource.data?.toUtilNavigationTree(),
                                 error = if (resource.data == null) resource.error.message else null
                             )
                         }
@@ -66,17 +65,17 @@ class MoviesViewModel @Inject constructor(
         }
     }
     
-    fun selectGroup(group: GroupNode) {
+    fun selectGroup(groupName: String) {
         _uiState.update { it.copy(
             currentLevel = NavigationLevel.CATEGORIES,
-            selectedGroup = group
+            selectedGroupName = groupName
         ) }
     }
     
-    fun selectCategory(category: ContentCategory) {
+    fun selectCategory(categoryId: String) {
         _uiState.update { it.copy(
             currentLevel = NavigationLevel.CONTENT,
-            selectedCategory = category
+            selectedCategoryId = categoryId
         ) }
     }
     
@@ -84,13 +83,39 @@ class MoviesViewModel @Inject constructor(
         return when (_uiState.value.currentLevel) {
             NavigationLevel.GROUPS -> false
             NavigationLevel.CATEGORIES -> {
-                _uiState.update { it.copy(currentLevel = NavigationLevel.GROUPS) }
+                _uiState.update { it.copy(
+                    currentLevel = NavigationLevel.GROUPS,
+                    selectedGroupName = null
+                ) }
                 true
             }
             NavigationLevel.CONTENT -> {
-                _uiState.update { it.copy(currentLevel = NavigationLevel.CATEGORIES) }
+                _uiState.update { it.copy(
+                    currentLevel = NavigationLevel.CATEGORIES,
+                    selectedCategoryId = null
+                ) }
                 true
             }
         }
+    }
+    
+    /**
+     * Convert domain NavigationTree to CategoryGrouper.NavigationTree.
+     * Temporary mapping until adapters are refactored in Phase 4.
+     */
+    private fun com.cactuvi.app.domain.model.NavigationTree.toUtilNavigationTree(): CategoryGrouper.NavigationTree {
+        val utilGroups = this.groups.map { domainGroup ->
+            CategoryGrouper.GroupNode(
+                name = domainGroup.name,
+                categories = domainGroup.categories.map { domainCategory ->
+                    com.cactuvi.app.data.models.Category(
+                        categoryId = domainCategory.categoryId,
+                        categoryName = domainCategory.categoryName,
+                        parentId = domainCategory.parentId
+                    )
+                }
+            )
+        }
+        return CategoryGrouper.NavigationTree(utilGroups)
     }
 }
