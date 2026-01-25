@@ -1477,7 +1477,7 @@ class ContentRepositoryImpl private constructor(
             }
         }
     
-    suspend fun getMovieInfo(vodId: Int): Result<MovieInfo> = withContext(Dispatchers.IO) {
+    override suspend fun getMovieInfo(vodId: Int): Result<MovieInfo> = withContext(Dispatchers.IO) {
         try {
             checkVpnRequirement()
             val (username, password, _) = getCredentials()
@@ -1851,7 +1851,7 @@ class ContentRepositoryImpl private constructor(
             }
         }
     
-    suspend fun getSeriesInfo(seriesId: Int): Result<SeriesInfo> = withContext(Dispatchers.IO) {
+    override suspend fun getSeriesInfo(seriesId: Int): Result<SeriesInfo> = withContext(Dispatchers.IO) {
         try {
             checkVpnRequirement()
             val (username, password, _) = getCredentials()
@@ -1864,7 +1864,7 @@ class ContentRepositoryImpl private constructor(
     
     // ========== FAVORITES ==========
     
-    suspend fun addToFavorites(
+    override suspend fun addToFavorites(
         contentId: String,
         contentType: String,
         contentName: String,
@@ -1899,7 +1899,7 @@ class ContentRepositoryImpl private constructor(
         }
     }
     
-    suspend fun removeFromFavorites(contentId: String, contentType: String): Result<Unit> = 
+    override suspend fun removeFromFavorites(contentId: String, contentType: String): Result<Unit> = 
         withContext(Dispatchers.IO) {
             try {
                 val sourceId = getActiveSourceId()
@@ -1919,7 +1919,7 @@ class ContentRepositoryImpl private constructor(
             }
         }
     
-    suspend fun getFavorites(contentType: String? = null): Result<List<FavoriteEntity>> = 
+    override suspend fun getFavorites(contentType: String?): Result<List<FavoriteEntity>> = 
         withContext(Dispatchers.IO) {
             try {
                 val sourceId = getActiveSourceId()
@@ -1934,7 +1934,7 @@ class ContentRepositoryImpl private constructor(
             }
         }
     
-    suspend fun isFavorite(contentId: String, contentType: String): Result<Boolean> = 
+    override suspend fun isFavorite(contentId: String, contentType: String): Result<Boolean> = 
         withContext(Dispatchers.IO) {
             try {
                 val sourceId = getActiveSourceId()
@@ -1990,7 +1990,7 @@ class ContentRepositoryImpl private constructor(
         }
     }
     
-    suspend fun getWatchHistory(limit: Int = 20): Result<List<WatchHistoryEntity>> = 
+    override suspend fun getWatchHistory(limit: Int): Result<List<WatchHistoryEntity>> = 
         withContext(Dispatchers.IO) {
             try {
                 val sourceId = getActiveSourceId()
@@ -2010,7 +2010,7 @@ class ContentRepositoryImpl private constructor(
         }
     }
     
-    suspend fun deleteWatchHistoryItem(contentId: String): Result<Unit> = withContext(Dispatchers.IO) {
+    override suspend fun deleteWatchHistoryItem(contentId: String): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             val sourceId = getActiveSourceId()
             val item = database.watchHistoryDao().getByContentId(sourceId, contentId, "movie") 

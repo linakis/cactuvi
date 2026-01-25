@@ -65,7 +65,7 @@ class MyListActivity : AppCompatActivity() {
         showLoading(true)
         
         lifecycleScope.launch {
-            val result = repository.getFavorites()
+            val result = repository.getFavorites(contentType = null)
             
             if (result.isSuccess) {
                 val favorites = result.getOrNull() ?: emptyList()
