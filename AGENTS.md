@@ -100,9 +100,10 @@ bd reopen <task-id>
 bd list --json | jq '.[] | select(.title | test("search term"; "i"))'
 
 # Set operational state (creates event + updates label)
-bd set-state <task-id> --state in_progress  # Mark as started
-bd set-state <task-id> --state blocked      # Mark as blocked
-bd set-state <task-id> --state completed    # Mark as done
+# Note: Use dimension=value syntax, not --state flag
+bd set-state <task-id> operational_state=in_progress  # Mark as started
+bd set-state <task-id> operational_state=blocked      # Mark as blocked
+bd set-state <task-id> operational_state=completed    # Mark as done
 ```
 
 ### Integration with Git Commits
