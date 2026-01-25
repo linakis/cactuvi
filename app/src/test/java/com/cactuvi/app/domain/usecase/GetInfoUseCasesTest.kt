@@ -186,8 +186,10 @@ class GetInfoUseCasesTest {
 
     @Test
     fun `GetSeriesInfoUseCase can be called multiple times with different IDs`() = runTest {
-        val seriesInfo1 = SeriesInfo(seasons = listOf(1), info = null, episodes = emptyMap())
-        val seriesInfo2 = SeriesInfo(seasons = listOf(1, 2), info = null, episodes = emptyMap())
+        // Simplified test: just verify different results are returned
+        val seriesInfo1 = SeriesInfo(seasons = null, info = null, episodes = emptyMap())
+        val seriesInfo2 =
+            SeriesInfo(seasons = null, info = null, episodes = mapOf("1" to emptyList()))
 
         coEvery { mockRepository.getSeriesInfo(1) } returns Result.success(seriesInfo1)
         coEvery { mockRepository.getSeriesInfo(2) } returns Result.success(seriesInfo2)
@@ -195,8 +197,10 @@ class GetInfoUseCasesTest {
         val result1 = getSeriesInfoUseCase(1)
         val result2 = getSeriesInfoUseCase(2)
 
-        assertEquals(1, result1.getOrNull()?.seasons?.size)
-        assertEquals(2, result2.getOrNull()?.seasons?.size)
+        assertTrue(result1.isSuccess)
+        assertTrue(result2.isSuccess)
+        assertEquals(0, result1.getOrNull()?.episodes?.size)
+        assertEquals(1, result2.getOrNull()?.episodes?.size)
     }
 
     // ========== ERROR PROPAGATION TESTS ==========

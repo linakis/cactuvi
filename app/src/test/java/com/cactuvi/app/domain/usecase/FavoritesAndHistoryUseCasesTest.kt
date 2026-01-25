@@ -136,22 +136,26 @@ class FavoritesAndHistoryUseCasesTest {
         val favorites =
             listOf(
                 FavoriteEntity(
-                    "1",
-                    "movie",
-                    "Movie 1",
-                    null,
-                    null,
-                    "Action",
-                    System.currentTimeMillis()
+                    sourceId = "source1",
+                    id = "movie_1",
+                    contentId = "1",
+                    contentType = "movie",
+                    contentName = "Movie 1",
+                    posterUrl = null,
+                    rating = null,
+                    categoryName = "Action",
+                    addedAt = System.currentTimeMillis()
                 ),
                 FavoriteEntity(
-                    "2",
-                    "series",
-                    "Series 1",
-                    null,
-                    null,
-                    "Drama",
-                    System.currentTimeMillis()
+                    sourceId = "source1",
+                    id = "series_2",
+                    contentId = "2",
+                    contentType = "series",
+                    contentName = "Series 1",
+                    posterUrl = null,
+                    rating = null,
+                    categoryName = "Drama",
+                    addedAt = System.currentTimeMillis()
                 ),
             )
         coEvery { mockRepository.getFavorites(null) } returns Result.success(favorites)
@@ -167,13 +171,15 @@ class FavoritesAndHistoryUseCasesTest {
         val favorites =
             listOf(
                 FavoriteEntity(
-                    "1",
-                    "movie",
-                    "Movie 1",
-                    null,
-                    null,
-                    "Action",
-                    System.currentTimeMillis()
+                    sourceId = "source1",
+                    id = "movie_1",
+                    contentId = "1",
+                    contentType = "movie",
+                    contentName = "Movie 1",
+                    posterUrl = null,
+                    rating = null,
+                    categoryName = "Action",
+                    addedAt = System.currentTimeMillis()
                 ),
             )
         coEvery { mockRepository.getFavorites("movie") } returns Result.success(favorites)
@@ -233,22 +239,28 @@ class FavoritesAndHistoryUseCasesTest {
         val history =
             listOf(
                 WatchHistoryEntity(
-                    "1",
-                    "movie",
-                    "Movie 1",
-                    null,
-                    System.currentTimeMillis(),
-                    "Action",
-                    1000L
+                    id = 1L,
+                    sourceId = "source1",
+                    contentId = "1",
+                    contentType = "movie",
+                    contentName = "Movie 1",
+                    posterUrl = null,
+                    resumePosition = 1000L,
+                    duration = 5000L,
+                    lastWatched = System.currentTimeMillis(),
+                    isCompleted = false
                 ),
                 WatchHistoryEntity(
-                    "2",
-                    "series",
-                    "Series 1",
-                    null,
-                    System.currentTimeMillis(),
-                    "Drama",
-                    5000L
+                    id = 2L,
+                    sourceId = "source1",
+                    contentId = "2",
+                    contentType = "series",
+                    contentName = "Series 1",
+                    posterUrl = null,
+                    resumePosition = 5000L,
+                    duration = 10000L,
+                    lastWatched = System.currentTimeMillis(),
+                    isCompleted = false
                 ),
             )
         coEvery { mockRepository.getWatchHistory(20) } returns Result.success(history)
@@ -264,13 +276,16 @@ class FavoritesAndHistoryUseCasesTest {
         val history =
             List(10) { i ->
                 WatchHistoryEntity(
-                    "$i",
-                    "movie",
-                    "Movie $i",
-                    null,
-                    System.currentTimeMillis(),
-                    "Action",
-                    1000L
+                    id = i.toLong(),
+                    sourceId = "source1",
+                    contentId = "$i",
+                    contentType = "movie",
+                    contentName = "Movie $i",
+                    posterUrl = null,
+                    resumePosition = 1000L,
+                    duration = 5000L,
+                    lastWatched = System.currentTimeMillis(),
+                    isCompleted = false
                 )
             }
         coEvery { mockRepository.getWatchHistory(10) } returns Result.success(history)
