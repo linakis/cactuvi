@@ -10,6 +10,7 @@ data class CategoryEntity(
     val sourceId: String,
     val categoryId: String,
     val categoryName: String,
+    val parentId: Int, // Parent category ID (0 = root level)
     val type: String, // "live", "vod", "series"
     val lastUpdated: Long = System.currentTimeMillis(),
 )
