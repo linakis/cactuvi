@@ -9,41 +9,40 @@ import android.view.ViewGroup
 import android.widget.HorizontalScrollView
 import android.widget.ProgressBar
 import android.widget.TextView
+import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
 import com.cactuvi.app.R
-import com.cactuvi.app.data.models.Category
 import com.cactuvi.app.data.models.LiveChannel
 import com.cactuvi.app.data.repository.ContentRepository
-import com.cactuvi.app.data.repository.LiveEffect
-import com.cactuvi.app.data.sync.ContentDiff
-import com.cactuvi.app.data.sync.ReactiveUpdateManager
 import com.cactuvi.app.ui.common.CategoryTreeAdapter
-import com.cactuvi.app.ui.common.GroupAdapter
 import com.cactuvi.app.ui.common.LiveChannelPagingAdapter
 import com.cactuvi.app.ui.common.ModernToolbar
-import com.cactuvi.app.ui.player.PlayerActivity
-import com.cactuvi.app.data.models.ContentFilterSettings
-import com.cactuvi.app.utils.CategoryGrouper
-import com.cactuvi.app.utils.CategoryGrouper.GroupNode
-import com.cactuvi.app.utils.CategoryGrouper.NavigationTree
-import com.cactuvi.app.utils.CredentialsManager
-import com.cactuvi.app.utils.SourceManager
 import com.cactuvi.app.utils.IdleDetectionHelper
-import com.cactuvi.app.utils.PerformanceLogger
-import com.cactuvi.app.utils.PreferencesManager
-import com.cactuvi.app.utils.StreamUrlBuilder
+import com.cactuvi.app.utils.SourceManager
+import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
+@AndroidEntryPoint
 class LiveTvFragment : Fragment() {
+    
+    private val viewModel: LiveTvViewModel by viewModels()
+    
+    @Inject
+    lateinit var repository: ContentRepository
+    
+    @Inject
+    lateinit var database: com.cactuvi.app.data.db.AppDatabase
     
     // UI Components
     private lateinit var recyclerView: RecyclerView
@@ -55,27 +54,9 @@ class LiveTvFragment : Fragment() {
     private lateinit var breadcrumbChips: ChipGroup
     
     // Adapters
-    private lateinit var groupAdapter: GroupAdapter
     private lateinit var categoryAdapter: CategoryTreeAdapter
     private val contentAdapter: LiveChannelPagingAdapter by lazy {
         LiveChannelPagingAdapter { channel -> playChannel(channel) }
-    }
-    
-    // Data
-    private lateinit var repository: ContentRepository
-    private lateinit var database: com.cactuvi.app.data.db.AppDatabase
-    private var navigationTree: NavigationTree? = null
-    private var categories: List<Category> = emptyList()
-    
-    // Navigation State
-    private var currentLevel: NavigationLevel = NavigationLevel.GROUPS
-    private var selectedGroup: GroupNode? = null
-    private var selectedCategory: Category? = null
-    
-    enum class NavigationLevel {
-        GROUPS,      // Show all groups
-        CATEGORIES,  // Show categories in group
-        CONTENT      // Show filtered content
     }
     
     override fun onCreateView(
@@ -98,28 +79,18 @@ class LiveTvFragment : Fragment() {
         breadcrumbScroll = view.findViewById(R.id.breadcrumbScroll)
         breadcrumbChips = view.findViewById(R.id.breadcrumbChips)
         
-        repository = ContentRepository.getInstance(requireContext())
-        
-        database = com.cactuvi.app.data.db.AppDatabase.getInstance(requireContext())
-        
         setupToolbar()
         setupRecyclerView()
-        setupReactiveUpdates()
         
-        // NEW: Observe reactive state + effects
-        observeLiveState()
-        observeLiveEffects()
-        
-        // Trigger initial load ONCE
-        triggerDataLoad()
+        // Observe ViewModel state
+        observeUiState()
     }
     
     private fun setupToolbar() {
         modernToolbar.title = "Live TV"
         modernToolbar.onBackClick = {
-            val handled = handleBackPress()
+            val handled = viewModel.navigateBack()
             if (!handled) {
-                // At top level, finish activity
                 requireActivity().finish()
             }
         }
@@ -143,357 +114,100 @@ class LiveTvFragment : Fragment() {
     }
     
     private fun setupRecyclerView() {
-        recyclerView.layoutManager = LinearLayoutManager(requireContext())
-        
         // Initialize adapters
-        groupAdapter = GroupAdapter { group ->
-            onGroupSelected(group)
-        }
-        
         categoryAdapter = CategoryTreeAdapter { category ->
-            onCategorySelected(category)
+            viewModel.selectCategory(category.categoryId)
         }
         
         // contentAdapter is already initialized as lazy property
+        
+        // Start with categories (linear layout)
+        recyclerView.layoutManager = LinearLayoutManager(requireContext())
+        recyclerView.adapter = categoryAdapter
         
         // Attach idle detection
         IdleDetectionHelper.attach(recyclerView)
     }
     
-    private fun setupReactiveUpdates() {
+    /**
+     * Observe ViewModel UiState - single source of truth.
+     */
+    private fun observeUiState() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                ReactiveUpdateManager.getInstance().contentDiffs.collect { diffs ->
-                    handleContentDiffs(diffs)
+                viewModel.uiState.collectLatest { state ->
+                    renderUiState(state)
                 }
             }
         }
     }
     
     /**
-     * Observe loading state from repository and show/hide progress indicator.
+     * Render UI based on current state.
+     * Pure UI rendering - no business logic.
      */
-    /**
-     * Observe live state reactively (FRP pattern).
-     */
-    private fun observeLiveState() {
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                repository.liveState.collectLatest { state ->
-                    handleLiveState(state)
-                }
-            }
-        }
-    }
-    
-    /**
-     * Handle live state changes reactively.
-     */
-    private fun handleLiveState(state: com.cactuvi.app.data.models.DataState<Unit>) {
-        when (state) {
-            is com.cactuvi.app.data.models.DataState.Loading -> {
-                lifecycleScope.launch {
-                    val hasCache = (database.cacheMetadataDao().get("live")?.itemCount ?: 0) > 0
-                    if (!hasCache) {
-                        showLoadingWithMessage("Loading live channels for the first time...")
-                    } else {
-                        progressBar.visibility = View.VISIBLE
-                        state.progress?.let { percent ->
-                            progressBar.isIndeterminate = false
-                            progressBar.progress = percent
-                        } ?: run {
-                            progressBar.isIndeterminate = true
-                        }
-                    }
-                }
-            }
-            is com.cactuvi.app.data.models.DataState.Success -> {
-                refreshUIFromCache()
-            }
-            is com.cactuvi.app.data.models.DataState.PartialSuccess -> {
-                // Silent partial success - just show the data we got
-                android.util.Log.w(
-                    "LiveTvFragment",
-                    "Partial success: ${state.successCount} items loaded, ${state.failedCount} failed - ${state.error.message}"
-                )
-                progressBar.visibility = View.GONE
-                refreshUIFromCache()
-            }
-            is com.cactuvi.app.data.models.DataState.Error -> {
-                if (state.cachedData != null) {
-                    refreshUIFromCache()
-                } else {
-                    showErrorWithRetry("Failed to load live channels: ${state.error.message}")
-                }
-            }
-        }
-    }
-    
-    /**
-     * Observe live effects (one-time actions).
-     */
-    private fun observeLiveEffects() {
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                repository.liveEffects.collect { effect ->
-                    when (effect) {
-                        is LiveEffect.LoadSuccess -> {
-                            android.util.Log.d("LiveTvFragment", "Live channels loaded successfully: ${effect.itemCount} items")
-                        }
-                        is LiveEffect.LoadPartialSuccess -> {
-                            android.util.Log.w(
-                                "LiveTvFragment",
-                                "Partial load: ${effect.successCount} items loaded, ${effect.failedCount} failed - ${effect.message}"
-                            )
-                            // Silent - no user notification
-                        }
-                        is LiveEffect.LoadError -> {
-                            if (effect.hasCachedData) {
-                                android.util.Log.w("LiveTvFragment", "Background refresh failed (cache exists): ${effect.message}")
-                            } else {
-                                android.util.Log.e("LiveTvFragment", "Initial load failed: ${effect.message}")
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-    
-    /**
-     * Trigger data load from repository.
-     */
-    private fun triggerDataLoad() {
-        lifecycleScope.launch {
-            repository.loadLive(forceRefresh = false)
-        }
-    }
-    
-    /**
-     * Refresh UI from cached data.
-     */
-    private fun refreshUIFromCache() {
-        progressBar.visibility = View.GONE
-        errorText.visibility = View.GONE
-        emptyText.visibility = View.GONE
-        recyclerView.visibility = View.VISIBLE
+    private fun renderUiState(state: LiveTvUiState) {
+        // Update loading/error visibility
+        progressBar.isVisible = state.showLoading
+        errorText.isVisible = state.showError
+        recyclerView.isVisible = state.showContent
         
-        lifecycleScope.launch {
-            loadCategoriesFromCache()
-        }
-    }
-    
-    /**
-     * Show error with retry button.
-     */
-    private fun showErrorWithRetry(message: String) {
-        progressBar.visibility = View.GONE
-        errorText.visibility = View.VISIBLE
-        errorText.text = "$message\n\nTap to retry"
-        recyclerView.visibility = View.GONE
-        
-        errorText.setOnClickListener {
-            triggerDataLoad()
-        }
-    }
-    
-    /**
-     * Load categories from cache.
-     */
-    private suspend fun loadCategoriesFromCache() {
-        android.util.Log.d("IPTV_PERF", "[DEBUG LiveTvFragment.loadCategoriesFromCache] START")
-        
-        val preferencesManager = PreferencesManager.getInstance(requireContext())
-        val groupingEnabled = preferencesManager.isGroupingEnabled(ContentFilterSettings.ContentType.LIVE_TV)
-        val separator = preferencesManager.getCustomSeparator(ContentFilterSettings.ContentType.LIVE_TV)
-        val hiddenGroups = preferencesManager.getHiddenGroups(ContentFilterSettings.ContentType.LIVE_TV)
-        val hiddenCategories = preferencesManager.getHiddenCategories(ContentFilterSettings.ContentType.LIVE_TV)
-        val filterMode = preferencesManager.getFilterMode(ContentFilterSettings.ContentType.LIVE_TV)
-        
-        navigationTree = repository.getCachedLiveNavigationTree()
-        
-        val categoriesResult = repository.getLiveCategories()
-        if (categoriesResult.isSuccess) {
-            categories = categoriesResult.getOrNull() ?: emptyList()
-            
-            if (navigationTree == null) {
-                navigationTree = CategoryGrouper.buildLiveNavigationTree(
-                    categories,
-                    groupingEnabled,
-                    separator,
-                    hiddenGroups,
-                    hiddenCategories,
-                    filterMode
-                )
+        if (state.showError) {
+            errorText.text = "${state.error}\n\nTap to retry"
+            errorText.setOnClickListener {
+                viewModel.refresh()
             }
+            return
         }
         
-        showGroups()
-        android.util.Log.d("IPTV_PERF", "[DEBUG LiveTvFragment.loadCategoriesFromCache] END")
-    }
-    
-    private fun handleContentDiffs(diffs: List<ContentDiff>) {
-        val liveDiffs = diffs.filter { diff ->
-            when (diff) {
-                is ContentDiff.GroupAdded -> diff.contentType == "live"
-                is ContentDiff.GroupRemoved -> diff.contentType == "live"
-                is ContentDiff.GroupCountChanged -> diff.contentType == "live"
-                is ContentDiff.ItemsAddedToCategory -> diff.contentType == "live"
-                is ContentDiff.ItemsRemovedFromCategory -> diff.contentType == "live"
+        // Render content based on whether category is selected
+        if (state.isViewingCategory) {
+            state.selectedCategoryId?.let { categoryId ->
+                showChannelsView(categoryId)
             }
+        } else {
+            showCategoriesView(state.categories)
         }
         
-        if (liveDiffs.isEmpty()) return
-        
-        lifecycleScope.launch {
-            val updatedTree = repository.getCachedLiveNavigationTree()
-            if (updatedTree != null) {
-                navigationTree = updatedTree
-                applyDiffsToUI(liveDiffs)
-            }
-        }
+        // Update breadcrumb
+        updateBreadcrumb(state)
     }
     
-    private fun applyDiffsToUI(diffs: List<ContentDiff>) {
-        when (currentLevel) {
-            NavigationLevel.GROUPS -> {
-                navigationTree?.let { tree ->
-                    groupAdapter.updateGroups(tree.groups)
-                }
-            }
-            NavigationLevel.CATEGORIES -> {
-                selectedGroup?.let { group ->
-                    val updatedGroup = navigationTree?.findGroup(group.name)
-                    if (updatedGroup != null && updatedGroup.count != group.count) {
-                        selectedGroup = updatedGroup
-                        val categoriesWithDepth = updatedGroup.categories.map { it to 0 }
-                        categoryAdapter.updateCategories(categoriesWithDepth)
-                    }
-                }
-            }
-            NavigationLevel.CONTENT -> {
-                val hasRelevantChanges = diffs.any { diff ->
-                    when (diff) {
-                        is ContentDiff.ItemsAddedToCategory -> 
-                            diff.categoryId == selectedCategory?.categoryId
-                        is ContentDiff.ItemsRemovedFromCategory -> 
-                            diff.categoryId == selectedCategory?.categoryId
-                        else -> false
-                    }
-                }
-                
-                if (hasRelevantChanges) {
-                    contentAdapter.refresh()
-                }
-            }
-        }
-    }
-    
-    @Deprecated("Replaced by reactive pattern - use triggerDataLoad() and observe liveState")
-    private fun loadData() {
-        triggerDataLoad()
-    }
-    
-    private fun showLoadingWithMessage(message: String) {
-        progressBar.visibility = View.VISIBLE
-        emptyText.visibility = View.VISIBLE
-        emptyText.text = message
-        recyclerView.visibility = View.GONE
-        errorText.visibility = View.GONE
-    }
-    
-    private fun showError(message: String) {
-        progressBar.visibility = View.GONE
-        errorText.visibility = View.VISIBLE
-        errorText.text = message
-        recyclerView.visibility = View.GONE
-        emptyText.visibility = View.GONE
-    }
-    
-    private fun showGroups() {
-        currentLevel = NavigationLevel.GROUPS
-        selectedGroup = null
-        selectedCategory = null
-        
-        // Update UI
-        updateBreadcrumb()
-        recyclerView.adapter = groupAdapter
-        
-        // Update adapter data
-        val groups = navigationTree?.groups ?: emptyList()
-        groupAdapter.updateGroups(groups)
-        
-        // Update visibility
-        emptyText.visibility = View.GONE
-        recyclerView.visibility = View.VISIBLE
-    }
-    
-    private fun showCategories(group: GroupNode) {
-        currentLevel = NavigationLevel.CATEGORIES
-        selectedGroup = group
-        selectedCategory = null
-        
-        // Update UI
-        updateBreadcrumb()
+    private fun showCategoriesView(categories: List<com.cactuvi.app.data.models.Category>) {
+        recyclerView.layoutManager = LinearLayoutManager(requireContext())
         recyclerView.adapter = categoryAdapter
         
-        // Update adapter data - get counts from DB instead of loading all channels
+        // Get counts from DB
         lifecycleScope.launch {
-            // Small delay to ensure database has flushed all pending writes
-            kotlinx.coroutines.delay(100)
-            val categoriesWithCounts = group.categories.map { category ->
+            val categoriesWithCounts = categories.map { category ->
                 val count = database.liveChannelDao().getCountByCategory(category.categoryId)
                 Pair(category, count)
             }
             categoryAdapter.updateCategories(categoriesWithCounts)
         }
-        
-        // Update visibility
-        emptyText.visibility = View.GONE
-        recyclerView.visibility = View.VISIBLE
     }
     
-    private fun showContent(category: Category) {
-        currentLevel = NavigationLevel.CONTENT
-        selectedCategory = category
-        
-        // Update UI
-        updateBreadcrumb()
+    private fun showChannelsView(categoryId: String) {
+        recyclerView.layoutManager = GridLayoutManager(requireContext(), 3)
         recyclerView.adapter = contentAdapter
         
         // Load paged channels for this category
         lifecycleScope.launch {
-            repository.getLiveStreamsPaged(categoryId = category.categoryId)
+            repository.getLiveStreamsPaged(categoryId = categoryId)
                 .collectLatest { pagingData ->
                     contentAdapter.submitData(pagingData)
                 }
         }
-        
-        // Show content area
-        emptyText.visibility = View.GONE
-        recyclerView.visibility = View.VISIBLE
     }
     
-    private fun updateBreadcrumb() {
-        when (currentLevel) {
-            NavigationLevel.GROUPS -> {
-                // Title updated by active source flow observer
-                breadcrumbScroll.visibility = View.GONE
-                breadcrumbChips.removeAllViews()
-            }
-            NavigationLevel.CATEGORIES -> {
-                // Title updated by active source flow observer
-                breadcrumbScroll.visibility = View.VISIBLE
-                breadcrumbChips.removeAllViews()
-                addBreadcrumbChip(selectedGroup?.name ?: "")
-            }
-            NavigationLevel.CONTENT -> {
-                // Title updated by active source flow observer
-                breadcrumbScroll.visibility = View.VISIBLE
-                breadcrumbChips.removeAllViews()
-                addBreadcrumbChip(selectedGroup?.name ?: "")
-                addBreadcrumbChip(selectedCategory?.categoryName ?: "")
-            }
+    private fun updateBreadcrumb(state: LiveTvUiState) {
+        if (state.isViewingCategory) {
+            breadcrumbScroll.visibility = View.VISIBLE
+            breadcrumbChips.removeAllViews()
+            addBreadcrumbChip(state.selectedCategory?.categoryName ?: "")
+        } else {
+            breadcrumbScroll.visibility = View.GONE
+            breadcrumbChips.removeAllViews()
         }
     }
     
@@ -505,65 +219,26 @@ class LiveTvFragment : Fragment() {
                 requireContext().getColor(R.color.surface_elevated)
             )
             setTextColor(requireContext().getColor(R.color.brand_green))
-            setOnClickListener { handleBackPress() }
+            setOnClickListener { viewModel.navigateBack() }
         }
         breadcrumbChips.addView(chip)
     }
     
-    private fun handleBackPress(): Boolean {
-        // Navigate back in tree
-        return when (currentLevel) {
-            NavigationLevel.GROUPS -> false // Let activity handle back
-            NavigationLevel.CATEGORIES -> {
-                showGroups()
-                true
-            }
-            NavigationLevel.CONTENT -> {
-                selectedGroup?.let { showCategories(it) }
-                true
-            }
-        }
-    }
-    
-    private fun onGroupSelected(group: GroupNode) {
-        showCategories(group)
-    }
-    
-    private fun onCategorySelected(category: Category) {
-        showContent(category)
-    }
-    
     private fun playChannel(channel: LiveChannel) {
-        val credentials = CredentialsManager.getInstance(requireContext()) ?: return
-        
-        val streamUrl = StreamUrlBuilder.buildLiveUrl(
-            server = credentials.getServer(),
-            username = credentials.getUsername(),
-            password = credentials.getPassword(),
-            streamId = channel.streamId
-        )
-        
-        val intent = Intent(requireContext(), PlayerActivity::class.java).apply {
-            putExtra("STREAM_URL", streamUrl)
+        // Navigate to player
+        val intent = Intent(requireContext(), com.cactuvi.app.ui.player.PlayerActivity::class.java).apply {
+            putExtra("STREAM_ID", channel.streamId)
+            putExtra("STREAM_TYPE", "live")
             putExtra("TITLE", channel.name)
+            putExtra("STREAM_ICON", channel.streamIcon)
+            putExtra("EPG_CHANNEL_ID", channel.epgChannelId)
+            putExtra("CATEGORY_ID", channel.categoryId)
         }
         startActivity(intent)
     }
     
-    private fun showLoading(show: Boolean) {
-        progressBar.visibility = if (show) View.VISIBLE else View.GONE
-        recyclerView.visibility = if (show) View.GONE else View.VISIBLE
-        errorText.visibility = View.GONE
-    }
-    
-    private fun showError() {
-        progressBar.visibility = View.GONE
-        recyclerView.visibility = View.GONE
-        errorText.visibility = View.VISIBLE
-    }
-    
     // Handle back press from activity
     fun onBackPressed(): Boolean {
-        return handleBackPress()
+        return viewModel.navigateBack()
     }
 }
