@@ -1,10 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp"
-    android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">
-    <path
-        android:fillColor="@color/accent"
-        android:pathData="M54,34L54,74L74,54L54,34ZM34,54L54,74L54,34L34,54Z"/>
-</vector>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Background gradient -->
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:startColor="#0E1416"
+                android:endColor="#0F3D2E"
+                android:angle="270"/>
+        </shape>
+    </item>
+
+</layer-list>
