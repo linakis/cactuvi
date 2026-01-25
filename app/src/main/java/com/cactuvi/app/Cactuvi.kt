@@ -7,11 +7,13 @@ import com.cactuvi.app.services.BackgroundSyncWorker
 import com.cactuvi.app.utils.PreferencesManager
 import com.cactuvi.app.utils.SourceManager
 import com.cactuvi.app.utils.VPNDetector
+import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
+@HiltAndroidApp
 class Cactuvi : Application() {
     
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -131,7 +133,7 @@ class Cactuvi : Application() {
                 }
                 
                 // Trigger parallel background load
-                val repository = ContentRepository(sourceManager, this)
+                val repository = ContentRepository.getInstance(this)
                 val (moviesResult, seriesResult, liveResult) = repository.loadAllContentParallel()
                 
                 // Log results (success/failure)

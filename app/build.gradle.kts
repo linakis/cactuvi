@@ -2,6 +2,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("com.google.devtools.ksp")
+    id("com.google.dagger.hilt.android")
 }
 
 android {
@@ -54,6 +55,16 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.7.0")
     implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.7.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
+    
+    // Hilt Dependency Injection
+    implementation("com.google.dagger:hilt-android:2.50")
+    ksp("com.google.dagger:hilt-compiler:2.50")
+    
+    // Hilt ViewModel integration
+    implementation("androidx.hilt:hilt-navigation-fragment:1.1.0")
+    
+    // Java Inject API (required for @Inject)
+    implementation("javax.inject:javax.inject:1")
     
     // AndroidX Room (Local Database)
     implementation("androidx.room:room-runtime:2.6.1")
