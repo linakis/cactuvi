@@ -20,5 +20,5 @@ data class DownloadEntity(
     val totalBytes: Long = 0,
     val failureReason: String? = null,
     val addedAt: Long = System.currentTimeMillis(),
-    val completedAt: Long? = null
+    val completedAt: Long? = null,
 )

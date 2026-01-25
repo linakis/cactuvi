@@ -14,7 +14,7 @@
         app:title="@string/downloads"
         app:showActionButton="false"
         app:layout_constraintTop_toTopOf="parent" />
-    
+
     <!-- Clear All Button -->
     <TextView
         android:id="@+id/clearAllButton"

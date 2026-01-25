@@ -1,9 +1,8 @@
 package com.cactuvi.app.domain.usecase
 
 /**
- * Base interface for use cases.
- * Invoke operator makes use cases callable like functions.
- * 
+ * Base interface for use cases. Invoke operator makes use cases callable like functions.
+ *
  * Example:
  * ```
  * class GetMoviesUseCase : UseCase<CategoryId, List<Movie>> {
@@ -11,7 +10,7 @@ package com.cactuvi.app.domain.usecase
  *         // Implementation
  *     }
  * }
- * 
+ *
  * // Usage:
  * val movies = getMoviesUseCase(categoryId)
  * ```
@@ -22,7 +21,7 @@ interface UseCase<in Params, out Result> {
 
 /**
  * Use case with no parameters
- * 
+ *
  * Example:
  * ```
  * class RefreshDataUseCase : NoParamsUseCase<Unit> {
@@ -30,7 +29,7 @@ interface UseCase<in Params, out Result> {
  *         // Implementation
  *     }
  * }
- * 
+ *
  * // Usage:
  * refreshDataUseCase()
  * ```

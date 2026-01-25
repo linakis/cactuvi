@@ -11,16 +11,14 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class MainActivity : AppCompatActivity() {
-    
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
+
         lifecycleScope.launch {
             val sourceManager = SourceManager.getInstance(this@MainActivity)
-            withContext(Dispatchers.IO) {
-                sourceManager.getAllSources()
-            }
-            
+            withContext(Dispatchers.IO) { sourceManager.getAllSources() }
+
             // Navigate to HomeActivity - sources are already configured at this point
             // (LoadingActivity handles the case when no sources exist)
             val intent = Intent(this@MainActivity, HomeActivity::class.java)

@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <merge xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
-    
+
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
         android:layout_height="@dimen/toolbar_height"
         android:background="@drawable/bg_toolbar_glass"
         android:elevation="@dimen/toolbar_elevation"
         android:paddingHorizontal="@dimen/spacing_s">
-        
+
         <ImageButton
             android:id="@+id/backButton"
             android:layout_width="48dp"
@@ -20,7 +20,7 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintBottom_toBottomOf="parent" />
-        
+
         <TextView
             android:id="@+id/titleText"
             style="@style/TextAppearance.Toolbar.Title.Cactuvi"
@@ -33,7 +33,7 @@
             app:layout_constraintEnd_toStartOf="@id/actionButton"
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintBottom_toBottomOf="parent" />
-        
+
         <ImageButton
             android:id="@+id/actionButton"
             android:layout_width="48dp"
@@ -45,6 +45,6 @@
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintBottom_toBottomOf="parent" />
-        
+
     </androidx.constraintlayout.widget.ConstraintLayout>
 </merge>

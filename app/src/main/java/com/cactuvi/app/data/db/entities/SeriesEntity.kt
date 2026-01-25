@@ -8,10 +8,11 @@ import com.cactuvi.app.data.db.Converters
 
 @Entity(
     tableName = "series",
-    indices = [
-        Index(value = ["categoryId"]),
-        Index(value = ["sourceId", "seriesId"], unique = true)
-    ]
+    indices =
+        [
+            Index(value = ["categoryId"]),
+            Index(value = ["sourceId", "seriesId"], unique = true),
+        ],
 )
 @TypeConverters(Converters::class)
 data class SeriesEntity(
@@ -35,5 +36,5 @@ data class SeriesEntity(
     val categoryId: String,
     val categoryName: String,
     val isFavorite: Boolean = false,
-    val lastUpdated: Long = System.currentTimeMillis()
+    val lastUpdated: Long = System.currentTimeMillis(),
 )

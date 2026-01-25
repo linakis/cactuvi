@@ -23,7 +23,7 @@ import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
 class SearchActivity : AppCompatActivity() {
-    
+
     companion object {
         const val EXTRA_CONTENT_TYPE = "content_type"
         const val TYPE_ALL = "all"
@@ -31,61 +31,61 @@ class SearchActivity : AppCompatActivity() {
         const val TYPE_SERIES = "series"
         const val TYPE_LIVE = "live"
     }
-    
+
     private val viewModel: SearchViewModel by viewModels()
-    
+
     private lateinit var modernToolbar: ModernToolbar
     private lateinit var searchView: SearchView
     private lateinit var resultsRecyclerView: RecyclerView
     private lateinit var emptyState: LinearLayout
     private lateinit var emptyText: TextView
-    
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_search)
-        
+
         val contentTypeFilter = intent.getStringExtra(EXTRA_CONTENT_TYPE) ?: TYPE_ALL
         viewModel.setContentType(contentTypeFilter)
-        
+
         initViews()
         setupSearch()
         observeUiState()
     }
-    
+
     private fun initViews() {
         modernToolbar = findViewById(R.id.modernToolbar)
         searchView = findViewById(R.id.searchView)
         resultsRecyclerView = findViewById(R.id.resultsRecyclerView)
         emptyState = findViewById(R.id.emptyState)
         emptyText = findViewById(R.id.emptyText)
-        
+
         modernToolbar.onBackClick = { finish() }
-        
+
         resultsRecyclerView.layoutManager = GridLayoutManager(this, 3)
     }
-    
+
     private fun setupSearch() {
-        searchView.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
-            override fun onQueryTextSubmit(query: String?): Boolean {
-                query?.let { viewModel.updateQuery(it) }
-                return true
+        searchView.setOnQueryTextListener(
+            object : SearchView.OnQueryTextListener {
+                override fun onQueryTextSubmit(query: String?): Boolean {
+                    query?.let { viewModel.updateQuery(it) }
+                    return true
+                }
+
+                override fun onQueryTextChange(newText: String?): Boolean {
+                    viewModel.updateQuery(newText ?: "")
+                    return true
+                }
             }
-            
-            override fun onQueryTextChange(newText: String?): Boolean {
-                viewModel.updateQuery(newText ?: "")
-                return true
-            }
-        })
+        )
     }
-    
+
     private fun observeUiState() {
         lifecycleScope.launch {
-            viewModel.uiState.collectLatest { uiState ->
-                renderUiState(uiState)
-            }
+            viewModel.uiState.collectLatest { uiState -> renderUiState(uiState) }
         }
     }
-    
+
     private fun renderUiState(uiState: SearchUiState) {
         when {
             uiState.isEmpty -> {
@@ -100,39 +100,43 @@ class SearchActivity : AppCompatActivity() {
             }
         }
     }
-    
+
     private fun displayMovies(movies: List<com.cactuvi.app.data.models.Movie>) {
-        val adapter = MovieAdapter(movies) { movie ->
-            val intent = Intent(this, MovieDetailActivity::class.java).apply {
-                putExtra("VOD_ID", movie.streamId)
-                putExtra("STREAM_ID", movie.streamId)
-                putExtra("TITLE", movie.name)
-                putExtra("POSTER_URL", movie.streamIcon)
-                putExtra("CONTAINER_EXTENSION", movie.containerExtension)
+        val adapter =
+            MovieAdapter(movies) { movie ->
+                val intent =
+                    Intent(this, MovieDetailActivity::class.java).apply {
+                        putExtra("VOD_ID", movie.streamId)
+                        putExtra("STREAM_ID", movie.streamId)
+                        putExtra("TITLE", movie.name)
+                        putExtra("POSTER_URL", movie.streamIcon)
+                        putExtra("CONTAINER_EXTENSION", movie.containerExtension)
+                    }
+                startActivity(intent)
             }
-            startActivity(intent)
-        }
         resultsRecyclerView.adapter = adapter
-        
+
         resultsRecyclerView.visibility = View.VISIBLE
         emptyState.visibility = View.GONE
     }
-    
+
     private fun displaySeries(series: List<com.cactuvi.app.data.models.Series>) {
-        val adapter = SeriesAdapter(series) { seriesItem ->
-            val intent = Intent(this, SeriesDetailActivity::class.java).apply {
-                putExtra("SERIES_ID", seriesItem.seriesId)
-                putExtra("TITLE", seriesItem.name)
-                putExtra("COVER_URL", seriesItem.cover)
+        val adapter =
+            SeriesAdapter(series) { seriesItem ->
+                val intent =
+                    Intent(this, SeriesDetailActivity::class.java).apply {
+                        putExtra("SERIES_ID", seriesItem.seriesId)
+                        putExtra("TITLE", seriesItem.name)
+                        putExtra("COVER_URL", seriesItem.cover)
+                    }
+                startActivity(intent)
             }
-            startActivity(intent)
-        }
         resultsRecyclerView.adapter = adapter
-        
+
         resultsRecyclerView.visibility = View.VISIBLE
         emptyState.visibility = View.GONE
     }
-    
+
     private fun showEmptyState(message: String) {
         emptyText.text = message
         emptyState.visibility = View.VISIBLE

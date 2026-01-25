@@ -13,22 +13,22 @@ import kotlinx.coroutines.launch
 @UnstableApi
 class DownloadTracker(
     context: Context,
-    private val downloadManager: DownloadManager
+    private val downloadManager: DownloadManager,
 ) {
-    
+
     private val downloadRepository = DownloadRepository(context)
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    
+
     init {
         downloadManager.addListener(DownloadListener())
     }
-    
+
     private inner class DownloadListener : DownloadManager.Listener {
-        
+
         override fun onDownloadChanged(
             downloadManager: DownloadManager,
             download: Download,
-            finalException: Exception?
+            finalException: Exception?,
         ) {
             scope.launch {
                 when (download.state) {
@@ -37,74 +37,70 @@ class DownloadTracker(
                             contentId = download.request.id,
                             status = "queued",
                             progress = 0f,
-                            bytesDownloaded = 0L
+                            bytesDownloaded = 0L,
                         )
                     }
-                    
                     Download.STATE_DOWNLOADING -> {
-                        val progress = if (download.bytesDownloaded > 0 && download.contentLength > 0) {
-                            (download.bytesDownloaded.toFloat() / download.contentLength.toFloat())
-                        } else {
-                            0f
-                        }
-                        
+                        val progress =
+                            if (download.bytesDownloaded > 0 && download.contentLength > 0) {
+                                (download.bytesDownloaded.toFloat() /
+                                    download.contentLength.toFloat())
+                            } else {
+                                0f
+                            }
+
                         downloadRepository.updateDownloadProgress(
                             contentId = download.request.id,
                             status = "downloading",
                             progress = progress,
-                            bytesDownloaded = download.bytesDownloaded
+                            bytesDownloaded = download.bytesDownloaded,
                         )
                     }
-                    
                     Download.STATE_COMPLETED -> {
                         // Get the download URI from Media3
                         val downloadUri = download.request.uri.toString()
-                        
+
                         downloadRepository.markDownloadComplete(
                             contentId = download.request.id,
-                            downloadUri = downloadUri
+                            downloadUri = downloadUri,
                         )
                     }
-                    
                     Download.STATE_FAILED -> {
                         val reason = finalException?.message ?: "Unknown error"
                         downloadRepository.markDownloadFailed(
                             contentId = download.request.id,
-                            reason = reason
+                            reason = reason,
                         )
                     }
-                    
                     Download.STATE_STOPPED -> {
                         downloadRepository.updateDownloadProgress(
                             contentId = download.request.id,
                             status = "paused",
                             progress = 0f,
-                            bytesDownloaded = download.bytesDownloaded
+                            bytesDownloaded = download.bytesDownloaded,
                         )
                     }
-                    
                     Download.STATE_REMOVING -> {
                         // Download is being removed, no action needed
                         // The repository will handle deletion
                     }
-                    
                     Download.STATE_RESTARTING -> {
                         downloadRepository.updateDownloadProgress(
                             contentId = download.request.id,
                             status = "downloading",
                             progress = 0f,
-                            bytesDownloaded = 0L
+                            bytesDownloaded = 0L,
                         )
                     }
                 }
             }
         }
-        
+
         override fun onDownloadRemoved(downloadManager: DownloadManager, download: Download) {
             // Download removed, database cleanup handled by repository
         }
     }
-    
+
     fun release() {
         downloadRepository.release()
     }

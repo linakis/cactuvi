@@ -15,13 +15,13 @@
     app:cardElevation="2dp"
     app:strokeWidth="0dp"
     app:rippleColor="@color/brand_green">
-    
+
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:padding="@dimen/spacing_m"
         android:minHeight="56dp">
-        
+
         <TextView
             android:id="@+id/categoryName"
             android:layout_width="0dp"
@@ -35,7 +35,7 @@
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toStartOf="@id/categoryCount" />
-        
+
         <TextView
             android:id="@+id/categoryCount"
             android:layout_width="wrap_content"
@@ -49,7 +49,7 @@
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toStartOf="@id/chevronIcon" />
-        
+
         <ImageView
             android:id="@+id/chevronIcon"
             android:layout_width="24dp"
@@ -59,7 +59,7 @@
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent" />
-        
+
     </androidx.constraintlayout.widget.ConstraintLayout>
-    
+
 </com.google.android.material.card.MaterialCardView>

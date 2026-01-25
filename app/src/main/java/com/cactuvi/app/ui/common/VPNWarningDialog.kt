@@ -4,22 +4,23 @@ import android.app.Dialog
 import android.os.Bundle
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.DialogFragment
-import com.cactuvi.app.R
 import com.cactuvi.app.utils.PreferencesManager
 
 /**
- * Dialog shown when VPN is not detected and VPN warning is enabled.
- * Gives user options to continue anyway, disable warning, or close app.
+ * Dialog shown when VPN is not detected and VPN warning is enabled. Gives user options to continue
+ * anyway, disable warning, or close app.
  */
 class VPNWarningDialog : DialogFragment() {
-    
+
     private var onContinue: (() -> Unit)? = null
     private var onCloseApp: (() -> Unit)? = null
-    
+
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
         return AlertDialog.Builder(requireContext())
             .setTitle("No VPN Detected")
-            .setMessage("For privacy and security, we recommend using a VPN when streaming content.")
+            .setMessage(
+                "For privacy and security, we recommend using a VPN when streaming content."
+            )
             .setPositiveButton("Continue Anyway") { _, _ ->
                 onContinue?.invoke()
                 dismiss()
@@ -36,10 +37,10 @@ class VPNWarningDialog : DialogFragment() {
             .setCancelable(false)
             .create()
     }
-    
+
     companion object {
         const val TAG = "VPNWarningDialog"
-        
+
         fun newInstance(
             onContinue: () -> Unit = {},
             onCloseApp: () -> Unit = {}

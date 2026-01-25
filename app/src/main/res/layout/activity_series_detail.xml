@@ -86,7 +86,7 @@
                 android:layout_marginStart="@dimen/spacing_l"
                 android:orientation="horizontal"
                 android:gravity="center_vertical">
-                
+
                 <!-- Favorite Icon Button -->
                 <ImageButton
                     android:id="@+id/favoriteButton"
@@ -98,7 +98,7 @@
                     android:padding="@dimen/spacing_s"
                     android:contentDescription="@string/my_list"
                     app:tint="@color/text_tertiary" />
-                
+
                 <!-- Download Icon Button -->
                 <ImageButton
                     android:id="@+id/downloadButton"
@@ -111,7 +111,7 @@
                     android:padding="@dimen/spacing_s"
                     android:contentDescription="@string/download"
                     app:tint="@color/text_tertiary" />
-                    
+
             </LinearLayout>
 
             <!-- Loading Progress -->

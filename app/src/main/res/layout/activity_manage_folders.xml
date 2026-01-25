@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout 
+<androidx.constraintlayout.widget.ConstraintLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
@@ -23,7 +23,7 @@
         android:padding="@dimen/spacing_m"
         android:background="@color/background_secondary"
         app:layout_constraintTop_toBottomOf="@id/modernToolbar">
-        
+
         <!-- Search Bar -->
         <EditText
             android:id="@+id/searchInput"
@@ -37,7 +37,7 @@
             android:textColorHint="@color/text_tertiary"
             android:inputType="text"
             android:imeOptions="actionSearch" />
-        
+
         <!-- Mode Toggle -->
         <LinearLayout
             android:layout_width="match_parent"
@@ -45,7 +45,7 @@
             android:layout_marginTop="@dimen/spacing_m"
             android:orientation="horizontal"
             android:gravity="center_vertical">
-            
+
             <TextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
@@ -53,13 +53,13 @@
                 android:text="Show only selected folders"
                 android:textColor="@color/text_primary"
                 android:textSize="14sp" />
-            
+
             <com.google.android.material.switchmaterial.SwitchMaterial
                 android:id="@+id/modeSwitch"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content" />
         </LinearLayout>
-        
+
         <!-- Action Buttons -->
         <LinearLayout
             android:layout_width="match_parent"
@@ -67,7 +67,7 @@
             android:layout_marginTop="@dimen/spacing_m"
             android:orientation="horizontal"
             android:gravity="center">
-            
+
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/selectAllButton"
                 android:layout_width="0dp"
@@ -78,7 +78,7 @@
                 android:textColor="@color/text_primary"
                 app:backgroundTint="@color/background_tertiary"
                 style="@style/Widget.Material3.Button.OutlinedButton" />
-            
+
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/deselectAllButton"
                 android:layout_width="0dp"
@@ -115,14 +115,14 @@
         app:layout_constraintBottom_toBottomOf="@id/foldersRecyclerView"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
-        
+
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="No folders found"
             android:textColor="@color/text_tertiary"
             android:textSize="16sp" />
-        
+
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"

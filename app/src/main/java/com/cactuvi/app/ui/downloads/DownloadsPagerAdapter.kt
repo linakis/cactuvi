@@ -7,7 +7,7 @@ import androidx.viewpager2.adapter.FragmentStateAdapter
 
 @UnstableApi
 class DownloadsPagerAdapter(
-    fragmentActivity: FragmentActivity
+    fragmentActivity: FragmentActivity,
 ) : FragmentStateAdapter(fragmentActivity) {
 
     override fun getItemCount(): Int = 2

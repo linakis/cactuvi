@@ -4,12 +4,12 @@ import androidx.room.Entity
 
 @Entity(
     tableName = "categories",
-    primaryKeys = ["sourceId", "categoryId", "type"]
+    primaryKeys = ["sourceId", "categoryId", "type"],
 )
 data class CategoryEntity(
     val sourceId: String,
     val categoryId: String,
     val categoryName: String,
-    val type: String,  // "live", "vod", "series"
-    val lastUpdated: Long = System.currentTimeMillis()
+    val type: String, // "live", "vod", "series"
+    val lastUpdated: Long = System.currentTimeMillis(),
 )

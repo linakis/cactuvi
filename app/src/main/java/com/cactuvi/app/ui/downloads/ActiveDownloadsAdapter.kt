@@ -15,12 +15,16 @@ import com.cactuvi.app.R
 import com.cactuvi.app.data.db.entities.DownloadEntity
 
 class ActiveDownloadsAdapter(
-    private val onCancelClick: (DownloadEntity) -> Unit
-) : ListAdapter<DownloadEntity, ActiveDownloadsAdapter.ActiveDownloadViewHolder>(ActiveDownloadDiffCallback()) {
+    private val onCancelClick: (DownloadEntity) -> Unit,
+) :
+    ListAdapter<DownloadEntity, ActiveDownloadsAdapter.ActiveDownloadViewHolder>(
+        ActiveDownloadDiffCallback()
+    ) {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ActiveDownloadViewHolder {
-        val view = LayoutInflater.from(parent.context)
-            .inflate(R.layout.item_download_active, parent, false)
+        val view =
+            LayoutInflater.from(parent.context)
+                .inflate(R.layout.item_download_active, parent, false)
         return ActiveDownloadViewHolder(view, onCancelClick)
     }
 
@@ -30,7 +34,7 @@ class ActiveDownloadsAdapter(
 
     class ActiveDownloadViewHolder(
         itemView: View,
-        private val onCancelClick: (DownloadEntity) -> Unit
+        private val onCancelClick: (DownloadEntity) -> Unit,
     ) : RecyclerView.ViewHolder(itemView) {
 
         private val posterImage: ImageView = itemView.findViewById(R.id.posterImage)
@@ -42,21 +46,24 @@ class ActiveDownloadsAdapter(
 
         fun bind(download: DownloadEntity) {
             // Set title with episode info if applicable
-            titleText.text = if (download.contentType == "series" && download.episodeName != null) {
-                "${download.contentName} - ${download.episodeName}"
-            } else {
-                download.contentName
-            }
+            titleText.text =
+                if (download.contentType == "series" && download.episodeName != null) {
+                    "${download.contentName} - ${download.episodeName}"
+                } else {
+                    download.contentName
+                }
 
             // Set status text
             val progressPercent = (download.progress * 100).toInt()
-            statusText.text = when (download.status) {
-                "queued" -> itemView.context.getString(R.string.download_queued)
-                "downloading" -> itemView.context.getString(R.string.download_progress, progressPercent)
-                "paused" -> itemView.context.getString(R.string.download_paused)
-                "failed" -> itemView.context.getString(R.string.download_failed)
-                else -> download.status.replaceFirstChar { it.uppercase() }
-            }
+            statusText.text =
+                when (download.status) {
+                    "queued" -> itemView.context.getString(R.string.download_queued)
+                    "downloading" ->
+                        itemView.context.getString(R.string.download_progress, progressPercent)
+                    "paused" -> itemView.context.getString(R.string.download_paused)
+                    "failed" -> itemView.context.getString(R.string.download_failed)
+                    else -> download.status.replaceFirstChar { it.uppercase() }
+                }
 
             // Set progress bar
             downloadProgress.progress = progressPercent
@@ -73,15 +80,13 @@ class ActiveDownloadsAdapter(
                 .into(posterImage)
 
             // Action button
-            actionButton.setOnClickListener {
-                onCancelClick(download)
-            }
+            actionButton.setOnClickListener { onCancelClick(download) }
         }
 
         private fun formatDownloadSize(downloaded: Long, total: Long): String {
             val downloadedMB = downloaded / (1024.0 * 1024.0)
             val totalMB = total / (1024.0 * 1024.0)
-            
+
             return if (total > 0) {
                 String.format("%.1f MB / %.1f MB", downloadedMB, totalMB)
             } else if (downloaded > 0) {

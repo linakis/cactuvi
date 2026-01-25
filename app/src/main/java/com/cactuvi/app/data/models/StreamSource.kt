@@ -11,5 +11,5 @@ data class StreamSource(
     val isActive: Boolean = false,
     val isPrimary: Boolean = false,
     val createdAt: Long = System.currentTimeMillis(),
-    val lastUsed: Long? = null
+    val lastUsed: Long? = null,
 )

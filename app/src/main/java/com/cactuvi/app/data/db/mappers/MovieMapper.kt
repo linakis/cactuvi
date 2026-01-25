@@ -20,7 +20,7 @@ fun Movie.toEntity(sourceId: String, categoryName: String): MovieEntity {
         directSource = directSource,
         categoryName = categoryName,
         isFavorite = isFavorite,
-        resumePosition = resumePosition
+        resumePosition = resumePosition,
     )
 }
 
@@ -40,6 +40,6 @@ fun MovieEntity.toModel(): Movie {
         directSource = directSource,
         isFavorite = isFavorite,
         categoryName = categoryName,
-        resumePosition = resumePosition
+        resumePosition = resumePosition,
     )
 }

@@ -5,7 +5,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/background_primary">
-    
+
     <!-- Modern Toolbar with Blur -->
     <com.cactuvi.app.ui.common.ModernToolbar
         android:id="@+id/modernToolbar"
@@ -15,7 +15,7 @@
         app:showActionButton="true"
         app:actionIcon="@drawable/ic_search_24"
         app:layout_constraintTop_toTopOf="parent" />
-    
+
     <!-- Breadcrumb Chips (below toolbar) -->
     <HorizontalScrollView
         android:id="@+id/breadcrumbScroll"
@@ -26,16 +26,16 @@
         android:scrollbars="none"
         android:visibility="gone"
         app:layout_constraintTop_toBottomOf="@id/modernToolbar">
-        
+
         <com.google.android.material.chip.ChipGroup
             android:id="@+id/breadcrumbChips"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             app:singleLine="true"
             app:chipSpacing="@dimen/spacing_s" />
-            
+
     </HorizontalScrollView>
-    
+
     <!-- Main Content RecyclerView -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recyclerView"
@@ -45,7 +45,7 @@
         android:padding="@dimen/spacing_s"
         app:layout_constraintTop_toBottomOf="@id/breadcrumbScroll"
         app:layout_constraintBottom_toBottomOf="parent" />
-    
+
     <!-- Loading indicator -->
     <ProgressBar
         android:id="@+id/progressBar"
@@ -57,7 +57,7 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
-    
+
     <!-- Error message -->
     <TextView
         android:id="@+id/errorText"
@@ -71,7 +71,7 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
-    
+
     <!-- Empty state -->
     <TextView
         android:id="@+id/emptyText"

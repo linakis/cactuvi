@@ -6,13 +6,13 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_margin="@dimen/spacing_xs">
-    
+
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:padding="@dimen/spacing_l"
         android:background="@drawable/bg_group_gradient">
-        
+
         <!-- Icon/Image -->
         <ImageView
             android:id="@+id/groupIcon"
@@ -24,7 +24,7 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintBottom_toBottomOf="parent" />
-        
+
         <!-- Group Name -->
         <TextView
             android:id="@+id/groupName"
@@ -38,7 +38,7 @@
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintBottom_toBottomOf="parent"
             tools:text="UK Channels" />
-        
+
         <!-- Count Badge -->
         <com.google.android.material.chip.Chip
             android:id="@+id/groupCount"
@@ -52,7 +52,7 @@
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintBottom_toBottomOf="parent"
             tools:text="45" />
-        
+
         <!-- Chevron (Material icon!) -->
         <ImageView
             android:id="@+id/chevronIcon"
@@ -64,7 +64,7 @@
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintBottom_toBottomOf="parent" />
-        
+
     </androidx.constraintlayout.widget.ConstraintLayout>
-    
+
 </com.cactuvi.app.ui.common.CactuviCard>

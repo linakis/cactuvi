@@ -6,10 +6,11 @@ import androidx.room.PrimaryKey
 
 @Entity(
     tableName = "live_channels",
-    indices = [
-        Index(value = ["categoryId"]),
-        Index(value = ["sourceId", "streamId"], unique = true)
-    ]
+    indices =
+        [
+            Index(value = ["categoryId"]),
+            Index(value = ["sourceId", "streamId"], unique = true),
+        ],
 )
 data class LiveChannelEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
@@ -28,5 +29,5 @@ data class LiveChannelEntity(
     val tvArchiveDuration: String?,
     val categoryName: String,
     val isFavorite: Boolean = false,
-    val lastUpdated: Long = System.currentTimeMillis()
+    val lastUpdated: Long = System.currentTimeMillis(),
 )

@@ -7,72 +7,72 @@ import retrofit2.http.Query
 import retrofit2.http.Streaming
 
 interface XtreamApiService {
-    
+
     @GET("player_api.php")
     suspend fun authenticate(
         @Query("username") username: String,
         @Query("password") password: String,
-        @Query("action") action: String = "get_account_info"
+        @Query("action") action: String = "get_account_info",
     ): LoginResponse
-    
+
     @Streaming
     @GET("player_api.php")
     suspend fun getLiveStreams(
         @Query("username") username: String,
         @Query("password") password: String,
-        @Query("action") action: String = "get_live_streams"
+        @Query("action") action: String = "get_live_streams",
     ): ResponseBody
-    
+
     @Streaming
     @GET("player_api.php")
     suspend fun getVodStreams(
         @Query("username") username: String,
         @Query("password") password: String,
-        @Query("action") action: String = "get_vod_streams"
+        @Query("action") action: String = "get_vod_streams",
     ): ResponseBody
-    
+
     @Streaming
     @GET("player_api.php")
     suspend fun getSeries(
         @Query("username") username: String,
         @Query("password") password: String,
-        @Query("action") action: String = "get_series"
+        @Query("action") action: String = "get_series",
     ): ResponseBody
-    
+
     @GET("player_api.php")
     suspend fun getLiveCategories(
         @Query("username") username: String,
         @Query("password") password: String,
-        @Query("action") action: String = "get_live_categories"
+        @Query("action") action: String = "get_live_categories",
     ): List<Category>
-    
+
     @GET("player_api.php")
     suspend fun getVodCategories(
         @Query("username") username: String,
         @Query("password") password: String,
-        @Query("action") action: String = "get_vod_categories"
+        @Query("action") action: String = "get_vod_categories",
     ): List<Category>
-    
+
     @GET("player_api.php")
     suspend fun getSeriesCategories(
         @Query("username") username: String,
         @Query("password") password: String,
-        @Query("action") action: String = "get_series_categories"
+        @Query("action") action: String = "get_series_categories",
     ): List<Category>
-    
+
     @GET("player_api.php")
     suspend fun getSeriesInfo(
         @Query("username") username: String,
         @Query("password") password: String,
         @Query("action") action: String = "get_series_info",
-        @Query("series_id") seriesId: Int
+        @Query("series_id") seriesId: Int,
     ): SeriesInfo
-    
+
     @GET("player_api.php")
     suspend fun getVodInfo(
         @Query("username") username: String,
         @Query("password") password: String,
         @Query("action") action: String = "get_vod_info",
-        @Query("vod_id") vodId: Int
+        @Query("vod_id") vodId: Int,
     ): MovieInfo
 }

@@ -19,7 +19,7 @@ fun LiveChannel.toEntity(sourceId: String, categoryName: String): LiveChannelEnt
         directSource = directSource,
         tvArchiveDuration = tvArchiveDuration,
         categoryName = categoryName,
-        isFavorite = isFavorite
+        isFavorite = isFavorite,
     )
 }
 
@@ -38,6 +38,6 @@ fun LiveChannelEntity.toModel(): LiveChannel {
         directSource = directSource,
         tvArchiveDuration = tvArchiveDuration,
         isFavorite = isFavorite,
-        categoryName = categoryName
+        categoryName = categoryName,
     )
 }

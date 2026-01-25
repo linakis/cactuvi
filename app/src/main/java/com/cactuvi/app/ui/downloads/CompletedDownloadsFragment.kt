@@ -61,14 +61,11 @@ class CompletedDownloadsFragment : Fragment() {
     }
 
     private fun setupRecyclerView() {
-        adapter = DownloadsAdapter(
-            onPlayClick = { download ->
-                playDownload(download)
-            },
-            onDeleteClick = { download ->
-                showDeleteDialog(download)
-            }
-        )
+        adapter =
+            DownloadsAdapter(
+                onPlayClick = { download -> playDownload(download) },
+                onDeleteClick = { download -> showDeleteDialog(download) },
+            )
 
         recyclerView.layoutManager = GridLayoutManager(requireContext(), 3)
         recyclerView.adapter = adapter
@@ -94,18 +91,20 @@ class CompletedDownloadsFragment : Fragment() {
     private fun playDownload(download: DownloadEntity) {
         val uri = download.downloadUri
         if (uri.isNullOrEmpty()) {
-            Toast.makeText(requireContext(), R.string.download_not_available, Toast.LENGTH_SHORT).show()
+            Toast.makeText(requireContext(), R.string.download_not_available, Toast.LENGTH_SHORT)
+                .show()
             return
         }
 
-        val intent = Intent(requireContext(), PlayerActivity::class.java).apply {
-            putExtra("STREAM_URL", uri)
-            putExtra("TITLE", download.contentName)
-            putExtra("CONTENT_ID", download.contentId)
-            putExtra("CONTENT_TYPE", download.contentType)
-            putExtra("POSTER_URL", download.posterUrl)
-            putExtra("RESUME_POSITION", 0L)
-        }
+        val intent =
+            Intent(requireContext(), PlayerActivity::class.java).apply {
+                putExtra("STREAM_URL", uri)
+                putExtra("TITLE", download.contentName)
+                putExtra("CONTENT_ID", download.contentId)
+                putExtra("CONTENT_TYPE", download.contentType)
+                putExtra("POSTER_URL", download.posterUrl)
+                putExtra("RESUME_POSITION", 0L)
+            }
         startActivity(intent)
     }
 
@@ -113,9 +112,7 @@ class CompletedDownloadsFragment : Fragment() {
         AlertDialog.Builder(requireContext())
             .setTitle(R.string.delete_download)
             .setMessage(getString(R.string.delete_download_message, download.contentName))
-            .setPositiveButton(R.string.delete_download) { _, _ ->
-                deleteDownload(download)
-            }
+            .setPositiveButton(R.string.delete_download) { _, _ -> deleteDownload(download) }
             .setNegativeButton(R.string.cancel, null)
             .show()
     }
@@ -125,16 +122,18 @@ class CompletedDownloadsFragment : Fragment() {
             try {
                 downloadRepository.deleteDownload(download.contentId)
                 Toast.makeText(
-                    requireContext(),
-                    R.string.download_deleted,
-                    Toast.LENGTH_SHORT
-                ).show()
+                        requireContext(),
+                        R.string.download_deleted,
+                        Toast.LENGTH_SHORT,
+                    )
+                    .show()
             } catch (e: Exception) {
                 Toast.makeText(
-                    requireContext(),
-                    getString(R.string.download_delete_failed, e.message),
-                    Toast.LENGTH_SHORT
-                ).show()
+                        requireContext(),
+                        getString(R.string.download_delete_failed, e.message),
+                        Toast.LENGTH_SHORT,
+                    )
+                    .show()
             }
         }
     }

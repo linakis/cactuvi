@@ -23,7 +23,7 @@ fun Series.toEntity(sourceId: String, categoryName: String): SeriesEntity {
         episodeRunTime = episodeRunTime,
         categoryId = categoryId,
         categoryName = categoryName,
-        isFavorite = isFavorite
+        isFavorite = isFavorite,
     )
 }
 
@@ -46,6 +46,6 @@ fun SeriesEntity.toModel(): Series {
         episodeRunTime = episodeRunTime,
         categoryId = categoryId,
         isFavorite = isFavorite,
-        categoryName = categoryName
+        categoryName = categoryName,
     )
 }

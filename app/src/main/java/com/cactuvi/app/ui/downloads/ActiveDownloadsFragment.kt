@@ -59,11 +59,10 @@ class ActiveDownloadsFragment : Fragment() {
     }
 
     private fun setupRecyclerView() {
-        adapter = ActiveDownloadsAdapter(
-            onCancelClick = { download ->
-                showCancelDialog(download)
-            }
-        )
+        adapter =
+            ActiveDownloadsAdapter(
+                onCancelClick = { download -> showCancelDialog(download) },
+            )
 
         recyclerView.layoutManager = LinearLayoutManager(requireContext())
         recyclerView.adapter = adapter
@@ -90,9 +89,7 @@ class ActiveDownloadsFragment : Fragment() {
         AlertDialog.Builder(requireContext())
             .setTitle(R.string.cancel_download)
             .setMessage(getString(R.string.cancel_download_message, download.contentName))
-            .setPositiveButton(R.string.cancel_download) { _, _ ->
-                cancelDownload(download)
-            }
+            .setPositiveButton(R.string.cancel_download) { _, _ -> cancelDownload(download) }
             .setNegativeButton(R.string.cancel, null)
             .show()
     }
@@ -102,16 +99,18 @@ class ActiveDownloadsFragment : Fragment() {
             try {
                 downloadRepository.cancelDownload(download.contentId)
                 Toast.makeText(
-                    requireContext(),
-                    R.string.download_cancelled,
-                    Toast.LENGTH_SHORT
-                ).show()
+                        requireContext(),
+                        R.string.download_cancelled,
+                        Toast.LENGTH_SHORT,
+                    )
+                    .show()
             } catch (e: Exception) {
                 Toast.makeText(
-                    requireContext(),
-                    getString(R.string.download_cancel_failed, e.message),
-                    Toast.LENGTH_SHORT
-                ).show()
+                        requireContext(),
+                        getString(R.string.download_cancel_failed, e.message),
+                        Toast.LENGTH_SHORT,
+                    )
+                    .show()
             }
         }
     }

@@ -5,7 +5,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="?attr/colorSurface">
-    
+
     <!-- Category Groups Section -->
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/groupsCard"
@@ -17,13 +17,13 @@
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
-        
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:padding="@dimen/spacing_m">
-            
+
             <!-- Header with expand/collapse -->
             <LinearLayout
                 android:id="@+id/groupsHeader"
@@ -32,7 +32,7 @@
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
                 android:paddingBottom="8dp">
-                
+
                 <TextView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
@@ -40,7 +40,7 @@
                     android:text="Filter by Groups"
                     android:textAppearance="?attr/textAppearanceTitleMedium"
                     android:textColor="?attr/colorOnSurface" />
-                
+
                 <ImageView
                     android:id="@+id/expandIcon"
                     android:layout_width="24dp"
@@ -48,7 +48,7 @@
                     android:src="@android:drawable/arrow_down_float"
                     android:tint="?attr/colorOnSurface" />
             </LinearLayout>
-            
+
             <!-- ChipGroup for category groups -->
             <com.google.android.material.chip.ChipGroup
                 android:id="@+id/categoryGroupChips"
@@ -57,7 +57,7 @@
                 app:chipSpacingHorizontal="4dp"
                 app:singleLine="false"
                 app:selectionRequired="false" />
-            
+
             <!-- Clear filters button -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/clearFiltersButton"
@@ -69,7 +69,7 @@
                 style="@style/Widget.Material3.Button.TextButton" />
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
-    
+
     <!-- Content RecyclerView -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recyclerView"
@@ -82,7 +82,7 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
-    
+
     <!-- Loading indicator -->
     <ProgressBar
         android:id="@+id/progressBar"
@@ -93,7 +93,7 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
-    
+
     <!-- Error message -->
     <TextView
         android:id="@+id/errorText"
@@ -107,7 +107,7 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
-    
+
     <!-- Empty state -->
     <TextView
         android:id="@+id/emptyText"

@@ -9,30 +9,31 @@ import com.cactuvi.app.domain.usecase.ObserveSeriesUseCase
 import com.cactuvi.app.domain.usecase.RefreshSeriesUseCase
 import com.cactuvi.app.ui.common.ContentViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
+import kotlinx.coroutines.flow.Flow
 
 /**
- * ViewModel for Series screen.
- * Handles series data and navigation state using MVVM + UDF pattern.
- * 
+ * ViewModel for Series screen. Handles series data and navigation state using MVVM + UDF pattern.
+ *
  * Extends ContentViewModel to reuse shared navigation and state management logic.
  */
 @HiltViewModel
-class SeriesViewModel @Inject constructor(
+class SeriesViewModel
+@Inject
+constructor(
     private val observeSeriesUseCase: ObserveSeriesUseCase,
     private val refreshSeriesUseCase: RefreshSeriesUseCase,
-    private val contentRepository: ContentRepository
+    private val contentRepository: ContentRepository,
 ) : ContentViewModel<Series>() {
-    
+
     override fun getPagedContent(categoryId: String): Flow<PagingData<Series>> {
         return contentRepository.getSeriesPaged(categoryId)
     }
-    
+
     override fun observeContent(): Flow<Resource<NavigationTree>> {
         return observeSeriesUseCase()
     }
-    
+
     override suspend fun refreshContent() {
         refreshSeriesUseCase()
     }

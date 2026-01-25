@@ -8,11 +8,11 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.util.UnstableApi
 import androidx.viewpager2.widget.ViewPager2
-import com.google.android.material.tabs.TabLayout
-import com.google.android.material.tabs.TabLayoutMediator
 import com.cactuvi.app.R
 import com.cactuvi.app.data.repository.DownloadRepository
 import com.cactuvi.app.ui.common.ModernToolbar
+import com.google.android.material.tabs.TabLayout
+import com.google.android.material.tabs.TabLayoutMediator
 import kotlinx.coroutines.launch
 
 @UnstableApi
@@ -25,10 +25,11 @@ class DownloadsActivity : AppCompatActivity() {
     private lateinit var downloadRepository: DownloadRepository
     private lateinit var pagerAdapter: DownloadsPagerAdapter
 
-    private val tabTitles = arrayOf(
-        R.string.tab_active,
-        R.string.tab_completed
-    )
+    private val tabTitles =
+        arrayOf(
+            R.string.tab_active,
+            R.string.tab_completed,
+        )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -48,9 +49,7 @@ class DownloadsActivity : AppCompatActivity() {
 
         modernToolbar.onBackClick = { finish() }
 
-        clearAllButton.setOnClickListener {
-            showClearAllDialog()
-        }
+        clearAllButton.setOnClickListener { showClearAllDialog() }
     }
 
     private fun setupTabs() {
@@ -59,8 +58,9 @@ class DownloadsActivity : AppCompatActivity() {
 
         // Connect TabLayout with ViewPager2
         TabLayoutMediator(tabLayout, viewPager) { tab, position ->
-            tab.text = getString(tabTitles[position])
-        }.attach()
+                tab.text = getString(tabTitles[position])
+            }
+            .attach()
 
         // Observe active downloads count for badge
         observeActiveDownloadsCount()
@@ -117,18 +117,20 @@ class DownloadsActivity : AppCompatActivity() {
                         downloadRepository.cancelDownload(download.contentId)
                     }
                     Toast.makeText(
-                        this@DownloadsActivity,
-                        R.string.all_downloads_cancelled,
-                        Toast.LENGTH_SHORT
-                    ).show()
+                            this@DownloadsActivity,
+                            R.string.all_downloads_cancelled,
+                            Toast.LENGTH_SHORT,
+                        )
+                        .show()
                     return@collect
                 }
             } catch (e: Exception) {
                 Toast.makeText(
-                    this@DownloadsActivity,
-                    getString(R.string.cancel_failed, e.message),
-                    Toast.LENGTH_SHORT
-                ).show()
+                        this@DownloadsActivity,
+                        getString(R.string.cancel_failed, e.message),
+                        Toast.LENGTH_SHORT,
+                    )
+                    .show()
             }
         }
     }
@@ -138,16 +140,18 @@ class DownloadsActivity : AppCompatActivity() {
             try {
                 downloadRepository.deleteAllDownloads()
                 Toast.makeText(
-                    this@DownloadsActivity,
-                    R.string.all_downloads_deleted,
-                    Toast.LENGTH_SHORT
-                ).show()
+                        this@DownloadsActivity,
+                        R.string.all_downloads_deleted,
+                        Toast.LENGTH_SHORT,
+                    )
+                    .show()
             } catch (e: Exception) {
                 Toast.makeText(
-                    this@DownloadsActivity,
-                    getString(R.string.delete_failed, e.message),
-                    Toast.LENGTH_SHORT
-                ).show()
+                        this@DownloadsActivity,
+                        getString(R.string.delete_failed, e.message),
+                        Toast.LENGTH_SHORT,
+                    )
+                    .show()
             }
         }
     }
