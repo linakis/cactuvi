@@ -234,20 +234,9 @@ class ManageFoldersActivity : AppCompatActivity() {
         preferencesManager.setHiddenGroups(contentType, selectedGroups)
         preferencesManager.setHiddenCategories(contentType, selectedCategories)
 
-        // Invalidate navigation cache to force rebuild with new filters
-        lifecycleScope.launch {
-            when (contentType) {
-                ContentFilterSettings.ContentType.MOVIES ->
-                    repository.invalidateMovieNavigationCache()
-                ContentFilterSettings.ContentType.SERIES ->
-                    repository.invalidateSeriesNavigationCache()
-                ContentFilterSettings.ContentType.LIVE_TV ->
-                    repository.invalidateLiveNavigationCache()
-            }
-
-            setResult(Activity.RESULT_OK)
-            finish()
-        }
+        // Navigation is now computed on-the-fly, no cache to invalidate
+        setResult(Activity.RESULT_OK)
+        finish()
     }
 
     private fun showEmptyState() {

@@ -67,4 +67,8 @@ interface SeriesDao {
      */
     @Query("SELECT COUNT(*) FROM series WHERE categoryId = :categoryId")
     suspend fun getCountByCategory(categoryId: String): Int
+
+    // Alias for consistency with navigation system
+    @Query("SELECT COUNT(*) FROM series WHERE categoryId = :categoryId")
+    suspend fun countByCategoryId(categoryId: String): Int
 }

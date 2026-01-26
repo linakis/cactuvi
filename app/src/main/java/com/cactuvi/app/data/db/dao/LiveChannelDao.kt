@@ -60,4 +60,8 @@ interface LiveChannelDao {
      */
     @Query("SELECT COUNT(*) FROM live_channels WHERE categoryId = :categoryId")
     suspend fun getCountByCategory(categoryId: String): Int
+
+    // Alias for consistency with navigation system
+    @Query("SELECT COUNT(*) FROM live_channels WHERE categoryId = :categoryId")
+    suspend fun countByCategoryId(categoryId: String): Int
 }

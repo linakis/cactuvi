@@ -20,7 +20,6 @@ import com.cactuvi.app.utils.SourceManager
 import com.cactuvi.app.utils.StreamingJsonParser
 import com.cactuvi.app.utils.VPNDetector
 import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
 import kotlin.time.Duration.Companion.minutes
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.TimeoutCancellationException
@@ -1057,10 +1056,8 @@ private constructor(
                 val entities = categories.map { it.toEntity(sourceId, "live") }
                 database.categoryDao().insertAll(entities)
 
-                // Cache navigation tree with user's separator preference
-                val prefsManager = PreferencesManager.getInstance(context)
-                val separator = prefsManager.getLiveGroupingSeparator()
-                cacheLiveNavigationTree(categories, separator)
+                // Compute children counts for navigation
+                computeChildrenCounts(ContentType.LIVE, categories)
 
                 Result.success(categories)
             } catch (e: Exception) {
@@ -1693,13 +1690,11 @@ private constructor(
                 database.categoryDao().insertAll(entities)
                 PerformanceLogger.end("DB insert", dbInsertStart, "inserted=${entities.size}")
 
-                // Cache navigation tree with user's separator preference
-                PerformanceLogger.logPhase("getMovieCategories", "Caching navigation tree")
-                val treeCacheStart = PerformanceLogger.start("Cache navigation tree")
-                val prefsManager = PreferencesManager.getInstance(context)
-                val separator = prefsManager.getMoviesGroupingSeparator()
-                cacheVodNavigationTree(categories, separator)
-                PerformanceLogger.end("Cache navigation tree", treeCacheStart)
+                // Compute children counts for navigation
+                PerformanceLogger.logPhase("getMovieCategories", "Computing children counts")
+                val countsStart = PerformanceLogger.start("Compute children counts")
+                computeChildrenCounts(ContentType.MOVIES, categories)
+                PerformanceLogger.end("Compute children counts", countsStart)
 
                 PerformanceLogger.end(
                     "Repository.getMovieCategories",
@@ -2168,10 +2163,8 @@ private constructor(
                     "[DEBUG getSeriesCategories] Inserted ${entities.size} categories into DB"
                 )
 
-                // Cache navigation tree with user's separator preference
-                val prefsManager = PreferencesManager.getInstance(context)
-                val separator = prefsManager.getSeriesGroupingSeparator()
-                cacheSeriesNavigationTree(categories, separator)
+                // Compute children counts for navigation
+                computeChildrenCounts(ContentType.SERIES, categories)
 
                 Result.success(categories)
             } catch (e: Exception) {
@@ -2439,294 +2432,278 @@ private constructor(
             .flowMap { pagingData -> pagingData.map { entity -> entity.toModel() } }
     }
 
-    // ========== NAVIGATION TREE CACHING ==========
+    // ========== DYNAMIC CATEGORY NAVIGATION ==========
 
-    private suspend fun cacheVodNavigationTree(
-        categories: List<Category>,
-        separator: String = "-"
-    ) {
-        val newTree =
-            CategoryTreeBuilder.buildNavigationTree(
-                categories = categories,
-                groupingEnabled = true,
-                separator = separator,
-            )
-        val tree = CategoryTreeBuilder.toGroupedNavigationTree(newTree)
-        val sourceId = getActiveSourceId()
+    /**
+     * Get top-level navigation (with grouping if enabled). Returns either grouped categories or
+     * flat list based on settings.
+     */
+    suspend fun getTopLevelNavigation(
+        contentType: ContentType,
+        groupingEnabled: Boolean,
+        separator: String
+    ): NavigationResult =
+        withContext(Dispatchers.IO) {
+            val categories =
+                database
+                    .categoryDao()
+                    .getTopLevel(contentType.value)
+                    .map { it.toModel() }
+                    .filter { it.childrenCount > 0 } // Hide empty categories
 
-        val entities =
-            tree.groups.map { group ->
-                NavigationGroupEntity(
-                    sourceId = sourceId,
-                    type = "vod",
-                    groupName = group.name,
-                    categoryIdsJson = gson.toJson(group.categories.map { it.categoryId }),
-                    separator = separator,
-                )
+            if (groupingEnabled && separator != "NONE") {
+                // Group categories by separator
+                val grouped = groupCategories(categories, separator)
+                NavigationResult.Groups(grouped)
+            } else {
+                // Return flat list
+                NavigationResult.Categories(categories)
+            }
+        }
+
+    /** Get children of a specific category. Automatically skips single-child levels. */
+    suspend fun getChildCategories(
+        contentType: ContentType,
+        parentCategoryId: String
+    ): NavigationResult =
+        withContext(Dispatchers.IO) {
+            val parentId =
+                parentCategoryId.toIntOrNull()
+                    ?: return@withContext NavigationResult.Categories(emptyList())
+
+            var children =
+                database
+                    .categoryDao()
+                    .getChildren(contentType.value, parentId)
+                    .map { it.toModel() }
+                    .filter { it.childrenCount > 0 } // Hide empty categories
+
+            // Auto-skip single-child levels
+            while (children.size == 1 && !children.first().isLeaf) {
+                val singleChild = children.first()
+                val nextParentId = singleChild.categoryId.toIntOrNull() ?: break
+                children =
+                    database
+                        .categoryDao()
+                        .getChildren(contentType.value, nextParentId)
+                        .map { it.toModel() }
+                        .filter { it.childrenCount > 0 }
             }
 
-        database.navigationGroupDao().deleteByType("vod")
-        database.navigationGroupDao().insertAll(entities)
+            NavigationResult.Categories(children)
+        }
+
+    /** Get category by ID. */
+    suspend fun getCategoryById(contentType: ContentType, categoryId: String): Category? =
+        withContext(Dispatchers.IO) {
+            database.categoryDao().getById(contentType.value, categoryId)?.toModel()
+        }
+
+    /** Get count of content items in a leaf category. */
+    suspend fun getContentItemCount(contentType: ContentType, categoryId: String): Int =
+        withContext(Dispatchers.IO) {
+            when (contentType) {
+                ContentType.MOVIES -> database.movieDao().countByCategoryId(categoryId)
+                ContentType.SERIES -> database.seriesDao().countByCategoryId(categoryId)
+                ContentType.LIVE -> database.liveChannelDao().countByCategoryId(categoryId)
+            }
+        }
+
+    /** Group categories by separator (helper for getTopLevelNavigation). */
+    private fun groupCategories(
+        categories: List<Category>,
+        separator: String
+    ): Map<String, List<Category>> {
+        return categories.groupBy { category ->
+            when (separator) {
+                "FIRST_WORD" -> category.categoryName.split(" ").firstOrNull()?.trim() ?: "Other"
+                "|",
+                "-",
+                "/" -> {
+                    val parts = category.categoryName.split(separator, limit = 2)
+                    if (parts.size > 1) parts[0].trim() else "Other"
+                }
+                else -> "Other"
+            }
+        }
     }
 
-    private suspend fun cacheSeriesNavigationTree(
-        categories: List<Category>,
-        separator: String = "FIRST_WORD"
-    ) {
-        val newTree =
-            CategoryTreeBuilder.buildNavigationTree(
-                categories = categories,
-                groupingEnabled = true,
-                separator = separator,
-            )
-        val tree = CategoryTreeBuilder.toGroupedNavigationTree(newTree)
-        val sourceId = getActiveSourceId()
+    /**
+     * Compute and cache children counts during initial load. Should be called after inserting
+     * categories from API.
+     */
+    private suspend fun computeChildrenCounts(
+        contentType: ContentType,
+        categories: List<Category>
+    ) =
+        withContext(Dispatchers.IO) {
+            // Build parent→children map
+            val childrenMap: Map<Int, List<Category>> = categories.groupBy { it.parentId }
 
-        val entities =
-            tree.groups.map { group ->
-                NavigationGroupEntity(
-                    sourceId = sourceId,
-                    type = "series",
-                    groupName = group.name,
-                    categoryIdsJson = gson.toJson(group.categories.map { it.categoryId }),
-                    separator = separator,
-                )
+            // Find leaf categories (no children in category table)
+            val leafCategoryIds =
+                categories
+                    .filter { category ->
+                        childrenMap[category.categoryId.toIntOrNull() ?: -1].isNullOrEmpty()
+                    }
+                    .map { it.categoryId }
+
+            // Mark leaf categories
+            if (leafCategoryIds.isNotEmpty()) {
+                database
+                    .categoryDao()
+                    .updateIsLeaf(contentType.value, leafCategoryIds, isLeaf = true)
             }
 
-        database.navigationGroupDao().deleteByType("series")
-        database.navigationGroupDao().insertAll(entities)
-    }
+            // Update children counts for all categories
+            categories.forEach { category ->
+                val categoryIdInt = category.categoryId.toIntOrNull() ?: return@forEach
 
-    private suspend fun cacheLiveNavigationTree(
-        categories: List<Category>,
-        separator: String = "|"
-    ) {
-        val newTree =
-            CategoryTreeBuilder.buildNavigationTree(
-                categories = categories,
-                groupingEnabled = true,
-                separator = separator,
-            )
-        val tree = CategoryTreeBuilder.toGroupedNavigationTree(newTree)
-        val sourceId = getActiveSourceId()
+                // For leaf categories, count actual content items
+                val count =
+                    if (category.categoryId in leafCategoryIds) {
+                        when (contentType) {
+                            ContentType.MOVIES ->
+                                database.movieDao().countByCategoryId(category.categoryId)
+                            ContentType.SERIES ->
+                                database.seriesDao().countByCategoryId(category.categoryId)
+                            ContentType.LIVE ->
+                                database.liveChannelDao().countByCategoryId(category.categoryId)
+                        }
+                    } else {
+                        // For non-leaf, count direct children categories
+                        childrenMap[categoryIdInt]?.size ?: 0
+                    }
 
-        val entities =
-            tree.groups.map { group ->
-                NavigationGroupEntity(
-                    sourceId = sourceId,
-                    type = "live",
-                    groupName = group.name,
-                    categoryIdsJson = gson.toJson(group.categories.map { it.categoryId }),
-                    separator = separator,
-                )
+                database
+                    .categoryDao()
+                    .updateChildrenCount(contentType.value, category.categoryId, count)
             }
+        }
 
-        database.navigationGroupDao().deleteByType("live")
-        database.navigationGroupDao().insertAll(entities)
-    }
+    // ========== COMPATIBILITY LAYER (for old ViewModels using CategoryGrouper.NavigationTree)
+    // ==========
 
+    /**
+     * Get cached navigation tree for movies (compatibility method for old ViewModels). Converts new
+     * dynamic navigation to old CategoryGrouper format.
+     */
     suspend fun getCachedVodNavigationTree(): CategoryGrouper.NavigationTree? =
         withContext(Dispatchers.IO) {
-            val startTime = PerformanceLogger.start("Repository.getCachedVodNavigationTree")
-
             try {
-                // Load navigation group entities
-                PerformanceLogger.logPhase(
-                    "getCachedVodNavigationTree",
-                    "Loading navigation groups"
-                )
-                val entityLoadStart = PerformanceLogger.start("Load navigation entities")
-                val entities = database.navigationGroupDao().getByType("vod")
-                PerformanceLogger.end(
-                    "Load navigation entities",
-                    entityLoadStart,
-                    "count=${entities.size}"
-                )
+                val prefsManager = PreferencesManager.getInstance(context)
+                val groupingEnabled = prefsManager.isMoviesGroupingEnabled()
+                val separator = prefsManager.getMoviesGroupingSeparator()
 
-                if (entities.isEmpty()) {
-                    PerformanceLogger.logCacheMiss("movies", "navigationTree", "no entities")
-                    PerformanceLogger.end(
-                        "Repository.getCachedVodNavigationTree",
-                        startTime,
-                        "MISS - empty"
-                    )
-                    return@withContext null
-                }
-
-                // Check TTL
-                val firstEntity = entities.first()
-                if (!isCacheValid(firstEntity.lastUpdated, CACHE_TTL_CATEGORIES)) {
-                    PerformanceLogger.logCacheMiss("movies", "navigationTree", "expired TTL")
-                    PerformanceLogger.end(
-                        "Repository.getCachedVodNavigationTree",
-                        startTime,
-                        "MISS - expired"
-                    )
-                    return@withContext null
-                }
-
-                // Get all VOD categories
-                PerformanceLogger.logPhase("getCachedVodNavigationTree", "Loading categories")
-                val categoryLoadStart = PerformanceLogger.start("Load categories")
-                val allCategories = database.categoryDao().getAllByType("vod").map { it.toModel() }
-                PerformanceLogger.end(
-                    "Load categories",
-                    categoryLoadStart,
-                    "count=${allCategories.size}"
-                )
-
-                // Reconstruct navigation tree from cached groups
-                PerformanceLogger.logPhase(
-                    "getCachedVodNavigationTree",
-                    "Deserializing JSON and building tree"
-                )
-                val deserializeStart = PerformanceLogger.start("Deserialize and build tree")
-                val groups =
-                    entities.map { entity ->
-                        val type = object : TypeToken<List<String>>() {}.type
-                        val categoryIds: List<String> = gson.fromJson(entity.categoryIdsJson, type)
-                        val groupCategories = allCategories.filter { it.categoryId in categoryIds }
-
-                        // Strip group prefix from category names (using the separator from cache)
-                        val strippedCategories =
-                            groupCategories.map { category ->
-                                category.copy(
-                                    categoryName =
-                                        CategoryTreeBuilder.stripGroupPrefix(
-                                            category.categoryName,
-                                            entity.separator
+                when (
+                    val result =
+                        getTopLevelNavigation(ContentType.MOVIES, groupingEnabled, separator)
+                ) {
+                    is NavigationResult.Groups -> {
+                        // Strip group prefixes from category names
+                        val groups =
+                            result.groups.map { (groupName, categories) ->
+                                val strippedCategories =
+                                    categories.map { category ->
+                                        category.copy(
+                                            categoryName =
+                                                CategoryTreeBuilder.stripGroupPrefix(
+                                                    category.categoryName,
+                                                    separator
+                                                )
                                         )
-                                )
+                                    }
+                                CategoryGrouper.GroupNode(groupName, strippedCategories)
                             }
-
-                        CategoryGrouper.GroupNode(entity.groupName, strippedCategories)
+                        CategoryGrouper.NavigationTree(groups)
                     }
-                PerformanceLogger.end(
-                    "Deserialize and build tree",
-                    deserializeStart,
-                    "groups=${groups.size}"
-                )
-
-                val tree = CategoryGrouper.NavigationTree(groups)
-                PerformanceLogger.logCacheHit("movies", "navigationTree", groups.size)
-                PerformanceLogger.end(
-                    "Repository.getCachedVodNavigationTree",
-                    startTime,
-                    "HIT - groups=${groups.size}"
-                )
-                tree
+                    is NavigationResult.Categories -> {
+                        // Create a single "All" group
+                        val group = CategoryGrouper.GroupNode("All", result.categories)
+                        CategoryGrouper.NavigationTree(listOf(group))
+                    }
+                }
             } catch (e: Exception) {
-                PerformanceLogger.log("getCachedVodNavigationTree failed: ${e.message}")
-                PerformanceLogger.end("Repository.getCachedVodNavigationTree", startTime, "ERROR")
                 null
             }
         }
 
+    /** Get cached navigation tree for series (compatibility method for old ViewModels). */
     suspend fun getCachedSeriesNavigationTree(): CategoryGrouper.NavigationTree? =
         withContext(Dispatchers.IO) {
             try {
-                val entities = database.navigationGroupDao().getByType("series")
-                if (entities.isEmpty()) return@withContext null
+                val prefsManager = PreferencesManager.getInstance(context)
+                val groupingEnabled = prefsManager.isSeriesGroupingEnabled()
+                val separator = prefsManager.getSeriesGroupingSeparator()
 
-                // Check TTL
-                val firstEntity = entities.first()
-                if (!isCacheValid(firstEntity.lastUpdated, CACHE_TTL_CATEGORIES)) {
-                    return@withContext null
-                }
-
-                // Get all series categories
-                val allCategories =
-                    database.categoryDao().getAllByType("series").map { it.toModel() }
-
-                // Reconstruct navigation tree from cached groups
-                val groups =
-                    entities.map { entity ->
-                        val type = object : TypeToken<List<String>>() {}.type
-                        val categoryIds: List<String> = gson.fromJson(entity.categoryIdsJson, type)
-                        val groupCategories = allCategories.filter { it.categoryId in categoryIds }
-
-                        // Strip group prefix from category names (using the separator from cache)
-                        val strippedCategories =
-                            groupCategories.map { category ->
-                                category.copy(
-                                    categoryName =
-                                        CategoryTreeBuilder.stripGroupPrefix(
-                                            category.categoryName,
-                                            entity.separator
+                when (
+                    val result =
+                        getTopLevelNavigation(ContentType.SERIES, groupingEnabled, separator)
+                ) {
+                    is NavigationResult.Groups -> {
+                        val groups =
+                            result.groups.map { (groupName, categories) ->
+                                val strippedCategories =
+                                    categories.map { category ->
+                                        category.copy(
+                                            categoryName =
+                                                CategoryTreeBuilder.stripGroupPrefix(
+                                                    category.categoryName,
+                                                    separator
+                                                )
                                         )
-                                )
+                                    }
+                                CategoryGrouper.GroupNode(groupName, strippedCategories)
                             }
-
-                        CategoryGrouper.GroupNode(entity.groupName, strippedCategories)
+                        CategoryGrouper.NavigationTree(groups)
                     }
-
-                CategoryGrouper.NavigationTree(groups)
+                    is NavigationResult.Categories -> {
+                        val group = CategoryGrouper.GroupNode("All", result.categories)
+                        CategoryGrouper.NavigationTree(listOf(group))
+                    }
+                }
             } catch (e: Exception) {
                 null
             }
         }
 
+    /** Get cached navigation tree for live TV (compatibility method for old ViewModels). */
     suspend fun getCachedLiveNavigationTree(): CategoryGrouper.NavigationTree? =
         withContext(Dispatchers.IO) {
             try {
-                val entities = database.navigationGroupDao().getByType("live")
-                if (entities.isEmpty()) return@withContext null
+                val prefsManager = PreferencesManager.getInstance(context)
+                val groupingEnabled = prefsManager.isLiveGroupingEnabled()
+                val separator = prefsManager.getLiveGroupingSeparator()
 
-                // Check TTL
-                val firstEntity = entities.first()
-                if (!isCacheValid(firstEntity.lastUpdated, CACHE_TTL_CATEGORIES)) {
-                    return@withContext null
-                }
-
-                // Get all live categories
-                val allCategories = database.categoryDao().getAllByType("live").map { it.toModel() }
-
-                // Reconstruct navigation tree from cached groups
-                val groups =
-                    entities.map { entity ->
-                        val type = object : TypeToken<List<String>>() {}.type
-                        val categoryIds: List<String> = gson.fromJson(entity.categoryIdsJson, type)
-                        val groupCategories = allCategories.filter { it.categoryId in categoryIds }
-
-                        // Strip group prefix from category names (using the separator from cache)
-                        val strippedCategories =
-                            groupCategories.map { category ->
-                                category.copy(
-                                    categoryName =
-                                        CategoryTreeBuilder.stripGroupPrefix(
-                                            category.categoryName,
-                                            entity.separator
+                when (
+                    val result = getTopLevelNavigation(ContentType.LIVE, groupingEnabled, separator)
+                ) {
+                    is NavigationResult.Groups -> {
+                        val groups =
+                            result.groups.map { (groupName, categories) ->
+                                val strippedCategories =
+                                    categories.map { category ->
+                                        category.copy(
+                                            categoryName =
+                                                CategoryTreeBuilder.stripGroupPrefix(
+                                                    category.categoryName,
+                                                    separator
+                                                )
                                         )
-                                )
+                                    }
+                                CategoryGrouper.GroupNode(groupName, strippedCategories)
                             }
-
-                        CategoryGrouper.GroupNode(entity.groupName, strippedCategories)
+                        CategoryGrouper.NavigationTree(groups)
                     }
-
-                CategoryGrouper.NavigationTree(groups)
+                    is NavigationResult.Categories -> {
+                        val group = CategoryGrouper.GroupNode("All", result.categories)
+                        CategoryGrouper.NavigationTree(listOf(group))
+                    }
+                }
             } catch (e: Exception) {
                 null
             }
         }
-
-    suspend fun invalidateVodNavigationTree() =
-        withContext(Dispatchers.IO) { database.navigationGroupDao().deleteByType("vod") }
-
-    suspend fun invalidateSeriesNavigationTree() =
-        withContext(Dispatchers.IO) { database.navigationGroupDao().deleteByType("series") }
-
-    suspend fun invalidateLiveNavigationTree() =
-        withContext(Dispatchers.IO) { database.navigationGroupDao().deleteByType("live") }
-
-    suspend fun invalidateAllNavigationTrees() =
-        withContext(Dispatchers.IO) { database.navigationGroupDao().clear() }
-
-    // Aliases for consistency
-    suspend fun invalidateMovieNavigationCache() = invalidateVodNavigationTree()
-
-    suspend fun invalidateSeriesNavigationCache() = invalidateSeriesNavigationTree()
-
-    suspend fun invalidateLiveNavigationCache() = invalidateLiveNavigationTree()
 
     // ========== CACHE MANAGEMENT ==========
 
@@ -2737,7 +2714,6 @@ private constructor(
                 database.movieDao().clearAll()
                 database.seriesDao().clearAll()
                 database.categoryDao().clearAll()
-                invalidateAllNavigationTrees()
                 Result.success(Unit)
             } catch (e: Exception) {
                 Result.failure(e)
@@ -2753,7 +2729,6 @@ private constructor(
                 database.movieDao().deleteBySourceId(sourceId)
                 database.seriesDao().deleteBySourceId(sourceId)
                 database.categoryDao().deleteBySourceId(sourceId)
-                database.navigationGroupDao().clear()
                 database.cacheMetadataDao().deleteAll()
 
                 // Clear favorites and watch history for this source

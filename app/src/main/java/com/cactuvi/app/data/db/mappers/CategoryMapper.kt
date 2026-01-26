@@ -10,6 +10,8 @@ fun Category.toEntity(sourceId: String, type: String): CategoryEntity {
         categoryName = categoryName,
         parentId = parentId,
         type = type,
+        childrenCount = childrenCount,
+        isLeaf = isLeaf,
     )
 }
 
@@ -18,5 +20,7 @@ fun CategoryEntity.toModel(): Category {
         categoryId = categoryId,
         categoryName = categoryName,
         parentId = parentId,
+        childrenCount = childrenCount,
+        isLeaf = isLeaf,
     )
 }

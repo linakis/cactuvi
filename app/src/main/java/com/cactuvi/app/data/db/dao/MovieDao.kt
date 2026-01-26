@@ -70,4 +70,8 @@ interface MovieDao {
      */
     @Query("SELECT COUNT(*) FROM movies WHERE categoryId = :categoryId")
     suspend fun getCountByCategory(categoryId: String): Int
+
+    // Alias for consistency with navigation system
+    @Query("SELECT COUNT(*) FROM movies WHERE categoryId = :categoryId")
+    suspend fun countByCategoryId(categoryId: String): Int
 }

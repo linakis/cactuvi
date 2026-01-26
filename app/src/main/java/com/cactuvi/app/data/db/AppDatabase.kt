@@ -19,11 +19,10 @@ import com.cactuvi.app.data.db.entities.*
             WatchHistoryEntity::class,
             FavoriteEntity::class,
             DownloadEntity::class,
-            NavigationGroupEntity::class,
             CacheMetadataEntity::class,
             StreamSourceEntity::class,
         ],
-    version = 9,
+    version = 10,
     exportSchema = false,
 )
 @TypeConverters(Converters::class)
@@ -42,8 +41,6 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun favoriteDao(): FavoriteDao
 
     abstract fun downloadDao(): DownloadDao
-
-    abstract fun navigationGroupDao(): NavigationGroupDao
 
     abstract fun cacheMetadataDao(): CacheMetadataDao
 
