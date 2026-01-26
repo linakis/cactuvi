@@ -1,97 +1,62 @@
 package com.cactuvi.app.ui.common
 
-import com.cactuvi.app.utils.CategoryGrouper
+import com.cactuvi.app.data.models.Category
 
-/** Navigation levels for hierarchical content browsing */
-enum class NavigationLevel {
-    GROUPS, // Top level: Genre/language groups (may be skipped if only 1 group)
-    CATEGORIES, // Mid level: Categories within a group (may be skipped if only 1 category)
-    CONTENT, // Bottom level: Actual content items (always shown)
-}
+/** Breadcrumb item for navigation path display. */
+data class BreadcrumbItem(
+    val categoryId: String?, // null for group names
+    val displayName: String,
+    val isGroup: Boolean = false,
+)
 
 /**
- * Unified UI state for all content types (Movies/Series/LiveTV)
+ * Unified UI state for dynamic level-by-level content navigation.
  *
- * Supports dynamic 2-3 level navigation:
- * - 3 levels: Groups → Categories → Content (when grouping enabled, multiple items at each level)
- * - 2 levels: Categories → Content (when grouping disabled OR only 1 group exists)
- * - 1 level: Content only (when only 1 category exists)
+ * Navigation is computed on-the-fly from category hierarchy:
+ * - Root level: Groups (if grouping enabled) or top-level categories
+ * - Child levels: Subcategories (arbitrary depth supported)
+ * - Leaf level: Content items (movies/series/channels)
  *
  * Auto-skip behavior:
- * - If only 1 group exists → skip to CATEGORIES level
- * - If only 1 category in group → skip to CONTENT level
- * - If only 1 group with 1 category → skip directly to CONTENT level
+ * - Single-child levels are automatically skipped
+ * - Empty categories are hidden (childrenCount = 0)
+ * - Breadcrumbs show full path including skipped levels
  */
 data class ContentUiState(
-    val navigationTree: CategoryGrouper.NavigationTree? = null,
-    val currentLevel: NavigationLevel = NavigationLevel.GROUPS,
-    val selectedGroupName: String? = null,
-    val selectedCategoryId: String? = null,
+    // Current navigation state
+    val currentCategoryId: String? = null, // null = root level
+    val currentCategories: List<Category> = emptyList(), // Categories at current level
+    val currentGroups: Map<String, List<Category>>? = null, // Non-null when showing groups
+    val isLeafLevel: Boolean = false, // True when showing content (movies/series/channels)
+
+    // Breadcrumb navigation
+    val breadcrumbPath: List<BreadcrumbItem> = emptyList(),
+
+    // Loading/error states
     val isLoading: Boolean = false,
     val error: String? = null,
 ) {
-    /** Get the currently selected group node from the navigation tree */
-    val selectedGroup: CategoryGrouper.GroupNode?
-        get() = selectedGroupName?.let { navigationTree?.findGroup(it) }
-
-    /**
-     * Build breadcrumb path showing current navigation position Includes skipped levels for user
-     * context
-     *
-     * Examples:
-     * - "Movies > GR > GR | Action" (all levels shown)
-     * - "Movies > GR" (at categories level, groups were auto-skipped)
-     * - "Movies > IT > IT | Action" (categories auto-skipped, shows in breadcrumb)
-     */
-    val breadcrumbPath: List<String>
-        get() = buildList {
-            // Always include selected group if set (even if groups level was skipped)
-            selectedGroupName?.let { add(it) }
-
-            // Add category name if at content level
-            if (currentLevel == NavigationLevel.CONTENT && selectedCategoryId != null) {
-                val category =
-                    selectedGroup?.categories?.find { it.categoryId == selectedCategoryId }
-                category?.let { add(it.categoryName) }
-            }
-        }
-
-    /** Determine if user is currently viewing groups list */
-    val isViewingGroups: Boolean
-        get() = currentLevel == NavigationLevel.GROUPS
-
-    /** Determine if user is currently viewing categories list */
-    val isViewingCategories: Boolean
-        get() = currentLevel == NavigationLevel.CATEGORIES
-
-    /** Determine if user is currently viewing content items */
-    val isViewingContent: Boolean
-        get() = currentLevel == NavigationLevel.CONTENT
-
-    /** Check if navigation should auto-skip groups level (only 1 group exists after filtering) */
-    val shouldAutoSkipGroups: Boolean
-        get() = navigationTree?.shouldSkipGroups == true
-
-    /** Check if navigation should auto-skip categories level (only 1 category in selected group) */
-    val shouldAutoSkipCategories: Boolean
-        get() = selectedGroupName?.let { navigationTree?.shouldSkipCategories(it) } == true
-
-    /**
-     * Check if navigation should skip both groups and categories (only 1 group with only 1
-     * category)
-     */
-    val shouldAutoSkipBoth: Boolean
-        get() = navigationTree?.shouldSkipBothLevels == true
-
     /** Helper: Should show loading indicator */
     val showLoading: Boolean
-        get() = isLoading
+        get() = isLoading && currentCategories.isEmpty() && currentGroups == null
 
     /** Helper: Should show error message */
     val showError: Boolean
-        get() = error != null && !isLoading
+        get() = error != null && currentCategories.isEmpty() && currentGroups == null
 
     /** Helper: Should show content */
     val showContent: Boolean
-        get() = !isLoading && error == null && navigationTree != null
+        get() = !isLoading && error == null
+
+    /** Determine if user is currently viewing groups list */
+    val isViewingGroups: Boolean
+        get() = currentGroups != null
+
+    /** Determine if user is currently viewing categories list */
+    val isViewingCategories: Boolean
+        get() = !isLeafLevel && currentCategories.isNotEmpty() && currentGroups == null
+
+    /** Determine if user is currently viewing content items */
+    val isViewingContent: Boolean
+        get() = isLeafLevel
 }

@@ -1,40 +1,29 @@
 package com.cactuvi.app.ui.series
 
+import android.content.Context
 import androidx.paging.PagingData
+import com.cactuvi.app.data.models.ContentType
 import com.cactuvi.app.data.models.Series
-import com.cactuvi.app.domain.model.NavigationTree
-import com.cactuvi.app.domain.model.Resource
+import com.cactuvi.app.data.repository.ContentRepositoryImpl
 import com.cactuvi.app.domain.repository.ContentRepository
-import com.cactuvi.app.domain.usecase.ObserveSeriesUseCase
-import com.cactuvi.app.domain.usecase.RefreshSeriesUseCase
 import com.cactuvi.app.ui.common.ContentViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
 
-/**
- * ViewModel for Series screen. Handles series data and navigation state using MVVM + UDF pattern.
- *
- * Extends ContentViewModel to reuse shared navigation and state management logic.
- */
+/** ViewModel for Series screen with dynamic level-by-level navigation. */
 @HiltViewModel
 class SeriesViewModel
 @Inject
 constructor(
-    private val observeSeriesUseCase: ObserveSeriesUseCase,
-    private val refreshSeriesUseCase: RefreshSeriesUseCase,
-    private val contentRepository: ContentRepository,
-) : ContentViewModel<Series>() {
+    repository: ContentRepository,
+    @ApplicationContext context: Context,
+) : ContentViewModel<Series>(repository as ContentRepositoryImpl, context) {
+
+    override fun getContentType(): ContentType = ContentType.SERIES
 
     override fun getPagedContent(categoryId: String): Flow<PagingData<Series>> {
-        return contentRepository.getSeriesPaged(categoryId)
-    }
-
-    override fun observeContent(): Flow<Resource<NavigationTree>> {
-        return observeSeriesUseCase()
-    }
-
-    override suspend fun refreshContent() {
-        refreshSeriesUseCase()
+        return (repository as ContentRepositoryImpl).getSeriesPaged(categoryId)
     }
 }

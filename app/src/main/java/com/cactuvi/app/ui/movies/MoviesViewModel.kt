@@ -1,40 +1,29 @@
 package com.cactuvi.app.ui.movies
 
+import android.content.Context
 import androidx.paging.PagingData
+import com.cactuvi.app.data.models.ContentType
 import com.cactuvi.app.data.models.Movie
-import com.cactuvi.app.domain.model.NavigationTree
-import com.cactuvi.app.domain.model.Resource
+import com.cactuvi.app.data.repository.ContentRepositoryImpl
 import com.cactuvi.app.domain.repository.ContentRepository
-import com.cactuvi.app.domain.usecase.ObserveMoviesUseCase
-import com.cactuvi.app.domain.usecase.RefreshMoviesUseCase
 import com.cactuvi.app.ui.common.ContentViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
 
-/**
- * ViewModel for Movies screen. Handles movies data and navigation state using MVVM + UDF pattern.
- *
- * Extends ContentViewModel to reuse shared navigation and state management logic.
- */
+/** ViewModel for Movies screen with dynamic level-by-level navigation. */
 @HiltViewModel
 class MoviesViewModel
 @Inject
 constructor(
-    private val observeMoviesUseCase: ObserveMoviesUseCase,
-    private val refreshMoviesUseCase: RefreshMoviesUseCase,
-    private val contentRepository: ContentRepository,
-) : ContentViewModel<Movie>() {
+    repository: ContentRepository,
+    @ApplicationContext context: Context,
+) : ContentViewModel<Movie>(repository as ContentRepositoryImpl, context) {
+
+    override fun getContentType(): ContentType = ContentType.MOVIES
 
     override fun getPagedContent(categoryId: String): Flow<PagingData<Movie>> {
-        return contentRepository.getMoviesPaged(categoryId)
-    }
-
-    override fun observeContent(): Flow<Resource<NavigationTree>> {
-        return observeMoviesUseCase()
-    }
-
-    override suspend fun refreshContent() {
-        refreshMoviesUseCase()
+        return (repository as ContentRepositoryImpl).getMoviesPaged(categoryId)
     }
 }

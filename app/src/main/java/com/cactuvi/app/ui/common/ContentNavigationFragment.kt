@@ -20,7 +20,6 @@ import androidx.recyclerview.widget.RecyclerView
 import com.cactuvi.app.R
 import com.cactuvi.app.utils.CategoryGrouper.GroupNode
 import com.cactuvi.app.utils.IdleDetectionHelper
-import com.cactuvi.app.utils.PerformanceLogger
 import com.cactuvi.app.utils.SourceManager
 import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
@@ -149,10 +148,10 @@ abstract class ContentNavigationFragment<T : Any> : Fragment() {
 
     private fun setupRecyclerView() {
         // Initialize adapters
-        groupAdapter = GroupAdapter { group -> getViewModel().selectGroup(group.name) }
+        groupAdapter = GroupAdapter { group -> getViewModel().navigateToGroup(group.name) }
 
         categoryAdapter = CategoryTreeAdapter { category ->
-            getViewModel().selectCategory(category.categoryId)
+            getViewModel().navigateToCategory(category.categoryId)
         }
 
         // contentAdapter is initialized by subclass
@@ -201,92 +200,64 @@ abstract class ContentNavigationFragment<T : Any> : Fragment() {
             return
         }
 
-        // Render content based on navigation level
-        when (state.currentLevel) {
-            NavigationLevel.GROUPS -> {
-                showGroupsView(state.navigationTree)
-            }
-            NavigationLevel.CATEGORIES -> {
-                state.selectedGroup?.let { group -> showCategoriesView(group) }
-            }
-            NavigationLevel.CONTENT -> {
-                state.selectedCategoryId?.let { categoryId -> showContentView(categoryId) }
-            }
+        // Render content based on what we're showing
+        when {
+            state.isViewingGroups -> showGroupsView(state.currentGroups!!)
+            state.isViewingCategories -> showCategoriesView(state.currentCategories)
+            state.isViewingContent -> showContentView()
         }
 
         // Update breadcrumb
-        updateBreadcrumb(state)
+        updateBreadcrumb(state.breadcrumbPath)
     }
 
-    private fun showGroupsView(
-        navigationTree: com.cactuvi.app.utils.CategoryGrouper.NavigationTree?
-    ) {
+    private fun showGroupsView(groups: Map<String, List<com.cactuvi.app.data.models.Category>>) {
         recyclerView.layoutManager = LinearLayoutManager(requireContext())
         recyclerView.adapter = groupAdapter
 
-        val groups = navigationTree?.groups ?: emptyList()
-        groupAdapter.updateGroups(groups)
+        // Convert to GroupNode format for adapter
+        val groupNodes = groups.map { (name, categories) -> GroupNode(name, categories) }
+        groupAdapter.updateGroups(groupNodes)
     }
 
-    private fun showCategoriesView(group: GroupNode) {
+    private fun showCategoriesView(categories: List<com.cactuvi.app.data.models.Category>) {
         recyclerView.layoutManager = LinearLayoutManager(requireContext())
         recyclerView.adapter = categoryAdapter
 
-        // Get counts from DB
-        lifecycleScope.launch {
-            val countsStart = PerformanceLogger.start("Get category counts")
-            kotlinx.coroutines.delay(100)
-            val categoriesWithCounts =
-                group.categories.map { category ->
-                    val count = getCategoryItemCount(category.categoryId)
-                    Pair(category, count)
-                }
-            PerformanceLogger.end(
-                "Get category counts",
-                countsStart,
-                "categories=${categoriesWithCounts.size}"
-            )
-            categoryAdapter.updateCategories(categoriesWithCounts)
-        }
+        // Categories already have childrenCount pre-computed
+        val categoriesWithCounts = categories.map { Pair(it, it.childrenCount) }
+        categoryAdapter.updateCategories(categoriesWithCounts)
     }
 
-    private fun showContentView(categoryId: String) {
+    private fun showContentView() {
         recyclerView.layoutManager = getContentLayoutManager()
         recyclerView.adapter = contentAdapter
         // Paged data is automatically loaded via observePagedContent()
     }
 
-    private fun updateBreadcrumb(state: ContentUiState) {
-        when (state.currentLevel) {
-            NavigationLevel.GROUPS -> {
-                breadcrumbScroll.visibility = View.GONE
-                breadcrumbChips.removeAllViews()
-            }
-            NavigationLevel.CATEGORIES -> {
-                breadcrumbScroll.visibility = View.VISIBLE
-                breadcrumbChips.removeAllViews()
-                addBreadcrumbChip(state.selectedGroupName ?: "")
-            }
-            NavigationLevel.CONTENT -> {
-                breadcrumbScroll.visibility = View.VISIBLE
-                breadcrumbChips.removeAllViews()
-                // Use breadcrumbPath if available (better), otherwise fallback to manual lookup
-                if (state.breadcrumbPath.isNotEmpty()) {
-                    state.breadcrumbPath.forEach { crumb -> addBreadcrumbChip(crumb) }
-                } else {
-                    addBreadcrumbChip(state.selectedGroupName ?: "")
-                    // Find category name from navigationTree
-                    val category =
-                        state.selectedGroup?.categories?.find {
-                            it.categoryId == state.selectedCategoryId
-                        }
-                    addBreadcrumbChip(category?.categoryName ?: "")
+    private fun updateBreadcrumb(breadcrumbs: List<BreadcrumbItem>) {
+        if (breadcrumbs.isEmpty()) {
+            breadcrumbScroll.visibility = View.GONE
+            breadcrumbChips.removeAllViews()
+            return
+        }
+
+        breadcrumbScroll.visibility = View.VISIBLE
+        breadcrumbChips.removeAllViews()
+
+        breadcrumbs.forEach { crumb ->
+            addBreadcrumbChip(crumb.displayName) {
+                // Handle breadcrumb click - navigate to that level
+                if (crumb.isGroup) {
+                    getViewModel().navigateToGroup(crumb.displayName)
+                } else if (crumb.categoryId != null) {
+                    getViewModel().navigateToCategory(crumb.categoryId)
                 }
             }
         }
     }
 
-    private fun addBreadcrumbChip(text: String) {
+    private fun addBreadcrumbChip(text: String, onClick: () -> Unit) {
         val chip =
             Chip(requireContext()).apply {
                 this.text = text
@@ -296,7 +267,7 @@ abstract class ContentNavigationFragment<T : Any> : Fragment() {
                         requireContext().getColor(R.color.surface_elevated),
                     )
                 setTextColor(requireContext().getColor(R.color.brand_green))
-                setOnClickListener { getViewModel().navigateBack() }
+                setOnClickListener { onClick() }
             }
         breadcrumbChips.addView(chip)
     }

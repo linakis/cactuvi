@@ -1,18 +1,21 @@
 package com.cactuvi.app.ui.common
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
-import com.cactuvi.app.domain.model.NavigationTree
-import com.cactuvi.app.domain.model.Resource
-import com.cactuvi.app.utils.CategoryGrouper
+import com.cactuvi.app.data.models.Category
+import com.cactuvi.app.data.models.ContentType
+import com.cactuvi.app.data.models.NavigationResult
+import com.cactuvi.app.data.repository.ContentRepositoryImpl
+import com.cactuvi.app.utils.CategoryTreeBuilder
+import com.cactuvi.app.utils.PreferencesManager
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
@@ -20,29 +23,40 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
- * Base ViewModel for content screens (Movies, Series, Live TV). Eliminates code duplication by
- * providing shared navigation and state management.
+ * Base ViewModel for content screens with dynamic level-by-level navigation.
  *
- * Subclasses only need to:
- * 1. Inject their specific UseCases
- * 2. Implement getPagedContent() to return their specific paged data
+ * Handles:
+ * - Loading root level (groups or categories)
+ * - Navigating to child categories
+ * - Auto-skipping single-child levels
+ * - Breadcrumb tracking
+ * - Navigation stack management
  *
  * @param T The content type (Movie, Series, or LiveChannel)
  */
-abstract class ContentViewModel<T : Any> : ViewModel() {
+abstract class ContentViewModel<T : Any>(
+    protected val repository: ContentRepositoryImpl,
+    protected val context: Context,
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ContentUiState())
     val uiState: StateFlow<ContentUiState> = _uiState.asStateFlow()
 
+    // Navigation stack (categoryIds, null = root)
+    private val navigationStack = mutableListOf<String?>()
+
     /**
-     * Paged content for the selected category. Automatically updates when selectedCategoryId
-     * changes. Subclasses implement this to provide their specific paged data.
+     * Paged content for the current leaf category. Automatically updates when navigating to a leaf
+     * level.
      */
     val pagedContent: StateFlow<PagingData<T>> by lazy {
         uiState
             .flatMapLatest { state ->
-                state.selectedCategoryId?.let { categoryId -> getPagedContent(categoryId) }
-                    ?: flowOf(PagingData.empty())
+                if (state.isLeafLevel && state.currentCategoryId != null) {
+                    getPagedContent(state.currentCategoryId)
+                } else {
+                    flowOf(PagingData.empty())
+                }
             }
             .cachedIn(viewModelScope)
             .stateIn(
@@ -52,248 +66,237 @@ abstract class ContentViewModel<T : Any> : ViewModel() {
             )
     }
 
-    /**
-     * Subclasses implement this to provide paged data for their content type. Called when a
-     * category is selected.
-     */
+    /** Subclasses provide their content type */
+    protected abstract fun getContentType(): ContentType
+
+    /** Subclasses provide paged data for a category */
     protected abstract fun getPagedContent(categoryId: String): Flow<PagingData<T>>
 
-    /**
-     * Subclasses implement this to observe their content navigation tree. Called once in init
-     * block.
-     */
-    protected abstract fun observeContent(): Flow<Resource<NavigationTree>>
-
-    /** Subclasses implement this to trigger a refresh of their content. */
-    protected abstract suspend fun refreshContent()
-
     init {
-        observeContentInternal()
+        loadRoot()
     }
 
-    private fun observeContentInternal() {
+    /** Load root level (groups or top-level categories). */
+    fun loadRoot() {
         viewModelScope.launch {
-            observeContent().collectLatest { resource ->
-                when (resource) {
-                    is Resource.Loading -> {
-                        _uiState.update { state ->
-                            state.copy(
-                                isLoading = true,
-                                navigationTree = resource.data?.toUtilNavigationTree(),
+            _uiState.update { it.copy(isLoading = true) }
+
+            try {
+                val prefsManager = PreferencesManager.getInstance(context)
+                val contentType = getContentType()
+                val (groupingEnabled, separator) = getGroupingSettings(prefsManager, contentType)
+
+                when (
+                    val result =
+                        repository.getTopLevelNavigation(contentType, groupingEnabled, separator)
+                ) {
+                    is NavigationResult.Groups -> {
+                        _uiState.update {
+                            it.copy(
+                                isLoading = false,
+                                currentGroups = result.groups,
+                                currentCategories = emptyList(),
+                                currentCategoryId = null,
+                                breadcrumbPath = emptyList(),
+                                isLeafLevel = false,
                                 error = null,
                             )
                         }
                     }
-                    is Resource.Success -> {
-                        val tree = resource.data.toUtilNavigationTree()
-                        _uiState.update { state ->
-                            state.copy(
+                    is NavigationResult.Categories -> {
+                        _uiState.update {
+                            it.copy(
                                 isLoading = false,
-                                navigationTree = tree,
+                                currentCategories = result.categories,
+                                currentGroups = null,
+                                currentCategoryId = null,
+                                breadcrumbPath = emptyList(),
+                                isLeafLevel = false,
                                 error = null,
-                            )
-                        }
-                        // Perform auto-navigation after state update
-                        performAutoNavigation(tree)
-                    }
-                    is Resource.Error -> {
-                        _uiState.update { state ->
-                            state.copy(
-                                isLoading = false,
-                                navigationTree = resource.data?.toUtilNavigationTree(),
-                                error = if (resource.data == null) resource.error.message else null,
                             )
                         }
                     }
                 }
-            }
-        }
-    }
 
-    /**
-     * Perform auto-navigation based on navigation tree structure. Auto-skips levels when only 1
-     * item exists.
-     *
-     * Auto-skip scenarios:
-     * 1. Only 1 group → skip to CATEGORIES level, auto-select group
-     * 2. Only 1 category in selected group → skip to CONTENT level, auto-select category
-     * 3. Only 1 group with 1 category → skip directly to CONTENT level
-     */
-    private fun performAutoNavigation(tree: CategoryGrouper.NavigationTree) {
-        when {
-            // Scenario 3: Skip both levels (1 group with 1 category)
-            tree.shouldSkipBothLevels -> {
-                val singleGroup = tree.singleGroup!!
-                val singleCategory = singleGroup.categories.first()
+                navigationStack.clear()
+            } catch (e: Exception) {
                 _uiState.update {
                     it.copy(
-                        currentLevel = NavigationLevel.CONTENT,
-                        selectedGroupName = singleGroup.name,
-                        selectedCategoryId = singleCategory.categoryId,
+                        isLoading = false,
+                        error = e.message ?: "Failed to load content",
                     )
                 }
             }
-            // Scenario 1: Skip groups level (only 1 group)
-            tree.shouldSkipGroups -> {
-                val singleGroup = tree.singleGroup!!
-                // Check if this single group also has only 1 category
-                if (singleGroup.categories.size == 1) {
-                    // Skip to content
-                    val singleCategory = singleGroup.categories.first()
-                    _uiState.update {
-                        it.copy(
-                            currentLevel = NavigationLevel.CONTENT,
-                            selectedGroupName = singleGroup.name,
-                            selectedCategoryId = singleCategory.categoryId,
-                        )
-                    }
-                } else {
-                    // Skip to categories
-                    _uiState.update {
-                        it.copy(
-                            currentLevel = NavigationLevel.CATEGORIES,
-                            selectedGroupName = singleGroup.name,
-                        )
-                    }
-                }
-            }
-            // No auto-skip: show groups normally
-            else -> {
-                _uiState.update { it.copy(currentLevel = NavigationLevel.GROUPS) }
-            }
         }
     }
 
-    fun refresh() {
-        viewModelScope.launch { refreshContent() }
-    }
+    /** Navigate to a group (when showing groups at root level). */
+    fun navigateToGroup(groupName: String) {
+        val groups = _uiState.value.currentGroups ?: return
+        val categories = groups[groupName] ?: return
 
-    /**
-     * Select a group and navigate to its categories. Auto-skips to content level if group has only
-     * 1 category.
-     */
-    fun selectGroup(groupName: String) {
-        val tree = _uiState.value.navigationTree
-        val group = tree?.findGroup(groupName)
+        // Apply prefix stripping
+        val prefsManager = PreferencesManager.getInstance(context)
+        val separator =
+            when (getContentType()) {
+                ContentType.MOVIES -> prefsManager.getMoviesGroupingSeparator()
+                ContentType.SERIES -> prefsManager.getSeriesGroupingSeparator()
+                ContentType.LIVE -> prefsManager.getLiveGroupingSeparator()
+            }
 
-        if (group != null && group.categories.size == 1) {
-            // Auto-skip categories: jump directly to content
-            val singleCategory = group.categories.first()
-            _uiState.update {
-                it.copy(
-                    currentLevel = NavigationLevel.CONTENT,
-                    selectedGroupName = groupName,
-                    selectedCategoryId = singleCategory.categoryId,
+        val strippedCategories =
+            categories.map { category ->
+                category.copy(
+                    categoryName =
+                        CategoryTreeBuilder.stripGroupPrefix(category.categoryName, separator)
                 )
             }
-        } else {
-            // Normal navigation to categories
-            _uiState.update {
-                it.copy(
-                    currentLevel = NavigationLevel.CATEGORIES,
-                    selectedGroupName = groupName,
-                )
-            }
+
+        // Check for single-child skip (auto-navigate if only 1 category that's not a leaf)
+        if (strippedCategories.size == 1 && !strippedCategories.first().isLeaf) {
+            navigationStack.add(null) // Mark that we came from root
+            navigateToCategory(strippedCategories.first().categoryId, groupName)
+            return
         }
-    }
 
-    fun selectCategory(categoryId: String) {
+        navigationStack.add(null) // Mark that we came from root
         _uiState.update {
             it.copy(
-                currentLevel = NavigationLevel.CONTENT,
-                selectedCategoryId = categoryId,
+                currentCategories = strippedCategories,
+                currentGroups = null,
+                breadcrumbPath = listOf(BreadcrumbItem(null, groupName, isGroup = true)),
+                isLeafLevel = false,
             )
         }
     }
 
-    /**
-     * Navigate back to previous level. Returns true if navigation handled, false if should exit to
-     * home.
-     *
-     * Smart back navigation:
-     * - Only navigates to levels that were actually shown to the user
-     * - Skips auto-skipped levels (e.g., if categories were auto-skipped, back from content goes to
-     *   groups)
-     * - If groups were auto-skipped, back from any level exits to home
-     */
-    fun navigateBack(): Boolean {
-        val state = _uiState.value
-        val tree = state.navigationTree
+    /** Navigate to a category. */
+    fun navigateToCategory(categoryId: String, groupName: String? = null) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
 
-        return when (state.currentLevel) {
-            NavigationLevel.GROUPS -> false // Already at top, exit to home
-            NavigationLevel.CATEGORIES -> {
-                // Go back to groups only if groups level was shown (not auto-skipped)
-                if (tree?.shouldSkipGroups == true) {
-                    // Groups were auto-skipped, exit to home
-                    false
-                } else {
-                    // Navigate back to groups
-                    _uiState.update {
-                        it.copy(
-                            currentLevel = NavigationLevel.GROUPS,
-                            selectedGroupName = null,
-                        )
-                    }
-                    true
-                }
-            }
-            NavigationLevel.CONTENT -> {
-                // Go back to categories if they were shown
-                val selectedGroupName = state.selectedGroupName
-                val categoriesWereShown =
-                    selectedGroupName != null &&
-                        tree?.shouldSkipCategories(selectedGroupName) == false
+            try {
+                val category = repository.getCategoryById(getContentType(), categoryId)
+                val result = repository.getChildCategories(getContentType(), categoryId)
 
-                if (categoriesWereShown) {
-                    // Navigate back to categories
-                    _uiState.update {
-                        it.copy(
-                            currentLevel = NavigationLevel.CATEGORIES,
-                            selectedCategoryId = null,
-                        )
-                    }
-                    true
-                } else {
-                    // Categories were auto-skipped, check if groups were shown
-                    if (tree?.shouldSkipGroups == true) {
-                        // Both groups and categories were auto-skipped, exit to home
-                        false
-                    } else {
-                        // Navigate back to groups (categories were skipped)
-                        _uiState.update {
-                            it.copy(
-                                currentLevel = NavigationLevel.GROUPS,
-                                selectedGroupName = null,
-                                selectedCategoryId = null,
-                            )
+                when (result) {
+                    is NavigationResult.Categories -> {
+                        val children = result.categories
+
+                        if (children.isEmpty() || children.first().isLeaf) {
+                            // Leaf level - show content
+                            navigationStack.add(categoryId)
+                            val breadcrumbs = buildBreadcrumbs(groupName, category)
+
+                            _uiState.update {
+                                it.copy(
+                                    isLoading = false,
+                                    currentCategoryId = categoryId,
+                                    isLeafLevel = true,
+                                    breadcrumbPath = breadcrumbs,
+                                    currentCategories = emptyList(),
+                                )
+                            }
+                        } else {
+                            // Has children - show categories
+                            navigationStack.add(categoryId)
+                            val breadcrumbs = buildBreadcrumbs(groupName, category)
+
+                            _uiState.update {
+                                it.copy(
+                                    isLoading = false,
+                                    currentCategories = children,
+                                    isLeafLevel = false,
+                                    breadcrumbPath = breadcrumbs,
+                                )
+                            }
                         }
-                        true
                     }
+                    is NavigationResult.Groups -> {
+                        // Shouldn't happen at this level
+                        _uiState.update { it.copy(isLoading = false) }
+                    }
+                }
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        error = e.message ?: "Failed to load category",
+                    )
                 }
             }
         }
     }
 
-    /**
-     * Convert domain NavigationTree to CategoryGrouper.NavigationTree. Temporary mapping until
-     * adapters are refactored.
-     */
-    private fun NavigationTree.toUtilNavigationTree(): CategoryGrouper.NavigationTree {
-        val utilGroups =
-            this.groups.map { domainGroup ->
-                CategoryGrouper.GroupNode(
-                    name = domainGroup.name,
-                    categories =
-                        domainGroup.categories.map { domainCategory ->
-                            com.cactuvi.app.data.models.Category(
-                                categoryId = domainCategory.categoryId,
-                                categoryName = domainCategory.categoryName,
-                                parentId = domainCategory.parentId,
-                            )
-                        },
+    /** Navigate back. Returns true if handled, false if should exit. */
+    fun navigateBack(): Boolean {
+        if (navigationStack.isEmpty()) return false
+
+        navigationStack.removeLastOrNull()
+
+        if (navigationStack.isEmpty()) {
+            loadRoot()
+        } else {
+            val previousCategoryId = navigationStack.lastOrNull()
+            if (previousCategoryId == null) {
+                loadRoot()
+            } else {
+                navigateToCategory(previousCategoryId)
+            }
+        }
+
+        return true
+    }
+
+    /** Handle separator change (reload root with new grouping). */
+    fun onSeparatorChanged() {
+        navigationStack.clear()
+        loadRoot()
+    }
+
+    /** Refresh current content. */
+    fun refresh() {
+        // For now, just reload root
+        // TODO: Could be smarter and reload current level
+        loadRoot()
+    }
+
+    private fun buildBreadcrumbs(groupName: String?, category: Category?): List<BreadcrumbItem> {
+        val breadcrumbs = _uiState.value.breadcrumbPath.toMutableList()
+
+        // Add group if not already in breadcrumbs
+        if (groupName != null && breadcrumbs.none { it.isGroup }) {
+            breadcrumbs.add(BreadcrumbItem(null, groupName, isGroup = true))
+        }
+
+        // Add category if provided
+        category?.let {
+            breadcrumbs.add(BreadcrumbItem(it.categoryId, it.categoryName, isGroup = false))
+        }
+
+        return breadcrumbs
+    }
+
+    private fun getGroupingSettings(
+        prefsManager: PreferencesManager,
+        contentType: ContentType
+    ): Pair<Boolean, String> {
+        return when (contentType) {
+            ContentType.MOVIES -> {
+                Pair(
+                    prefsManager.isMoviesGroupingEnabled(),
+                    prefsManager.getMoviesGroupingSeparator()
                 )
             }
-        return CategoryGrouper.NavigationTree(utilGroups)
+            ContentType.SERIES -> {
+                Pair(
+                    prefsManager.isSeriesGroupingEnabled(),
+                    prefsManager.getSeriesGroupingSeparator()
+                )
+            }
+            ContentType.LIVE -> {
+                Pair(prefsManager.isLiveGroupingEnabled(), prefsManager.getLiveGroupingSeparator())
+            }
+        }
     }
 }
