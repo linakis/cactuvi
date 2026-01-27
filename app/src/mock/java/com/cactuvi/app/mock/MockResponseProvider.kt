@@ -22,6 +22,9 @@ object MockResponseProvider {
             "get_vod_categories" to "get_vod_categories.json",
             "get_live_categories" to "get_live_categories.json",
             "get_series_categories" to "get_series_categories.json",
+            "get_account_info" to "get_account_info.json",
+            "get_vod_info" to "get_vod_info.json",
+            "get_series_info" to "get_series_info.json",
         )
 
     /**
