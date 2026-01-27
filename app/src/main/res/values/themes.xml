@@ -1,5 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Splash Screen Theme (Android 12+ API) -->
+    <style name="Theme.IPTVPlayer.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/background_primary</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="windowSplashScreenAnimationDuration">200</item>
+        <item name="postSplashScreenTheme">@style/Theme.IPTVPlayer</item>
+    </style>
+
     <style name="Base.Theme.IPTVPlayer" parent="Theme.Material3.Dark.NoActionBar">
         <!-- Primary colors (Material 3) -->
         <item name="colorPrimary">@color/brand_green</item>

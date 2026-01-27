@@ -7,6 +7,7 @@ import android.widget.Button
 import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.lifecycleScope
 import com.cactuvi.app.MainActivity
 import com.cactuvi.app.R
@@ -35,8 +36,18 @@ class LoadingActivity : AppCompatActivity() {
     private lateinit var detailText: TextView
     private lateinit var retryButton: Button
 
+    /** Track whether initial source check is complete (for splash screen) */
+    private var isCheckingSource = true
+
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Install splash screen BEFORE super.onCreate() per Android 12+ API requirements
+        val splashScreen = installSplashScreen()
+
         super.onCreate(savedInstanceState)
+
+        // Keep splash screen visible while checking for sources
+        splashScreen.setKeepOnScreenCondition { isCheckingSource }
+
         setContentView(R.layout.activity_loading)
 
         progressBar = findViewById(R.id.progressBar)
@@ -59,6 +70,9 @@ class LoadingActivity : AppCompatActivity() {
                 // Check if any sources are configured
                 val sources = sourceManager.getAllSources()
 
+                // Source check complete - dismiss splash screen
+                isCheckingSource = false
+
                 if (sources.isEmpty()) {
                     // No sources configured - jump directly to add source screen
                     navigateToAddSource()
@@ -69,6 +83,7 @@ class LoadingActivity : AppCompatActivity() {
                 // Background sync will load any missing content types
                 navigateToMain()
             } catch (e: Exception) {
+                isCheckingSource = false
                 showError("Failed to check cache: ${e.message}")
             }
         }

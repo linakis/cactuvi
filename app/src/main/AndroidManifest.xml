@@ -38,7 +38,7 @@
         <activity
             android:name=".ui.LoadingActivity"
             android:exported="true"
-            android:theme="@style/Theme.IPTVPlayer">
+            android:theme="@style/Theme.IPTVPlayer.Starting">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
