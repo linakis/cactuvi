@@ -376,6 +376,114 @@ class MoviesViewModelTest {
         }
     }
 
+    // ========== SYNC UX TESTS ==========
+
+    @Test
+    fun `shows Syncing state with indeterminate progress when progress is null`() = runTest {
+        // Given: Sync is loading with no progress info
+        moviesStateFlow.value = DataState.Loading(progress = null)
+
+        every { mockRepository.observeTopLevelNavigation(ContentType.MOVIES, any(), any()) } returns
+            flowOf(NavigationResult.Categories(emptyList()))
+
+        // When: ViewModel is created
+        viewModel = MoviesViewModel(mockRepository, mockPreferencesManager)
+
+        // Then: Should show syncing state with null progress (indeterminate)
+        viewModel.uiState.test {
+            val state = awaitItem()
+            assertTrue("Expected Syncing state but got $state", state is ContentUiState.Syncing)
+            assertEquals(null, (state as ContentUiState.Syncing).progress)
+        }
+    }
+
+    @Test
+    fun `shows Content when data exists even during sync`() = runTest {
+        // Given: Sync is loading but data exists
+        moviesStateFlow.value = DataState.Loading(progress = 30)
+        val categories = createMockCategories()
+
+        every { mockPreferencesManager.isMoviesGroupingEnabled() } returns false
+        every { mockRepository.observeTopLevelNavigation(ContentType.MOVIES, false, "-") } returns
+            flowOf(NavigationResult.Categories(categories))
+
+        // When: ViewModel is created
+        viewModel = MoviesViewModel(mockRepository, mockPreferencesManager)
+
+        // Then: Should show content (not syncing) because data exists
+        viewModel.uiState.test {
+            val state = awaitItem()
+            assertTrue(
+                "Expected Content.Categories but got $state (data exists, should show content not syncing)",
+                state is ContentUiState.Content.Categories
+            )
+        }
+    }
+
+    @Test
+    fun `transitions from Syncing to Content when data arrives`() = runTest {
+        // Given: Initially syncing with no data
+        moviesStateFlow.value = DataState.Loading(progress = 50)
+        val categoriesFlow =
+            MutableStateFlow<NavigationResult>(NavigationResult.Categories(emptyList()))
+
+        every { mockPreferencesManager.isMoviesGroupingEnabled() } returns false
+        every { mockRepository.observeTopLevelNavigation(ContentType.MOVIES, false, "-") } returns
+            categoriesFlow
+
+        viewModel = MoviesViewModel(mockRepository, mockPreferencesManager)
+
+        viewModel.uiState.test {
+            // Initial state: Syncing (no data)
+            val syncingState = awaitItem()
+            assertTrue(
+                "Expected Syncing but got $syncingState",
+                syncingState is ContentUiState.Syncing
+            )
+            assertEquals(50, (syncingState as ContentUiState.Syncing).progress)
+
+            // Simulate data arriving
+            categoriesFlow.value = NavigationResult.Categories(createMockCategories())
+
+            // Should transition to Content
+            val contentState = awaitItem()
+            assertTrue(
+                "Expected Content.Categories but got $contentState",
+                contentState is ContentUiState.Content.Categories
+            )
+        }
+    }
+
+    @Test
+    fun `sync progress updates are reflected in Syncing state`() = runTest {
+        // Given: Syncing with progress updates
+        moviesStateFlow.value = DataState.Loading(progress = 10)
+
+        every { mockRepository.observeTopLevelNavigation(ContentType.MOVIES, any(), any()) } returns
+            flowOf(NavigationResult.Categories(emptyList()))
+
+        viewModel = MoviesViewModel(mockRepository, mockPreferencesManager)
+
+        viewModel.uiState.test {
+            // Initial: 10%
+            val state1 = awaitItem()
+            assertTrue(state1 is ContentUiState.Syncing)
+            assertEquals(10, (state1 as ContentUiState.Syncing).progress)
+
+            // Update to 50%
+            moviesStateFlow.value = DataState.Loading(progress = 50)
+            val state2 = awaitItem()
+            assertTrue(state2 is ContentUiState.Syncing)
+            assertEquals(50, (state2 as ContentUiState.Syncing).progress)
+
+            // Update to 90%
+            moviesStateFlow.value = DataState.Loading(progress = 90)
+            val state3 = awaitItem()
+            assertTrue(state3 is ContentUiState.Syncing)
+            assertEquals(90, (state3 as ContentUiState.Syncing).progress)
+        }
+    }
+
     // ========== SEPARATOR CHANGE TEST ==========
 
     @Test
