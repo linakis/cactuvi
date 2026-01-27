@@ -245,126 +245,408 @@ class MoviesFragment : Fragment() {
 
 ## Dependency Injection with Hilt
 
+All dependencies are managed by Hilt. **NO singletons with getInstance() pattern.**
+
+### Architecture Flow
+
+```
+UI Layer (Fragments/Activities)
+  ↓ @AndroidEntryPoint + @Inject / @HiltViewModel
+ViewModels
+  ↓ @Inject constructor
+UseCases
+  ↓ @Inject constructor
+Repository Interface (domain layer)
+  ↓ @Binds in DataModule
+Repository Implementation (data layer)
+  ↓ @Inject constructor
+Managers + Data Sources
+  ↓ @Inject constructor / @Provides
+Room, Retrofit, SharedPreferences
+```
+
 ### Application Setup
 
 ```kotlin
 @HiltAndroidApp
-class IPTVApplication : Application()
+class Cactuvi : Application(), Configuration.Provider {
+
+    @Inject lateinit var workerFactory: HiltWorkerFactory
+
+    override val workManagerConfiguration: Configuration
+        get() = Configuration.Builder().setWorkerFactory(workerFactory).build()
+}
 ```
 
-### Modules
+### Hilt Modules
+
+#### DataModule (provides Repository + API)
 
 ```kotlin
 @Module
 @InstallIn(SingletonComponent::class)
-object DataModule {
-    
-    @Provides
+abstract class DataModule {
+
+    @Binds
     @Singleton
-    fun provideAppDatabase(
-        @ApplicationContext context: Context
-    ): AppDatabase = AppDatabase.getInstance(context)
-    
-    @Provides
-    @Singleton
-    fun provideContentRepository(
-        @ApplicationContext context: Context
-    ): ContentRepository = ContentRepositoryImpl(context)
+    abstract fun bindContentRepository(impl: ContentRepositoryImpl): ContentRepository
+
+    companion object {
+        @Provides
+        @Singleton
+        fun provideXtreamApiService(): XtreamApiService {
+            return Retrofit.Builder()
+                .baseUrl("https://placeholder.com/")
+                .addConverterFactory(GsonConverterFactory.create())
+                .client(OkHttpClient.Builder().build())
+                .build()
+                .create(XtreamApiService::class.java)
+        }
+    }
 }
 ```
 
-### Usage in ViewModel
+#### ManagerModule (provides Database + Managers)
+
+```kotlin
+@Module
+@InstallIn(SingletonComponent::class)
+object ManagerModule {
+
+    @Provides
+    @Singleton
+    fun provideAppDatabase(@ApplicationContext context: Context): AppDatabase {
+        return Room.databaseBuilder(context, AppDatabase::class.java, "iptv_database")
+            .fallbackToDestructiveMigration()
+            .build()
+    }
+
+    @Provides
+    @Singleton
+    fun provideSharedPreferences(@ApplicationContext context: Context): SharedPreferences {
+        return context.getSharedPreferences("iptv_prefs", Context.MODE_PRIVATE)
+    }
+}
+```
+
+### Common Patterns
+
+#### ViewModels
 
 ```kotlin
 @HiltViewModel
 class MoviesViewModel @Inject constructor(
-    private val observeMoviesUseCase: ObserveMoviesUseCase,
-    private val refreshMoviesUseCase: RefreshMoviesUseCase
-) : ViewModel()
+    repository: ContentRepository,
+    preferencesManager: PreferencesManager,
+) : ContentViewModel<Movie>(repository, preferencesManager) {
+
+    override fun getContentType(): ContentType = ContentType.MOVIES
+
+    override fun getPagedContent(categoryId: String): Flow<PagingData<Movie>> {
+        return repository.getMoviesPaged(categoryId)
+    }
+}
 ```
 
-### Usage in Fragment
+#### UseCases
+
+```kotlin
+class ObserveMoviesUseCase @Inject constructor(
+    private val repository: ContentRepository
+) {
+    operator fun invoke(): Flow<Resource<NavigationTree>> = repository.observeMovies()
+}
+```
+
+#### Repository Implementation
+
+```kotlin
+class ContentRepositoryImpl @Inject constructor(
+    @ApplicationContext private val context: Context,
+    private val database: AppDatabase,
+    private val sourceManager: SourceManager,
+    private val preferencesManager: PreferencesManager,
+    private val credentialsManager: CredentialsManager,
+    private val syncPreferencesManager: SyncPreferencesManager,
+) : ContentRepository {
+    // All dependencies explicit in constructor
+}
+```
+
+#### Managers
+
+```kotlin
+@Singleton
+class SourceManager @Inject constructor(
+    private val database: AppDatabase,
+    private val sharedPreferences: SharedPreferences,
+) {
+    // No getInstance() - Hilt manages lifecycle
+}
+```
+
+#### Activities
 
 ```kotlin
 @AndroidEntryPoint
-class MoviesFragment : Fragment() {
-    private val viewModel: MoviesViewModel by viewModels()
+class SettingsActivity : AppCompatActivity() {
+    @Inject lateinit var preferencesManager: PreferencesManager
+    @Inject lateinit var repository: ContentRepository
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        // Fields already injected, use directly
+    }
 }
+```
+
+#### Fragments
+
+```kotlin
+@AndroidEntryPoint
+class MoviesFragment : ContentNavigationFragment<Movie>() {
+    private val viewModel: MoviesViewModel by viewModels()
+
+    @Inject lateinit var preferencesManager: PreferencesManager
+}
+```
+
+#### Workers (Background Tasks)
+
+```kotlin
+@HiltWorker
+class BackgroundSyncWorker @AssistedInject constructor(
+    @Assisted context: Context,
+    @Assisted params: WorkerParameters,
+    private val repository: ContentRepository,
+    private val preferencesManager: PreferencesManager,
+) : CoroutineWorker(context, params) {
+
+    override suspend fun doWork(): Result {
+        // Dependencies already injected
+    }
+}
+```
+
+**Important:** Disable default WorkManager initializer in `AndroidManifest.xml`:
+```xml
+<provider
+    android:name="androidx.startup.InitializationProvider"
+    android:authorities="${applicationId}.androidx-startup"
+    tools:node="remove" />
+```
+
+### Injection Rules
+
+| Class Type | Annotation | Injection Method |
+|------------|------------|------------------|
+| Application | `@HiltAndroidApp` | N/A |
+| Activity | `@AndroidEntryPoint` | `@Inject lateinit var` |
+| Fragment | `@AndroidEntryPoint` | `@Inject lateinit var` or `by viewModels()` |
+| ViewModel | `@HiltViewModel` | `@Inject constructor` |
+| UseCase | None | `@Inject constructor` |
+| Repository | `@Singleton` on impl | `@Inject constructor` + `@Binds` |
+| Manager | `@Singleton` | `@Inject constructor` |
+| Worker | `@HiltWorker` | `@AssistedInject constructor` |
+
+### What NOT to Do
+
+```kotlin
+// ❌ DON'T: Singleton pattern
+companion object {
+    @Volatile private var INSTANCE: SomeManager? = null
+    fun getInstance(context: Context): SomeManager { ... }
+}
+
+// ❌ DON'T: Call getInstance() anywhere
+val manager = SomeManager.getInstance(context)
+
+// ❌ DON'T: Create dependencies manually
+val repository = ContentRepositoryImpl(context, ...)
+```
+
+### What TO Do
+
+```kotlin
+// ✅ DO: @Inject constructor
+class SomeManager @Inject constructor(
+    private val database: AppDatabase,
+) { ... }
+
+// ✅ DO: Field injection in Android components
+@Inject lateinit var manager: SomeManager
+
+// ✅ DO: Constructor injection in ViewModels/UseCases
+@HiltViewModel
+class MyViewModel @Inject constructor(
+    private val repository: ContentRepository,
+) : ViewModel()
 ```
 
 ## Testing Strategy
 
-### ViewModel Tests
+### Why Constructor Injection Enables Testing
+
+With Hilt DI, all dependencies are passed via constructor. This makes mocking trivial:
+
+```kotlin
+// Production: Hilt injects real dependencies
+@HiltViewModel
+class MoviesViewModel @Inject constructor(
+    private val repository: ContentRepository,
+) : ViewModel()
+
+// Test: You inject mocks directly
+val mockRepository = mockk<ContentRepository>()
+val viewModel = MoviesViewModel(mockRepository)
+```
+
+### Unit Test Patterns
+
+#### ViewModel Tests
 
 ```kotlin
 @OptIn(ExperimentalCoroutinesApi::class)
 class MoviesViewModelTest {
-    @get:Rule
-    val mainDispatcherRule = MainDispatcherRule()
-    
-    private lateinit var observeMoviesUseCase: ObserveMoviesUseCase
-    private lateinit var refreshMoviesUseCase: RefreshMoviesUseCase
+    private val testDispatcher = UnconfinedTestDispatcher()
+
+    private lateinit var mockRepository: ContentRepository
+    private lateinit var mockPreferencesManager: PreferencesManager
     private lateinit var viewModel: MoviesViewModel
-    
+
     @Before
     fun setup() {
-        observeMoviesUseCase = mockk()
-        refreshMoviesUseCase = mockk(relaxed = true)
-        
-        every { observeMoviesUseCase() } returns flowOf(
-            Resource.Loading(),
-            Resource.Success(mockNavigationTree)
-        )
-        
-        viewModel = MoviesViewModel(observeMoviesUseCase, refreshMoviesUseCase)
+        Dispatchers.setMain(testDispatcher)
+
+        mockRepository = mockk(relaxed = true)
+        mockPreferencesManager = mockk(relaxed = true)
+
+        // Default behavior
+        every { mockPreferencesManager.isMoviesGroupingEnabled() } returns true
+        every { mockPreferencesManager.getMoviesGroupingSeparator() } returns "-"
     }
-    
-    @Test
-    fun `observes movies and updates state`() = runTest {
-        viewModel.uiState.test {
-            val initial = awaitItem()
-            assertFalse(initial.isLoading)
-            
-            val loading = awaitItem()
-            assertTrue(loading.isLoading)
-            
-            val success = awaitItem()
-            assertFalse(success.isLoading)
-            assertNotNull(success.navigationTree)
-        }
+
+    @After
+    fun tearDown() {
+        Dispatchers.resetMain()
     }
-    
+
     @Test
-    fun `refresh triggers use case`() = runTest {
+    fun `initial state has correct defaults`() {
+        coEvery { mockRepository.getTopLevelNavigation(any(), any(), any()) } returns
+            NavigationResult.Categories(emptyList())
+
+        viewModel = MoviesViewModel(mockRepository, mockPreferencesManager)
+
+        val state = viewModel.uiState.value
+        assertFalse(state.isLoading)
+        assertFalse(state.isLeafLevel)
+    }
+
+    @Test
+    fun `refresh reloads content`() = runTest {
+        coEvery { mockRepository.getTopLevelNavigation(any(), any(), any()) } returns
+            NavigationResult.Categories(emptyList())
+        viewModel = MoviesViewModel(mockRepository, mockPreferencesManager)
+
         viewModel.refresh()
-        
-        coVerify { refreshMoviesUseCase() }
+
+        coVerify(atLeast = 2) { mockRepository.getTopLevelNavigation(any(), any(), any()) }
     }
 }
 ```
 
-### UseCase Tests
+#### Manager Tests
+
+```kotlin
+@OptIn(ExperimentalCoroutinesApi::class)
+class SourceManagerTest {
+    private val testDispatcher = UnconfinedTestDispatcher()
+
+    private lateinit var mockDatabase: AppDatabase
+    private lateinit var mockSourceDao: SourceDao
+    private lateinit var mockSharedPreferences: SharedPreferences
+    private lateinit var sourceManager: SourceManager
+
+    @Before
+    fun setup() {
+        Dispatchers.setMain(testDispatcher)
+
+        mockDatabase = mockk(relaxed = true)
+        mockSourceDao = mockk(relaxed = true)
+        mockSharedPreferences = mockk(relaxed = true)
+
+        every { mockDatabase.sourceDao() } returns mockSourceDao
+
+        sourceManager = SourceManager(mockDatabase, mockSharedPreferences)
+    }
+
+    @Test
+    fun `getAllSources returns empty list when no sources`() = runTest {
+        coEvery { mockSourceDao.getAll() } returns emptyList()
+
+        val result = sourceManager.getAllSources()
+
+        assertTrue(result.isEmpty())
+    }
+
+    @Test
+    fun `setActiveSource updates database and preferences`() = runTest {
+        val source = StreamSource(id = "1", ...)
+        coEvery { mockSourceDao.update(any()) } just Runs
+        every { mockSharedPreferences.edit().putString(any(), any()).apply() } just Runs
+
+        sourceManager.setActiveSource(source)
+
+        coVerify { mockSourceDao.update(any()) }
+    }
+}
+```
+
+#### UseCase Tests
 
 ```kotlin
 class ObserveMoviesUseCaseTest {
     private lateinit var repository: ContentRepository
     private lateinit var useCase: ObserveMoviesUseCase
-    
+
     @Before
     fun setup() {
         repository = mockk()
         useCase = ObserveMoviesUseCase(repository)
     }
-    
+
     @Test
     fun `invoke delegates to repository`() = runTest {
         val mockFlow = flowOf(Resource.Success(mockNavigationTree))
         every { repository.observeMovies() } returns mockFlow
-        
+
         val result = useCase()
-        
+
         assertEquals(mockFlow, result)
         verify { repository.observeMovies() }
+    }
+}
+```
+
+### Flow Testing with Turbine
+
+```kotlin
+@Test
+fun `observeMovies emits Loading then Success`() = runTest {
+    every { mockRepository.observeMovies() } returns flowOf(
+        Resource.Loading(),
+        Resource.Success(mockNavigationTree)
+    )
+
+    useCase().test {
+        val loading = awaitItem()
+        assertTrue(loading is Resource.Loading)
+
+        val success = awaitItem()
+        assertTrue(success is Resource.Success)
+
+        awaitComplete()
     }
 }
 ```
@@ -372,11 +654,38 @@ class ObserveMoviesUseCaseTest {
 ### Test Dependencies
 
 ```kotlin
+// build.gradle.kts
 testImplementation("junit:junit:4.13.2")
-testImplementation("io.mockk:mockk:1.13.9")
+testImplementation("io.mockk:mockk:1.13.8")
 testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
 testImplementation("app.cash.turbine:turbine:1.0.0")
 ```
+
+### Running Tests
+
+```bash
+# Run all unit tests
+./gradlew testProdDebugUnitTest
+
+# Run specific test class
+./gradlew testProdDebugUnitTest --tests "*.MoviesViewModelTest"
+
+# Run tests with coverage
+./gradlew testDebugUnitTest jacocoTestReport
+
+# View coverage report
+open app/build/reports/jacoco/jacocoTestReport/html/index.html
+```
+
+### Test Coverage Goals
+
+| Layer | Target | Key Classes |
+|-------|--------|-------------|
+| ViewModel | 80%+ | MoviesViewModel, SeriesViewModel, LiveTvViewModel |
+| UseCase | 80%+ | All UseCases in domain/usecase/ |
+| Repository | 70%+ | ContentRepositoryImpl |
+| Manager | 80%+ | SourceManager, PreferencesManager |
+| Utility | 90%+ | CategoryTreeBuilder, StreamingJsonParser |
 
 ## File Structure
 
@@ -428,11 +737,38 @@ app/src/main/java/com/cactuvi/app/
 │       └── LiveTvUiState.kt
 │
 └── di/                              # Dependency injection
-    ├── DataModule.kt                # Repository, Database
-    └── AppModule.kt                 # App-level singletons
+    ├── DataModule.kt                # Repository binding, API service
+    └── ManagerModule.kt             # Database, SharedPreferences, Managers
 ```
 
-## Migration Path
+## Migration History
+
+### DI Migration (January 2026) - Completed
+
+Migrated from singleton pattern (`getInstance()`) to full Hilt dependency injection.
+
+**What was migrated:**
+
+| Component | Before | After |
+|-----------|--------|-------|
+| ContentRepositoryImpl | `getInstance(context)` | `@Inject constructor` |
+| SourceManager | `getInstance(context)` | `@Inject constructor` + `@Singleton` |
+| PreferencesManager | `getInstance(context)` | `@Inject constructor` + `@Singleton` |
+| CredentialsManager | `getInstance(context)` | `@Inject constructor` + `@Singleton` |
+| SyncPreferencesManager | `getInstance(context)` | `@Inject constructor` + `@Singleton` |
+| ReactiveUpdateManager | `getInstance()` | `@Inject constructor` + `@Singleton` |
+| BackgroundSyncWorker | Manual deps | `@HiltWorker` + `@AssistedInject` |
+| All Activities | Manual init | `@AndroidEntryPoint` |
+| All Fragments | Manual init | `@AndroidEntryPoint` |
+
+**Benefits achieved:**
+- ✅ 200+ unit tests now possible (constructor injection enables mocking)
+- ✅ No more `getInstance()` calls scattered through codebase
+- ✅ Clear dependency graph visible in constructors
+- ✅ Proper lifecycle management by Hilt
+- ✅ Testable Workers with injected dependencies
+
+## Architecture Evolution
 
 ### Phase 1: Foundation
 1. Create `Resource<T>` wrapper
