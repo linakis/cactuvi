@@ -30,14 +30,17 @@ import com.cactuvi.app.utils.CredentialsManager
 import com.cactuvi.app.utils.StreamUrlBuilder
 import com.google.android.material.appbar.CollapsingToolbarLayout
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
 class SeriesDetailActivity : AppCompatActivity() {
 
+    @Inject lateinit var downloadRepository: DownloadRepository
+    @Inject lateinit var credentialsManager: CredentialsManager
+
     private val viewModel: SeriesDetailViewModel by viewModels()
-    private lateinit var downloadRepository: DownloadRepository
 
     private lateinit var collapsingToolbar: CollapsingToolbarLayout
     private lateinit var toolbar: Toolbar
@@ -64,9 +67,6 @@ class SeriesDetailActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_series_detail)
-
-        // Initialize download repository
-        downloadRepository = DownloadRepository(this)
 
         // Get data from intent
         seriesId = intent.getIntExtra("SERIES_ID", 0)
@@ -235,7 +235,6 @@ class SeriesDetailActivity : AppCompatActivity() {
     }
 
     private fun playEpisode(episode: Episode, seasonNumber: Int) {
-        val credentialsManager = CredentialsManager.getInstance(this)
         val server = credentialsManager.getServer()
         val username = credentialsManager.getUsername()
         val password = credentialsManager.getPassword()
@@ -379,7 +378,6 @@ class SeriesDetailActivity : AppCompatActivity() {
     }
 
     private suspend fun downloadEpisodeInternal(episode: Episode, seasonNumber: Int) {
-        val credentialsManager = CredentialsManager.getInstance(this)
         val server = credentialsManager.getServer()
         val username = credentialsManager.getUsername()
         val password = credentialsManager.getPassword()

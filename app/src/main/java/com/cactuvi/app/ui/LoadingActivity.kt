@@ -11,6 +11,8 @@ import androidx.lifecycle.lifecycleScope
 import com.cactuvi.app.MainActivity
 import com.cactuvi.app.R
 import com.cactuvi.app.utils.SourceManager
+import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 import kotlinx.coroutines.launch
 
 /**
@@ -23,7 +25,10 @@ import kotlinx.coroutines.launch
  *
  * Each fragment (Movies/Series/Live) handles its own loading state independently.
  */
+@AndroidEntryPoint
 class LoadingActivity : AppCompatActivity() {
+
+    @Inject lateinit var sourceManager: SourceManager
 
     private lateinit var progressBar: ProgressBar
     private lateinit var statusText: TextView
@@ -52,7 +57,6 @@ class LoadingActivity : AppCompatActivity() {
         lifecycleScope.launch {
             try {
                 // Check if any sources are configured
-                val sourceManager = SourceManager.getInstance(this@LoadingActivity)
                 val sources = sourceManager.getAllSources()
 
                 if (sources.isEmpty()) {

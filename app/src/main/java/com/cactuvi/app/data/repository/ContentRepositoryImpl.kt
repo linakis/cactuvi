@@ -14,12 +14,17 @@ import com.cactuvi.app.data.mappers.toDomain
 import com.cactuvi.app.data.models.*
 import com.cactuvi.app.utils.CategoryGrouper
 import com.cactuvi.app.utils.CategoryTreeBuilder
+import com.cactuvi.app.utils.CredentialsManager
 import com.cactuvi.app.utils.PerformanceLogger
 import com.cactuvi.app.utils.PreferencesManager
 import com.cactuvi.app.utils.SourceManager
 import com.cactuvi.app.utils.StreamingJsonParser
+import com.cactuvi.app.utils.SyncPreferencesManager
 import com.cactuvi.app.utils.VPNDetector
 import com.google.gson.Gson
+import dagger.hilt.android.qualifiers.ApplicationContext
+import javax.inject.Inject
+import javax.inject.Singleton
 import kotlin.time.Duration.Companion.minutes
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.TimeoutCancellationException
@@ -44,9 +49,6 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
-
-// Type alias for backward compatibility with existing code
-typealias ContentRepository = ContentRepositoryImpl
 
 /**
  * ContentRepository - Data layer for IPTV content
@@ -217,28 +219,24 @@ sealed class LiveEffect {
     ) : LiveEffect()
 }
 
+@Singleton
 class ContentRepositoryImpl
-private constructor(
-    private val context: Context,
+@Inject
+constructor(
+    @ApplicationContext private val context: Context,
+    private val database: AppDatabase,
+    private val sourceManager: SourceManager,
+    private val preferencesManager: PreferencesManager,
+    private val credentialsManager: CredentialsManager,
+    private val syncPreferencesManager: SyncPreferencesManager
 ) : com.cactuvi.app.domain.repository.ContentRepository {
 
-    private val sourceManager = SourceManager.getInstance(context)
     private var apiService: XtreamApiService? = null
-    private val database = AppDatabase.getInstance(context)
     private val dbWriter = database.getDbWriter()
     private val gson = Gson()
     private var currentSourceId: String? = null
 
     companion object {
-        @Volatile private var INSTANCE: ContentRepositoryImpl? = null
-
-        fun getInstance(context: Context): ContentRepositoryImpl {
-            return INSTANCE
-                ?: synchronized(this) {
-                    INSTANCE
-                        ?: ContentRepositoryImpl(context.applicationContext).also { INSTANCE = it }
-                }
-        }
 
         // Cache Time-To-Live (TTL) in milliseconds
         // NOTE: TTL only used for fallback safety check (7 days) - background sync handles
@@ -269,19 +267,19 @@ private constructor(
 
     // Series: State (what to display) + Effects (one-time actions)
     private val _seriesState = MutableStateFlow<DataState<Unit>>(DataState.Success(Unit))
-    val seriesState: StateFlow<DataState<Unit>> = _seriesState.asStateFlow()
+    override val seriesState: StateFlow<DataState<Unit>> = _seriesState.asStateFlow()
     private val _seriesEffects = MutableSharedFlow<SeriesEffect>()
     val seriesEffects: SharedFlow<SeriesEffect> = _seriesEffects.asSharedFlow()
 
     // Movies: State (what to display) + Effects (one-time actions)
     private val _moviesState = MutableStateFlow<DataState<Unit>>(DataState.Success(Unit))
-    val moviesState: StateFlow<DataState<Unit>> = _moviesState.asStateFlow()
+    override val moviesState: StateFlow<DataState<Unit>> = _moviesState.asStateFlow()
     private val _moviesEffects = MutableSharedFlow<MoviesEffect>()
     val moviesEffects: SharedFlow<MoviesEffect> = _moviesEffects.asSharedFlow()
 
     // Live: State (what to display) + Effects (one-time actions)
     private val _liveState = MutableStateFlow<DataState<Unit>>(DataState.Success(Unit))
-    val liveState: StateFlow<DataState<Unit>> = _liveState.asStateFlow()
+    override val liveState: StateFlow<DataState<Unit>> = _liveState.asStateFlow()
     private val _liveEffects = MutableSharedFlow<LiveEffect>()
     val liveEffects: SharedFlow<LiveEffect> = _liveEffects.asSharedFlow()
 
@@ -665,15 +663,15 @@ private constructor(
      * This blocks all API calls when VPN warning is enabled and VPN is not connected.
      */
     private suspend fun checkVpnRequirement() {
-        val prefsManager = PreferencesManager.getInstance(context)
-        if (prefsManager.isVpnWarningEnabled() && !VPNDetector.isVpnActive(context)) {
+
+        if (preferencesManager.isVpnWarningEnabled() && !VPNDetector.isVpnActive(context)) {
             throw VpnRequiredException()
         }
     }
 
     // ========== AUTHENTICATION ==========
 
-    suspend fun authenticate(): Result<LoginResponse> =
+    override suspend fun authenticate(): Result<LoginResponse> =
         withContext(Dispatchers.IO) {
             try {
                 checkVpnRequirement()
@@ -702,7 +700,7 @@ private constructor(
      *
      * @return Triple of results for (Movies, Series, Live)
      */
-    suspend fun loadAllContentParallel():
+    override suspend fun loadAllContentParallel():
         Triple<Result<List<Movie>>, Result<List<Series>>, Result<List<LiveChannel>>> =
         coroutineScope {
             PerformanceLogger.log("Starting parallel content load (Movies + Series + Live)")
@@ -744,7 +742,7 @@ private constructor(
      *
      * @param forceRefresh If true, bypass cache and force API fetch
      */
-    suspend fun loadLive(forceRefresh: Boolean = false) =
+    override suspend fun loadLive(forceRefresh: Boolean) =
         withContext(Dispatchers.IO) {
             // Race condition check - BEFORE mutex acquisition
             if (_liveState.value.isLoading() && !forceRefresh) {
@@ -923,7 +921,7 @@ private constructor(
         }
 
     @Deprecated("Use loadLive() instead", ReplaceWith("loadLive(forceRefresh)"))
-    suspend fun getLiveStreams(forceRefresh: Boolean = false): Result<List<LiveChannel>> =
+    override suspend fun getLiveStreams(forceRefresh: Boolean): Result<List<LiveChannel>> =
         withContext(Dispatchers.IO) {
             try {
                 withTimeout(5.minutes.inWholeMilliseconds) {
@@ -1048,7 +1046,7 @@ private constructor(
             }
         }
 
-    suspend fun getLiveCategories(forceRefresh: Boolean = false): Result<List<Category>> =
+    override suspend fun getLiveCategories(forceRefresh: Boolean): Result<List<Category>> =
         withContext(Dispatchers.IO) {
             try {
                 val cached = database.categoryDao().getAllByType("live")
@@ -1114,7 +1112,7 @@ private constructor(
      *
      * @param forceRefresh If true, bypass cache and force API fetch
      */
-    suspend fun loadMovies(forceRefresh: Boolean = false) =
+    override suspend fun loadMovies(forceRefresh: Boolean) =
         withContext(Dispatchers.IO) {
             // Race condition check - BEFORE mutex acquisition
             val currentState = _moviesState.value
@@ -1454,7 +1452,7 @@ private constructor(
         }
 
     @Deprecated("Use loadMovies() instead", ReplaceWith("loadMovies(forceRefresh)"))
-    suspend fun getMovies(forceRefresh: Boolean = false): Result<List<Movie>> =
+    override suspend fun getMovies(forceRefresh: Boolean): Result<List<Movie>> =
         withContext(Dispatchers.IO) {
             try {
                 withTimeout(5.minutes.inWholeMilliseconds) {
@@ -1672,7 +1670,7 @@ private constructor(
             }
         }
 
-    suspend fun getMovieCategories(forceRefresh: Boolean = false): Result<List<Category>> =
+    override suspend fun getMovieCategories(forceRefresh: Boolean): Result<List<Category>> =
         withContext(Dispatchers.IO) {
             val startTime = PerformanceLogger.start("Repository.getMovieCategories")
 
@@ -1786,7 +1784,7 @@ private constructor(
      *
      * @param forceRefresh If true, bypass cache and force API fetch
      */
-    suspend fun loadSeries(forceRefresh: Boolean = false) =
+    override suspend fun loadSeries(forceRefresh: Boolean) =
         withContext(Dispatchers.IO) {
             val startTime = System.currentTimeMillis()
 
@@ -1987,7 +1985,7 @@ private constructor(
         }
 
     @Deprecated("Use loadSeries() instead", ReplaceWith("loadSeries(forceRefresh)"))
-    suspend fun getSeries(forceRefresh: Boolean = false): Result<List<Series>> =
+    override suspend fun getSeries(forceRefresh: Boolean): Result<List<Series>> =
         withContext(Dispatchers.IO) {
             try {
                 withTimeout(5.minutes.inWholeMilliseconds) {
@@ -2161,7 +2159,7 @@ private constructor(
             }
         }
 
-    suspend fun getSeriesCategories(forceRefresh: Boolean = false): Result<List<Category>> =
+    override suspend fun getSeriesCategories(forceRefresh: Boolean): Result<List<Category>> =
         withContext(Dispatchers.IO) {
             try {
                 val cached = database.categoryDao().getAllByType("series")
@@ -2323,16 +2321,16 @@ private constructor(
 
     // ========== WATCH HISTORY ==========
 
-    suspend fun updateWatchProgress(
+    override suspend fun updateWatchProgress(
         contentId: String,
         contentType: String,
         contentName: String,
         posterUrl: String?,
         resumePosition: Long,
         duration: Long,
-        seriesId: Int? = null,
-        seasonNumber: Int? = null,
-        episodeNumber: Int? = null,
+        seriesId: Int?,
+        seasonNumber: Int?,
+        episodeNumber: Int?,
     ): Result<Unit> =
         withContext(Dispatchers.IO) {
             try {
@@ -2379,7 +2377,7 @@ private constructor(
             }
         }
 
-    suspend fun clearWatchHistory(): Result<Unit> =
+    override suspend fun clearWatchHistory(): Result<Unit> =
         withContext(Dispatchers.IO) {
             try {
                 database.watchHistoryDao().clearAll()
@@ -2482,7 +2480,7 @@ private constructor(
      * Get top-level navigation (with grouping if enabled). Returns either grouped categories or
      * flat list based on settings.
      */
-    suspend fun getTopLevelNavigation(
+    override suspend fun getTopLevelNavigation(
         contentType: ContentType,
         groupingEnabled: Boolean,
         separator: String
@@ -2506,7 +2504,7 @@ private constructor(
         }
 
     /** Get children of a specific category. Automatically skips single-child levels. */
-    suspend fun getChildCategories(
+    override suspend fun getChildCategories(
         contentType: ContentType,
         parentCategoryId: String
     ): NavigationResult =
@@ -2538,13 +2536,13 @@ private constructor(
         }
 
     /** Get category by ID. */
-    suspend fun getCategoryById(contentType: ContentType, categoryId: String): Category? =
+    override suspend fun getCategoryById(contentType: ContentType, categoryId: String): Category? =
         withContext(Dispatchers.IO) {
             database.categoryDao().getById(contentType.value, categoryId)?.toModel()
         }
 
     /** Get count of content items in a leaf category. */
-    suspend fun getContentItemCount(contentType: ContentType, categoryId: String): Int =
+    override suspend fun getContentItemCount(contentType: ContentType, categoryId: String): Int =
         withContext(Dispatchers.IO) {
             when (contentType) {
                 ContentType.MOVIES -> database.movieDao().countByCategoryId(categoryId)
@@ -2632,12 +2630,12 @@ private constructor(
      * Get cached navigation tree for movies (compatibility method for old ViewModels). Converts new
      * dynamic navigation to old CategoryGrouper format.
      */
-    suspend fun getCachedVodNavigationTree(): CategoryGrouper.NavigationTree? =
+    override suspend fun getCachedVodNavigationTree(): CategoryGrouper.NavigationTree? =
         withContext(Dispatchers.IO) {
             try {
-                val prefsManager = PreferencesManager.getInstance(context)
-                val groupingEnabled = prefsManager.isMoviesGroupingEnabled()
-                val separator = prefsManager.getMoviesGroupingSeparator()
+
+                val groupingEnabled = preferencesManager.isMoviesGroupingEnabled()
+                val separator = preferencesManager.getMoviesGroupingSeparator()
 
                 when (
                     val result =
@@ -2673,12 +2671,12 @@ private constructor(
         }
 
     /** Get cached navigation tree for series (compatibility method for old ViewModels). */
-    suspend fun getCachedSeriesNavigationTree(): CategoryGrouper.NavigationTree? =
+    override suspend fun getCachedSeriesNavigationTree(): CategoryGrouper.NavigationTree? =
         withContext(Dispatchers.IO) {
             try {
-                val prefsManager = PreferencesManager.getInstance(context)
-                val groupingEnabled = prefsManager.isSeriesGroupingEnabled()
-                val separator = prefsManager.getSeriesGroupingSeparator()
+
+                val groupingEnabled = preferencesManager.isSeriesGroupingEnabled()
+                val separator = preferencesManager.getSeriesGroupingSeparator()
 
                 when (
                     val result =
@@ -2712,12 +2710,12 @@ private constructor(
         }
 
     /** Get cached navigation tree for live TV (compatibility method for old ViewModels). */
-    suspend fun getCachedLiveNavigationTree(): CategoryGrouper.NavigationTree? =
+    override suspend fun getCachedLiveNavigationTree(): CategoryGrouper.NavigationTree? =
         withContext(Dispatchers.IO) {
             try {
-                val prefsManager = PreferencesManager.getInstance(context)
-                val groupingEnabled = prefsManager.isLiveGroupingEnabled()
-                val separator = prefsManager.getLiveGroupingSeparator()
+
+                val groupingEnabled = preferencesManager.isLiveGroupingEnabled()
+                val separator = preferencesManager.getLiveGroupingSeparator()
 
                 when (
                     val result = getTopLevelNavigation(ContentType.LIVE, groupingEnabled, separator)
@@ -2751,7 +2749,7 @@ private constructor(
 
     // ========== CACHE MANAGEMENT ==========
 
-    suspend fun clearAllCache(): Result<Unit> =
+    override suspend fun clearAllCache(): Result<Unit> =
         withContext(Dispatchers.IO) {
             try {
                 database.liveChannelDao().clearAll()
@@ -2765,7 +2763,7 @@ private constructor(
         }
 
     /** Clear all cached data for a specific source */
-    suspend fun clearSourceCache(sourceId: String): Result<Unit> =
+    override suspend fun clearSourceCache(sourceId: String): Result<Unit> =
         withContext(Dispatchers.IO) {
             try {
                 // Clear all content for this source using sourceId-specific deletes

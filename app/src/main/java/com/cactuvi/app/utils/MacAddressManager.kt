@@ -3,7 +3,10 @@ package com.cactuvi.app.utils
 import android.content.Context
 import android.content.SharedPreferences
 import android.util.Base64
+import dagger.hilt.android.qualifiers.ApplicationContext
 import java.nio.charset.StandardCharsets
+import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * Manages MAC address spoofing for Xtream Codes API authentication.
@@ -11,7 +14,12 @@ import java.nio.charset.StandardCharsets
  * Many IPTV providers bind credentials to specific MAC addresses. This class allows you to
  * configure and use a fixed MAC address instead of the device's actual MAC address.
  */
-class MacAddressManager(context: Context) {
+@Singleton
+class MacAddressManager
+@Inject
+constructor(
+    @ApplicationContext context: Context,
+) {
 
     private val prefs: SharedPreferences =
         context.getSharedPreferences(
@@ -25,15 +33,6 @@ class MacAddressManager(context: Context) {
 
         // Default MAC address format (you should change this to your registered MAC)
         private const val DEFAULT_MAC = "00:1A:79:XX:XX:XX"
-
-        @Volatile private var instance: MacAddressManager? = null
-
-        fun getInstance(context: Context): MacAddressManager {
-            return instance
-                ?: synchronized(this) {
-                    instance ?: MacAddressManager(context.applicationContext).also { instance = it }
-                }
-        }
     }
 
     /**

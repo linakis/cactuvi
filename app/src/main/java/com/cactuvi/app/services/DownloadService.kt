@@ -12,8 +12,12 @@ import androidx.media3.exoplayer.offline.DownloadManager
 import androidx.media3.exoplayer.offline.DownloadService as Media3DownloadService
 import androidx.media3.exoplayer.scheduler.Scheduler
 import com.cactuvi.app.R
+import com.cactuvi.app.data.repository.DownloadRepository
+import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
 @UnstableApi
+@AndroidEntryPoint
 class DownloadService :
     Media3DownloadService(
         FOREGROUND_NOTIFICATION_ID,
@@ -22,6 +26,8 @@ class DownloadService :
         R.string.app_name,
         0,
     ) {
+
+    @Inject lateinit var downloadRepository: DownloadRepository
 
     companion object {
         const val CHANNEL_ID = "download_channel"
@@ -42,9 +48,9 @@ class DownloadService :
         super.onCreate()
         createNotificationChannel()
 
-        // Initialize download tracker
+        // Initialize download tracker with injected repository
         if (downloadTracker == null) {
-            downloadTracker = DownloadTracker(this, getDownloadManager())
+            downloadTracker = DownloadTracker(getDownloadManager(), downloadRepository)
         }
     }
 

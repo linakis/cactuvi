@@ -12,14 +12,18 @@ import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import com.cactuvi.app.R
-import com.cactuvi.app.data.repository.ContentRepository
+import com.cactuvi.app.domain.repository.ContentRepository
+import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 import kotlinx.coroutines.launch
 
+@AndroidEntryPoint
 class PlayerActivity : AppCompatActivity() {
+
+    @Inject lateinit var repository: ContentRepository
 
     private var player: ExoPlayer? = null
     private lateinit var playerView: PlayerView
-    private lateinit var repository: ContentRepository
 
     private var streamUrl: String = ""
     private var title: String = ""
@@ -41,9 +45,6 @@ class PlayerActivity : AppCompatActivity() {
         hideSystemUI()
 
         playerView = findViewById(R.id.playerView)
-
-        // Initialize repository
-        repository = ContentRepository.getInstance(this)
 
         // Get data from intent
         streamUrl = intent.getStringExtra("STREAM_URL") ?: ""

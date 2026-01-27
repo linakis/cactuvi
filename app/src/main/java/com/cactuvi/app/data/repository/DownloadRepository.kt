@@ -10,13 +10,22 @@ import com.cactuvi.app.data.db.AppDatabase
 import com.cactuvi.app.data.db.entities.DownloadEntity
 import com.cactuvi.app.services.DownloadService
 import com.cactuvi.app.services.DownloadUtil
+import dagger.hilt.android.qualifiers.ApplicationContext
+import javax.inject.Inject
+import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
 @UnstableApi
-class DownloadRepository(private val context: Context) {
+@Singleton
+class DownloadRepository
+@Inject
+constructor(
+    @ApplicationContext private val context: Context,
+    database: AppDatabase,
+) {
 
-    private val downloadDao = AppDatabase.getInstance(context).downloadDao()
+    private val downloadDao = database.downloadDao()
     private val downloadManager = DownloadService.getDownloadManager(context)
 
     fun getAllDownloads(): Flow<List<DownloadEntity>> {

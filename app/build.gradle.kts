@@ -78,6 +78,10 @@ dependencies {
     // Hilt ViewModel integration
     implementation("androidx.hilt:hilt-navigation-fragment:1.1.0")
 
+    // Hilt WorkManager integration
+    implementation("androidx.hilt:hilt-work:1.1.0")
+    ksp("androidx.hilt:hilt-compiler:1.1.0")
+
     // Java Inject API (required for @Inject)
     implementation("javax.inject:javax.inject:1")
 

@@ -24,6 +24,7 @@ import com.cactuvi.app.ui.player.PlayerActivity
 import com.cactuvi.app.utils.CredentialsManager
 import com.cactuvi.app.utils.StreamUrlBuilder
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
@@ -31,8 +32,10 @@ import kotlinx.coroutines.launch
 @AndroidEntryPoint
 class MovieDetailActivity : AppCompatActivity() {
 
+    @Inject lateinit var downloadRepository: DownloadRepository
+    @Inject lateinit var credentialsManager: CredentialsManager
+
     private val viewModel: MovieDetailViewModel by viewModels()
-    private lateinit var downloadRepository: DownloadRepository
 
     private lateinit var backdropImage: ImageView
     private lateinit var posterImage: ImageView
@@ -61,9 +64,6 @@ class MovieDetailActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_movie_detail)
-
-        // Initialize download repository
-        downloadRepository = DownloadRepository(this)
 
         // Get data from intent
         vodId = intent.getIntExtra("VOD_ID", 0)
@@ -235,7 +235,6 @@ class MovieDetailActivity : AppCompatActivity() {
     }
 
     private fun playMovie(startPosition: Long) {
-        val credentialsManager = CredentialsManager.getInstance(this)
         val server = credentialsManager.getServer()
         val username = credentialsManager.getUsername()
         val password = credentialsManager.getPassword()
@@ -327,7 +326,6 @@ class MovieDetailActivity : AppCompatActivity() {
     private fun startDownload() {
         lifecycleScope.launch {
             try {
-                val credentialsManager = CredentialsManager.getInstance(this@MovieDetailActivity)
                 val server = credentialsManager.getServer()
                 val username = credentialsManager.getUsername()
                 val password = credentialsManager.getPassword()

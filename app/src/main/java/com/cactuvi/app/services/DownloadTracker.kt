@@ -1,6 +1,6 @@
 package com.cactuvi.app.services
 
-import android.content.Context
+import android.util.Log
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.offline.Download
 import androidx.media3.exoplayer.offline.DownloadManager
@@ -12,11 +12,10 @@ import kotlinx.coroutines.launch
 
 @UnstableApi
 class DownloadTracker(
-    context: Context,
     private val downloadManager: DownloadManager,
+    private val downloadRepository: DownloadRepository,
 ) {
 
-    private val downloadRepository = DownloadRepository(context)
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     init {
@@ -31,8 +30,14 @@ class DownloadTracker(
             finalException: Exception?,
         ) {
             scope.launch {
+                Log.d(
+                    "DownloadTracker",
+                    "Download state changed: id=${download.request.id}, state=${download.state}, bytes=${download.bytesDownloaded}, contentLength=${download.contentLength}"
+                )
+
                 when (download.state) {
                     Download.STATE_QUEUED -> {
+                        Log.d("DownloadTracker", "Download QUEUED: ${download.request.id}")
                         downloadRepository.updateDownloadProgress(
                             contentId = download.request.id,
                             status = "queued",
@@ -49,6 +54,11 @@ class DownloadTracker(
                                 0f
                             }
 
+                        Log.d(
+                            "DownloadTracker",
+                            "Download DOWNLOADING: ${download.request.id}, progress=$progress, bytes=${download.bytesDownloaded}/${download.contentLength}"
+                        )
+
                         downloadRepository.updateDownloadProgress(
                             contentId = download.request.id,
                             status = "downloading",
@@ -60,6 +70,11 @@ class DownloadTracker(
                         // Get the download URI from Media3
                         val downloadUri = download.request.uri.toString()
 
+                        Log.d(
+                            "DownloadTracker",
+                            "Download COMPLETED: ${download.request.id}, uri=$downloadUri"
+                        )
+
                         downloadRepository.markDownloadComplete(
                             contentId = download.request.id,
                             downloadUri = downloadUri,
@@ -67,6 +82,11 @@ class DownloadTracker(
                     }
                     Download.STATE_FAILED -> {
                         val reason = finalException?.message ?: "Unknown error"
+                        Log.e(
+                            "DownloadTracker",
+                            "Download FAILED: ${download.request.id}, reason=$reason",
+                            finalException
+                        )
                         downloadRepository.markDownloadFailed(
                             contentId = download.request.id,
                             reason = reason,

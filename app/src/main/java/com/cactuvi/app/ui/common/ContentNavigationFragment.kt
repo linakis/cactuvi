@@ -32,9 +32,16 @@ import kotlinx.coroutines.launch
  * navigation logic: groups → categories → content. Subclasses only need to provide content-specific
  * behavior via abstract methods.
  *
+ * Note: This class has type parameters, so it cannot have @AndroidEntryPoint directly. Subclasses
+ * must add @AndroidEntryPoint and inject dependencies.
+ *
  * @param T Content type (Movie, Series, LiveChannel)
  */
 abstract class ContentNavigationFragment<T : Any> : Fragment() {
+
+    // Abstract properties that subclasses must inject and provide
+    protected abstract val sourceManager: SourceManager
+    protected abstract val idleDetectionHelper: IdleDetectionHelper
 
     // UI Components
     protected lateinit var recyclerView: RecyclerView
@@ -137,8 +144,7 @@ abstract class ContentNavigationFragment<T : Any> : Fragment() {
         // Observe active source and update title
         lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                SourceManager.getInstance(requireContext()).getActiveSourceFlow().collectLatest {
-                    source ->
+                sourceManager.getActiveSourceFlow().collectLatest { source ->
                     val sourceName = source?.nickname ?: "No Source"
                     modernToolbar.title = "${getContentTitle()} • $sourceName"
                 }
@@ -161,7 +167,7 @@ abstract class ContentNavigationFragment<T : Any> : Fragment() {
         recyclerView.adapter = groupAdapter
 
         // Attach idle detection
-        IdleDetectionHelper.attach(recyclerView)
+        idleDetectionHelper.attach(recyclerView)
     }
 
     // ========== OBSERVATION ==========

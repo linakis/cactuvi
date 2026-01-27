@@ -1,6 +1,5 @@
 package com.cactuvi.app.ui.common
 
-import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.paging.PagingData
@@ -8,7 +7,7 @@ import androidx.paging.cachedIn
 import com.cactuvi.app.data.models.Category
 import com.cactuvi.app.data.models.ContentType
 import com.cactuvi.app.data.models.NavigationResult
-import com.cactuvi.app.data.repository.ContentRepositoryImpl
+import com.cactuvi.app.domain.repository.ContentRepository
 import com.cactuvi.app.utils.CategoryTreeBuilder
 import com.cactuvi.app.utils.PreferencesManager
 import kotlinx.coroutines.flow.Flow
@@ -35,8 +34,8 @@ import kotlinx.coroutines.launch
  * @param T The content type (Movie, Series, or LiveChannel)
  */
 abstract class ContentViewModel<T : Any>(
-    protected val repository: ContentRepositoryImpl,
-    protected val context: Context,
+    protected val repository: ContentRepository,
+    protected val preferencesManager: PreferencesManager,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ContentUiState())
@@ -82,9 +81,9 @@ abstract class ContentViewModel<T : Any>(
             _uiState.update { it.copy(isLoading = true) }
 
             try {
-                val prefsManager = PreferencesManager.getInstance(context)
                 val contentType = getContentType()
-                val (groupingEnabled, separator) = getGroupingSettings(prefsManager, contentType)
+                val (groupingEnabled, separator) =
+                    getGroupingSettings(preferencesManager, contentType)
 
                 when (
                     val result =
@@ -136,12 +135,11 @@ abstract class ContentViewModel<T : Any>(
         val categories = groups[groupName] ?: return
 
         // Apply prefix stripping
-        val prefsManager = PreferencesManager.getInstance(context)
         val separator =
             when (getContentType()) {
-                ContentType.MOVIES -> prefsManager.getMoviesGroupingSeparator()
-                ContentType.SERIES -> prefsManager.getSeriesGroupingSeparator()
-                ContentType.LIVE -> prefsManager.getLiveGroupingSeparator()
+                ContentType.MOVIES -> preferencesManager.getMoviesGroupingSeparator()
+                ContentType.SERIES -> preferencesManager.getSeriesGroupingSeparator()
+                ContentType.LIVE -> preferencesManager.getLiveGroupingSeparator()
             }
 
         val strippedCategories =

@@ -2,12 +2,13 @@ package com.cactuvi.app.utils
 
 import android.content.Context
 import android.content.SharedPreferences
+import dagger.hilt.android.qualifiers.ApplicationContext
+import javax.inject.Inject
+import javax.inject.Singleton
 
-/**
- * Manages background sync preferences and tracks sync status. Singleton pattern for app-wide
- * access.
- */
-class SyncPreferencesManager private constructor(context: Context) {
+/** Manages background sync preferences and tracks sync status. */
+@Singleton
+class SyncPreferencesManager @Inject constructor(@ApplicationContext context: Context) {
 
     private val prefs: SharedPreferences =
         context.getSharedPreferences(
@@ -28,16 +29,6 @@ class SyncPreferencesManager private constructor(context: Context) {
 
         // Default values
         const val DEFAULT_SYNC_INTERVAL_HOURS = 6L
-
-        @Volatile private var INSTANCE: SyncPreferencesManager? = null
-
-        fun getInstance(context: Context): SyncPreferencesManager {
-            return INSTANCE
-                ?: synchronized(this) {
-                    INSTANCE
-                        ?: SyncPreferencesManager(context.applicationContext).also { INSTANCE = it }
-                }
-        }
     }
 
     // ========== SYNC SETTINGS ==========

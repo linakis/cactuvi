@@ -15,15 +15,18 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.cactuvi.app.R
 import com.cactuvi.app.data.models.StreamSource
-import com.cactuvi.app.data.repository.ContentRepository
+import com.cactuvi.app.domain.repository.ContentRepository
 import com.cactuvi.app.utils.SourceManager
 import com.google.android.material.floatingactionbutton.FloatingActionButton
+import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 import kotlinx.coroutines.launch
 
+@AndroidEntryPoint
 class ManageSourcesActivity : AppCompatActivity() {
 
-    private lateinit var sourceManager: SourceManager
-    private lateinit var repository: ContentRepository
+    @Inject lateinit var sourceManager: SourceManager
+    @Inject lateinit var repository: ContentRepository
     private lateinit var recyclerView: RecyclerView
     private lateinit var adapter: SourcesAdapter
     private lateinit var progressBar: ProgressBar
@@ -33,9 +36,6 @@ class ManageSourcesActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_manage_sources)
-
-        sourceManager = SourceManager.getInstance(this)
-        repository = ContentRepository.getInstance(this)
 
         setupToolbar()
         setupViews()

@@ -14,7 +14,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.cactuvi.app.R
 import com.cactuvi.app.data.models.ContentFilterSettings
-import com.cactuvi.app.data.repository.ContentRepository
+import com.cactuvi.app.domain.repository.ContentRepository
 import com.cactuvi.app.ui.common.HierarchicalFolderAdapter
 import com.cactuvi.app.ui.common.HierarchicalItem
 import com.cactuvi.app.ui.common.HierarchicalItemHelper
@@ -23,8 +23,11 @@ import com.cactuvi.app.utils.CategoryTreeBuilder
 import com.cactuvi.app.utils.PreferencesManager
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.switchmaterial.SwitchMaterial
+import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 import kotlinx.coroutines.launch
 
+@AndroidEntryPoint
 class ManageFoldersActivity : AppCompatActivity() {
 
     private lateinit var modernToolbar: ModernToolbar
@@ -36,8 +39,8 @@ class ManageFoldersActivity : AppCompatActivity() {
     private lateinit var emptyState: LinearLayout
     private lateinit var applyButton: MaterialButton
 
-    private lateinit var repository: ContentRepository
-    private lateinit var preferencesManager: PreferencesManager
+    @Inject lateinit var repository: ContentRepository
+    @Inject lateinit var preferencesManager: PreferencesManager
     private lateinit var hierarchicalAdapter: HierarchicalFolderAdapter
 
     private lateinit var contentType: ContentFilterSettings.ContentType
@@ -55,9 +58,6 @@ class ManageFoldersActivity : AppCompatActivity() {
                 }
 
         contentType = ContentFilterSettings.ContentType.valueOf(contentTypeString)
-
-        repository = ContentRepository.getInstance(this)
-        preferencesManager = PreferencesManager.getInstance(this)
 
         setupToolbar()
         setupViews()

@@ -9,6 +9,10 @@ import com.cactuvi.app.data.models.LiveChannel
 import com.cactuvi.app.ui.common.ContentNavigationFragment
 import com.cactuvi.app.ui.common.ContentViewModel
 import com.cactuvi.app.ui.common.LiveChannelPagingAdapter
+import com.cactuvi.app.utils.CredentialsManager
+import com.cactuvi.app.utils.IdleDetectionHelper
+import com.cactuvi.app.utils.SourceManager
+import com.cactuvi.app.utils.StreamUrlBuilder
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
@@ -19,6 +23,15 @@ class LiveTvFragment : ContentNavigationFragment<LiveChannel>() {
     private val viewModel: LiveTvViewModel by viewModels()
 
     @Inject lateinit var database: com.cactuvi.app.data.db.AppDatabase
+    @Inject lateinit var credentialsManager: CredentialsManager
+    @Inject lateinit var _sourceManager: SourceManager
+    @Inject lateinit var _idleDetectionHelper: IdleDetectionHelper
+
+    override val sourceManager: SourceManager
+        get() = _sourceManager
+
+    override val idleDetectionHelper: IdleDetectionHelper
+        get() = _idleDetectionHelper
 
     override val contentAdapter: PagingDataAdapter<LiveChannel, *> by lazy {
         LiveChannelPagingAdapter { channel -> onContentItemClick(channel) }
@@ -40,15 +53,13 @@ class LiveTvFragment : ContentNavigationFragment<LiveChannel>() {
 
     override fun onContentItemClick(item: LiveChannel) {
         // Build stream URL
-        val credentialsManager =
-            com.cactuvi.app.utils.CredentialsManager.getInstance(requireContext())
         val server = credentialsManager.getServer()
         val username = credentialsManager.getUsername()
         val password = credentialsManager.getPassword()
 
         // Live streams typically use .ts extension
         val streamUrl =
-            com.cactuvi.app.utils.StreamUrlBuilder.buildLiveUrl(
+            StreamUrlBuilder.buildLiveUrl(
                 server = server,
                 username = username,
                 password = password,

@@ -13,16 +13,19 @@ import com.cactuvi.app.data.repository.DownloadRepository
 import com.cactuvi.app.ui.common.ModernToolbar
 import com.google.android.material.tabs.TabLayout
 import com.google.android.material.tabs.TabLayoutMediator
+import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 import kotlinx.coroutines.launch
 
 @UnstableApi
+@AndroidEntryPoint
 class DownloadsActivity : AppCompatActivity() {
 
     private lateinit var modernToolbar: ModernToolbar
     private lateinit var tabLayout: TabLayout
     private lateinit var viewPager: ViewPager2
     private lateinit var clearAllButton: TextView
-    private lateinit var downloadRepository: DownloadRepository
+    @Inject lateinit var downloadRepository: DownloadRepository
     private lateinit var pagerAdapter: DownloadsPagerAdapter
 
     private val tabTitles =
@@ -34,8 +37,6 @@ class DownloadsActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_downloads)
-
-        downloadRepository = DownloadRepository(this)
 
         initViews()
         setupTabs()

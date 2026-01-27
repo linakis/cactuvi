@@ -1,9 +1,10 @@
 package com.cactuvi.app.data.sync
 
-import android.content.Context
 import com.cactuvi.app.data.db.AppDatabase
-import com.cactuvi.app.data.repository.ContentRepository
+import com.cactuvi.app.domain.repository.ContentRepository
 import com.cactuvi.app.utils.SyncPreferencesManager
+import javax.inject.Inject
+import javax.inject.Singleton
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 
@@ -20,12 +21,15 @@ import kotlinx.coroutines.coroutineScope
  * Handles partial failures (Option A): If Movies succeeds but Series fails, still apply Movies
  * diffs and update status accordingly.
  */
-class SyncCoordinator(context: Context) {
-
-    private val repository = ContentRepository.getInstance(context)
-    private val database = AppDatabase.getInstance(context)
-    private val syncPrefs = SyncPreferencesManager.getInstance(context)
-    private val reactiveUpdateManager = ReactiveUpdateManager.getInstance()
+@Singleton
+class SyncCoordinator
+@Inject
+constructor(
+    private val repository: ContentRepository,
+    private val database: AppDatabase,
+    private val syncPrefs: SyncPreferencesManager,
+    private val reactiveUpdateManager: ReactiveUpdateManager,
+) {
 
     /**
      * Sync all content types in parallel and generate diff events. Target: 6-8 seconds total sync

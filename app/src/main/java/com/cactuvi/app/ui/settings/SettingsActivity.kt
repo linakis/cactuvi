@@ -10,20 +10,24 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.cactuvi.app.R
-import com.cactuvi.app.data.repository.ContentRepository
+import com.cactuvi.app.domain.repository.ContentRepository
 import com.cactuvi.app.services.BackgroundSyncWorker
 import com.cactuvi.app.ui.common.ModernToolbar
 import com.cactuvi.app.utils.PreferencesManager
 import com.cactuvi.app.utils.SyncPreferencesManager
 import com.google.android.material.switchmaterial.SwitchMaterial
+import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 import kotlinx.coroutines.launch
 
+@AndroidEntryPoint
 class SettingsActivity : AppCompatActivity() {
 
+    @Inject lateinit var repository: ContentRepository
+    @Inject lateinit var syncPrefs: SyncPreferencesManager
+    @Inject lateinit var prefsManager: PreferencesManager
+
     private lateinit var modernToolbar: ModernToolbar
-    private lateinit var repository: ContentRepository
-    private lateinit var syncPrefs: SyncPreferencesManager
-    private lateinit var prefsManager: PreferencesManager
 
     private lateinit var lastSyncText: TextView
     private lateinit var syncEnabledSwitch: SwitchMaterial
@@ -34,10 +38,6 @@ class SettingsActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_settings)
-
-        repository = ContentRepository.getInstance(this)
-        syncPrefs = SyncPreferencesManager.getInstance(this)
-        prefsManager = PreferencesManager.getInstance(this)
 
         setupToolbar()
         setupVpnSettings()
@@ -183,7 +183,7 @@ class SettingsActivity : AppCompatActivity() {
         // Setup listeners
         syncEnabledSwitch.setOnCheckedChangeListener { _, isChecked ->
             syncPrefs.isSyncEnabled = isChecked
-            BackgroundSyncWorker.schedule(this)
+            BackgroundSyncWorker.schedule(this, syncPrefs)
             Toast.makeText(
                     this,
                     if (isChecked) "Background sync enabled" else "Background sync disabled",
@@ -194,7 +194,7 @@ class SettingsActivity : AppCompatActivity() {
 
         wifiOnlySwitch.setOnCheckedChangeListener { _, isChecked ->
             syncPrefs.isWifiOnly = isChecked
-            BackgroundSyncWorker.schedule(this)
+            BackgroundSyncWorker.schedule(this, syncPrefs)
         }
 
         syncIntervalGroup.setOnCheckedChangeListener { _, checkedId ->
@@ -206,7 +206,7 @@ class SettingsActivity : AppCompatActivity() {
                     else -> 6L
                 }
             syncPrefs.syncIntervalHours = interval
-            BackgroundSyncWorker.schedule(this)
+            BackgroundSyncWorker.schedule(this, syncPrefs)
         }
     }
 
@@ -241,7 +241,7 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun triggerImmediateSync() {
-        BackgroundSyncWorker.syncNow(this)
+        BackgroundSyncWorker.syncNow(this, syncPrefs)
         Toast.makeText(this, "Sync started...", Toast.LENGTH_SHORT).show()
 
         // Update UI after a short delay

@@ -14,20 +14,24 @@ import com.cactuvi.app.ui.common.ModernToolbar
 import com.cactuvi.app.utils.SourceManager
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
+import dagger.hilt.android.AndroidEntryPoint
 import java.net.URL
 import java.util.UUID
+import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+@AndroidEntryPoint
 class AddEditSourceActivity : AppCompatActivity() {
 
     companion object {
         const val EXTRA_SOURCE_ID = "source_id"
     }
 
+    @Inject lateinit var sourceManager: SourceManager
+
     private lateinit var modernToolbar: ModernToolbar
-    private lateinit var sourceManager: SourceManager
 
     private lateinit var nicknameInputLayout: TextInputLayout
     private lateinit var serverInputLayout: TextInputLayout
@@ -49,8 +53,6 @@ class AddEditSourceActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_add_edit_source)
-
-        sourceManager = SourceManager.getInstance(this)
 
         // Check if editing existing source
         editingSourceId = intent.getStringExtra(EXTRA_SOURCE_ID)

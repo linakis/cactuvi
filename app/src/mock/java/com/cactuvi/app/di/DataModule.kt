@@ -4,13 +4,16 @@ import android.content.Context
 import com.cactuvi.app.data.api.ApiClient
 import com.cactuvi.app.data.api.XtreamApiService
 import com.cactuvi.app.data.db.AppDatabase
+import com.cactuvi.app.data.repository.ContentRepositoryImpl
 import com.cactuvi.app.data.source.local.LiveLocalDataSource
 import com.cactuvi.app.data.source.local.MovieLocalDataSource
 import com.cactuvi.app.data.source.local.SeriesLocalDataSource
 import com.cactuvi.app.data.source.remote.LiveRemoteDataSource
 import com.cactuvi.app.data.source.remote.MovieRemoteDataSource
 import com.cactuvi.app.data.source.remote.SeriesRemoteDataSource
+import com.cactuvi.app.domain.repository.ContentRepository
 import com.cactuvi.app.mock.MockServerManager
+import dagger.Binds
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -21,18 +24,15 @@ import javax.inject.Singleton
 /**
  * Mock flavor DataModule - provides mock server configuration.
  *
- * Overrides main DataModule to use MockWebServer on localhost:8080 instead of real API endpoints.
+ * Overrides production DataModule to use MockWebServer on localhost:8080 instead of real API
+ * endpoints.
+ *
+ * Note: AppDatabase and all Managers are provided by ManagerModule (in main source set). This
+ * module provides flavor-specific API configuration and data sources.
  */
 @Module
 @InstallIn(SingletonComponent::class)
 object DataModule {
-
-    /** Provide singleton database instance. */
-    @Provides
-    @Singleton
-    fun provideAppDatabase(@ApplicationContext context: Context): AppDatabase {
-        return AppDatabase.getInstance(context)
-    }
 
     /** Provide mock server base URL. Returns localhost:8080 where MockWebServer is running. */
     @Provides
@@ -95,15 +95,21 @@ object DataModule {
     fun provideLiveRemoteDataSource(apiService: XtreamApiService): LiveRemoteDataSource {
         return LiveRemoteDataSource(apiService)
     }
+}
 
-    // ========== REPOSITORY ==========
+/**
+ * Bindings module for interface-to-implementation bindings. Uses @Binds for zero-overhead binding
+ * (no object allocation at runtime).
+ */
+@Module
+@InstallIn(SingletonComponent::class)
+abstract class DataBindingsModule {
 
-    /** Provide ContentRepository implementation. */
-    @Provides
+    /**
+     * Bind ContentRepository interface to ContentRepositoryImpl. ContentRepositoryImpl is annotated
+     * with @Singleton @Inject constructor, so Hilt can instantiate it automatically.
+     */
+    @Binds
     @Singleton
-    fun provideContentRepository(
-        @ApplicationContext context: Context,
-    ): com.cactuvi.app.domain.repository.ContentRepository {
-        return com.cactuvi.app.data.repository.ContentRepositoryImpl.getInstance(context)
-    }
+    abstract fun bindContentRepository(impl: ContentRepositoryImpl): ContentRepository
 }

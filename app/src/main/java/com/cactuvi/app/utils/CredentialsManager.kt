@@ -2,6 +2,9 @@ package com.cactuvi.app.utils
 
 import android.content.Context
 import com.cactuvi.app.data.db.AppDatabase
+import dagger.hilt.android.qualifiers.ApplicationContext
+import javax.inject.Inject
+import javax.inject.Singleton
 import kotlinx.coroutines.runBlocking
 
 /**
@@ -11,21 +14,10 @@ import kotlinx.coroutines.runBlocking
  * Note: Methods use runBlocking for synchronous access. For async operations, use
  * SourceManager.getActiveSource() directly.
  */
-class CredentialsManager(context: Context) {
-
-    private val database = AppDatabase.getInstance(context.applicationContext)
-
-    companion object {
-        @Volatile private var instance: CredentialsManager? = null
-
-        fun getInstance(context: Context): CredentialsManager {
-            return instance
-                ?: synchronized(this) {
-                    instance
-                        ?: CredentialsManager(context.applicationContext).also { instance = it }
-                }
-        }
-    }
+@Singleton
+class CredentialsManager
+@Inject
+constructor(@ApplicationContext context: Context, private val database: AppDatabase) {
 
     fun getServer(): String {
         return runBlocking { database.streamSourceDao().getActive()?.server ?: "" }

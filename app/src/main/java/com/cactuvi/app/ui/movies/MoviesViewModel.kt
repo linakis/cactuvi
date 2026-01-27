@@ -1,14 +1,12 @@
 package com.cactuvi.app.ui.movies
 
-import android.content.Context
 import androidx.paging.PagingData
 import com.cactuvi.app.data.models.ContentType
 import com.cactuvi.app.data.models.Movie
-import com.cactuvi.app.data.repository.ContentRepositoryImpl
 import com.cactuvi.app.domain.repository.ContentRepository
 import com.cactuvi.app.ui.common.ContentViewModel
+import com.cactuvi.app.utils.PreferencesManager
 import dagger.hilt.android.lifecycle.HiltViewModel
-import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
 
@@ -18,12 +16,12 @@ class MoviesViewModel
 @Inject
 constructor(
     repository: ContentRepository,
-    @ApplicationContext context: Context,
-) : ContentViewModel<Movie>(repository as ContentRepositoryImpl, context) {
+    preferencesManager: PreferencesManager,
+) : ContentViewModel<Movie>(repository, preferencesManager) {
 
     override fun getContentType(): ContentType = ContentType.MOVIES
 
     override fun getPagedContent(categoryId: String): Flow<PagingData<Movie>> {
-        return (repository as ContentRepositoryImpl).getMoviesPaged(categoryId)
+        return repository.getMoviesPaged(categoryId)
     }
 }

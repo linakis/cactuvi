@@ -1,6 +1,7 @@
 package com.cactuvi.app.services
 
 import android.content.Context
+import androidx.hilt.work.HiltWorker
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
@@ -12,6 +13,8 @@ import com.cactuvi.app.data.sync.SyncCoordinator
 import com.cactuvi.app.utils.PreferencesManager
 import com.cactuvi.app.utils.SyncPreferencesManager
 import com.cactuvi.app.utils.VPNDetector
+import dagger.assisted.Assisted
+import dagger.assisted.AssistedInject
 import java.util.concurrent.TimeUnit
 
 /**
@@ -19,9 +22,14 @@ import java.util.concurrent.TimeUnit
  * respects network constraints (WiFi-only by default). Delegates actual sync logic to
  * SyncCoordinator.
  */
-class BackgroundSyncWorker(
-    context: Context,
-    params: WorkerParameters,
+@HiltWorker
+class BackgroundSyncWorker
+@AssistedInject
+constructor(
+    @Assisted context: Context,
+    @Assisted params: WorkerParameters,
+    private val syncCoordinator: SyncCoordinator,
+    private val preferencesManager: PreferencesManager,
 ) : CoroutineWorker(context, params) {
 
     companion object {
@@ -31,9 +39,7 @@ class BackgroundSyncWorker(
          * Schedule periodic background sync based on user preferences. Call this on app startup and
          * when sync settings change.
          */
-        fun schedule(context: Context) {
-            val syncPrefs = SyncPreferencesManager.getInstance(context)
-
+        fun schedule(context: Context, syncPrefs: SyncPreferencesManager) {
             // Don't schedule if sync is disabled
             if (!syncPrefs.isSyncEnabled) {
                 WorkManager.getInstance(context).cancelUniqueWork(WORK_NAME)
@@ -68,8 +74,7 @@ class BackgroundSyncWorker(
         }
 
         /** Trigger immediate one-time sync (e.g., when user taps "Sync Now" button) */
-        fun syncNow(context: Context) {
-            val syncPrefs = SyncPreferencesManager.getInstance(context)
+        fun syncNow(context: Context, syncPrefs: SyncPreferencesManager) {
             if (!syncPrefs.isSyncEnabled) return
 
             val constraints =
@@ -89,16 +94,15 @@ class BackgroundSyncWorker(
         return try {
             // Check VPN requirement - silently skip if VPN required but not active
             // This is background work so we don't warn the user
-            val prefsManager = PreferencesManager.getInstance(applicationContext)
             if (
-                prefsManager.isVpnWarningEnabled() && !VPNDetector.isVpnActive(applicationContext)
+                preferencesManager.isVpnWarningEnabled() &&
+                    !VPNDetector.isVpnActive(applicationContext)
             ) {
                 // Skip sync silently - will retry on next schedule when VPN may be active
                 return Result.success()
             }
 
             // Delegate to SyncCoordinator
-            val syncCoordinator = SyncCoordinator(applicationContext)
             val syncResult = syncCoordinator.syncAll()
 
             // SyncCoordinator returns SyncResult which includes success/failure status

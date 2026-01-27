@@ -28,6 +28,7 @@ import com.cactuvi.app.ui.player.PlayerActivity
 import com.cactuvi.app.utils.CredentialsManager
 import com.cactuvi.app.utils.StreamUrlBuilder
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
@@ -35,6 +36,7 @@ import kotlinx.coroutines.launch
 class MyListFragment : Fragment() {
 
     private val viewModel: MyListViewModel by activityViewModels()
+    @Inject lateinit var credentialsManager: CredentialsManager
     private var contentType: String? = null
 
     private lateinit var recyclerView: RecyclerView
@@ -217,17 +219,11 @@ class MyListFragment : Fragment() {
     }
 
     private fun playLiveChannel(channel: LiveChannel) {
-        val credentials = CredentialsManager.getInstance(requireContext())
-        if (credentials == null) {
-            Toast.makeText(requireContext(), "No credentials found", Toast.LENGTH_SHORT).show()
-            return
-        }
-
         val streamUrl =
             StreamUrlBuilder.buildLiveUrl(
-                server = credentials.getServer(),
-                username = credentials.getUsername(),
-                password = credentials.getPassword(),
+                server = credentialsManager.getServer(),
+                username = credentialsManager.getUsername(),
+                password = credentialsManager.getPassword(),
                 streamId = channel.streamId,
                 extension = "ts",
             )

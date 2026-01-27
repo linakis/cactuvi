@@ -5,29 +5,22 @@ import android.content.SharedPreferences
 import com.cactuvi.app.data.db.AppDatabase
 import com.cactuvi.app.data.db.entities.toEntity
 import com.cactuvi.app.data.models.StreamSource
+import dagger.hilt.android.qualifiers.ApplicationContext
+import javax.inject.Inject
+import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 
-class SourceManager private constructor(context: Context) {
-
-    private val database = AppDatabase.getInstance(context)
+@Singleton
+class SourceManager
+@Inject
+constructor(@ApplicationContext context: Context, private val database: AppDatabase) {
     private val prefs: SharedPreferences =
         context.getSharedPreferences("source_prefs", Context.MODE_PRIVATE)
 
     companion object {
-        @Volatile private var INSTANCE: SourceManager? = null
-
-        fun getInstance(context: Context): SourceManager {
-            return INSTANCE
-                ?: synchronized(this) {
-                    val instance = SourceManager(context.applicationContext)
-                    INSTANCE = instance
-                    instance
-                }
-        }
-
         private const val KEY_ACTIVE_SOURCE_ID = "active_source_id"
     }
 

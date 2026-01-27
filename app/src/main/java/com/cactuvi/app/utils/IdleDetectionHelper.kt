@@ -4,6 +4,8 @@ import android.view.MotionEvent
 import android.view.View
 import androidx.recyclerview.widget.RecyclerView
 import com.cactuvi.app.data.sync.ReactiveUpdateManager
+import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * Helper to detect user interaction and notify ReactiveUpdateManager. Attach to RecyclerView or any
@@ -11,12 +13,15 @@ import com.cactuvi.app.data.sync.ReactiveUpdateManager
  *
  * Usage:
  * ```
- * IdleDetectionHelper.attach(recyclerView)
+ * idleDetectionHelper.attach(recyclerView)
  * ```
  */
-object IdleDetectionHelper {
-
-    private val reactiveUpdateManager = ReactiveUpdateManager.getInstance()
+@Singleton
+class IdleDetectionHelper
+@Inject
+constructor(
+    private val reactiveUpdateManager: ReactiveUpdateManager,
+) {
 
     /** Attach idle detection to a RecyclerView. Tracks scroll and touch events. */
     fun attach(recyclerView: RecyclerView) {

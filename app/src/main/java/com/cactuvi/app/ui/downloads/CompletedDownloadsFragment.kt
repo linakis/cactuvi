@@ -18,9 +18,12 @@ import com.cactuvi.app.R
 import com.cactuvi.app.data.db.entities.DownloadEntity
 import com.cactuvi.app.data.repository.DownloadRepository
 import com.cactuvi.app.ui.player.PlayerActivity
+import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 import kotlinx.coroutines.launch
 
 @UnstableApi
+@AndroidEntryPoint
 class CompletedDownloadsFragment : Fragment() {
 
     private lateinit var recyclerView: RecyclerView
@@ -29,7 +32,7 @@ class CompletedDownloadsFragment : Fragment() {
     private lateinit var emptyText: TextView
     private lateinit var emptySubtext: TextView
     private lateinit var adapter: DownloadsAdapter
-    private lateinit var downloadRepository: DownloadRepository
+    @Inject lateinit var downloadRepository: DownloadRepository
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -41,8 +44,6 @@ class CompletedDownloadsFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-
-        downloadRepository = DownloadRepository(requireContext())
 
         initViews(view)
         setupRecyclerView()

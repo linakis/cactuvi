@@ -1,47 +1,36 @@
 package com.cactuvi.app.di
 
-import android.content.Context
 import com.cactuvi.app.data.api.ApiClient
 import com.cactuvi.app.data.api.XtreamApiService
 import com.cactuvi.app.data.db.AppDatabase
+import com.cactuvi.app.data.repository.ContentRepositoryImpl
 import com.cactuvi.app.data.source.local.LiveLocalDataSource
 import com.cactuvi.app.data.source.local.MovieLocalDataSource
 import com.cactuvi.app.data.source.local.SeriesLocalDataSource
 import com.cactuvi.app.data.source.remote.LiveRemoteDataSource
 import com.cactuvi.app.data.source.remote.MovieRemoteDataSource
 import com.cactuvi.app.data.source.remote.SeriesRemoteDataSource
+import com.cactuvi.app.domain.repository.ContentRepository
 import com.cactuvi.app.utils.SourceManager
+import dagger.Binds
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
-import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 import kotlinx.coroutines.runBlocking
 
 /**
- * Hilt module providing data layer dependencies.
+ * Hilt module providing data layer dependencies for production flavor.
  *
- * Scope: SingletonComponent - lives for entire application lifetime All provided dependencies
- * are @Singleton (single instance per app)
+ * Scope: SingletonComponent - lives for entire application lifetime.
+ *
+ * Note: AppDatabase and all Managers are provided by ManagerModule (in main source set). This
+ * module provides flavor-specific API configuration and data sources.
  */
 @Module
 @InstallIn(SingletonComponent::class)
 object DataModule {
-
-    /** Provide singleton database instance. Uses existing AppDatabase.getInstance() pattern. */
-    @Provides
-    @Singleton
-    fun provideAppDatabase(@ApplicationContext context: Context): AppDatabase {
-        return AppDatabase.getInstance(context)
-    }
-
-    /** Provide SourceManager for accessing active source configuration. */
-    @Provides
-    @Singleton
-    fun provideSourceManager(@ApplicationContext context: Context): SourceManager {
-        return SourceManager.getInstance(context)
-    }
 
     /**
      * Provide base URL from active source. Returns active source's server URL or default
@@ -90,8 +79,6 @@ object DataModule {
         return LiveLocalDataSource(database)
     }
 
-    // ========== REPOSITORY ==========
-
     // ========== REMOTE DATA SOURCES ==========
 
     @Provides
@@ -111,19 +98,21 @@ object DataModule {
     fun provideLiveRemoteDataSource(apiService: XtreamApiService): LiveRemoteDataSource {
         return LiveRemoteDataSource(apiService)
     }
+}
 
-    // ========== REPOSITORY ==========
+/**
+ * Bindings module for interface-to-implementation bindings. Uses @Binds for zero-overhead binding
+ * (no object allocation at runtime).
+ */
+@Module
+@InstallIn(SingletonComponent::class)
+abstract class DataBindingsModule {
 
     /**
-     * Provide ContentRepository implementation. Returns singleton instance for now (Phase 2.1).
-     * TODO Phase 3: Refactor to proper constructor injection when Repository no longer uses
-     * singleton pattern.
+     * Bind ContentRepository interface to ContentRepositoryImpl. ContentRepositoryImpl is annotated
+     * with @Singleton @Inject constructor, so Hilt can instantiate it automatically.
      */
-    @Provides
+    @Binds
     @Singleton
-    fun provideContentRepository(
-        @ApplicationContext context: Context,
-    ): com.cactuvi.app.domain.repository.ContentRepository {
-        return com.cactuvi.app.data.repository.ContentRepositoryImpl.getInstance(context)
-    }
+    abstract fun bindContentRepository(impl: ContentRepositoryImpl): ContentRepository
 }

@@ -5,12 +5,17 @@ import android.os.Bundle
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.DialogFragment
 import com.cactuvi.app.utils.PreferencesManager
+import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
 /**
  * Dialog shown when VPN is not detected and VPN warning is enabled. Gives user options to continue
  * anyway, disable warning, or close app.
  */
+@AndroidEntryPoint
 class VPNWarningDialog : DialogFragment() {
+
+    @Inject lateinit var preferencesManager: PreferencesManager
 
     private var onContinue: (() -> Unit)? = null
     private var onCloseApp: (() -> Unit)? = null
@@ -26,7 +31,7 @@ class VPNWarningDialog : DialogFragment() {
                 dismiss()
             }
             .setNeutralButton("Disable Warning") { _, _ ->
-                PreferencesManager.getInstance(requireContext()).setVpnWarningEnabled(false)
+                preferencesManager.setVpnWarningEnabled(false)
                 onContinue?.invoke()
                 dismiss()
             }

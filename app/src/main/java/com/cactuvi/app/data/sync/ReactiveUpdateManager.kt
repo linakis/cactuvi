@@ -1,6 +1,8 @@
 package com.cactuvi.app.data.sync
 
 import java.util.concurrent.CopyOnWriteArrayList
+import javax.inject.Inject
+import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -11,7 +13,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 
 /**
- * Singleton event bus for reactive UI updates with idle detection.
+ * Event bus for reactive UI updates with idle detection.
  *
  * Flow:
  * 1. SyncCoordinator emits ContentDiff events
@@ -19,7 +21,8 @@ import kotlinx.coroutines.launch
  * 3. When user becomes idle (3s no interaction) AND fragment is visible, emit queued events
  * 4. Fragments apply granular updates without full screen reload
  */
-class ReactiveUpdateManager private constructor() {
+@Singleton
+class ReactiveUpdateManager @Inject constructor() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
@@ -36,14 +39,7 @@ class ReactiveUpdateManager private constructor() {
     private var lastInteractionTime = 0L
 
     companion object {
-        @Volatile private var INSTANCE: ReactiveUpdateManager? = null
-
-        private const val IDLE_DELAY_MS = 3000L // 3 seconds
-
-        fun getInstance(): ReactiveUpdateManager {
-            return INSTANCE
-                ?: synchronized(this) { INSTANCE ?: ReactiveUpdateManager().also { INSTANCE = it } }
-        }
+        private const val IDLE_THRESHOLD_MS = 3000L // 3 seconds
     }
 
     /**
@@ -67,11 +63,11 @@ class ReactiveUpdateManager private constructor() {
 
         // Start idle timer
         scope.launch {
-            delay(IDLE_DELAY_MS)
+            delay(IDLE_THRESHOLD_MS)
 
             // Check if still idle (no new interaction in last 3s)
             val timeSinceLastInteraction = System.currentTimeMillis() - lastInteractionTime
-            if (timeSinceLastInteraction >= IDLE_DELAY_MS) {
+            if (timeSinceLastInteraction >= IDLE_THRESHOLD_MS) {
                 isUserIdle = true
                 flushPendingDiffs()
             }

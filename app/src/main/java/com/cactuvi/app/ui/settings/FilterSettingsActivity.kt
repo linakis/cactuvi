@@ -14,15 +14,19 @@ import com.cactuvi.app.ui.common.ModernToolbar
 import com.cactuvi.app.utils.PreferencesManager
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.switchmaterial.SwitchMaterial
+import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
+@AndroidEntryPoint
 abstract class FilterSettingsActivity : AppCompatActivity() {
+
+    @Inject lateinit var preferencesManager: PreferencesManager
 
     protected lateinit var modernToolbar: ModernToolbar
     protected lateinit var groupingSwitch: SwitchMaterial
     protected lateinit var separatorSpinner: Spinner
     protected lateinit var manageFoldersCard: MaterialCardView
     protected lateinit var folderFilterStatus: TextView
-    protected lateinit var preferencesManager: PreferencesManager
 
     protected abstract fun getContentType(): ContentFilterSettings.ContentType
 
@@ -31,8 +35,6 @@ abstract class FilterSettingsActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_filter_settings)
-
-        preferencesManager = PreferencesManager.getInstance(this)
 
         setupToolbar()
         setupViews()
@@ -182,18 +184,21 @@ abstract class FilterSettingsActivity : AppCompatActivity() {
     }
 }
 
+@AndroidEntryPoint
 class MoviesFilterSettingsActivity : FilterSettingsActivity() {
     override fun getContentType() = ContentFilterSettings.ContentType.MOVIES
 
     override fun getToolbarTitle() = "Movies Filter Settings"
 }
 
+@AndroidEntryPoint
 class SeriesFilterSettingsActivity : FilterSettingsActivity() {
     override fun getContentType() = ContentFilterSettings.ContentType.SERIES
 
     override fun getToolbarTitle() = "Series Filter Settings"
 }
 
+@AndroidEntryPoint
 class LiveTvFilterSettingsActivity : FilterSettingsActivity() {
     override fun getContentType() = ContentFilterSettings.ContentType.LIVE_TV
 

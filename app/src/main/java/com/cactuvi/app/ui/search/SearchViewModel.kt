@@ -1,6 +1,5 @@
 package com.cactuvi.app.ui.search
 
-import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.cactuvi.app.data.db.AppDatabase
@@ -10,7 +9,6 @@ import com.cactuvi.app.data.models.Series
 import com.cactuvi.app.domain.usecase.RefreshMoviesUseCase
 import com.cactuvi.app.domain.usecase.RefreshSeriesUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
-import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
@@ -31,7 +29,7 @@ import kotlinx.coroutines.withContext
 class SearchViewModel
 @Inject
 constructor(
-    @ApplicationContext private val context: Context,
+    private val database: AppDatabase,
     private val refreshMoviesUseCase: RefreshMoviesUseCase,
     private val refreshSeriesUseCase: RefreshSeriesUseCase,
 ) : ViewModel() {
@@ -52,8 +50,6 @@ constructor(
     private fun loadCachedData() {
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
-                val database = AppDatabase.getInstance(context)
-
                 // Load cached movies
                 val movieEntities = database.movieDao().getAll()
                 allMovies = movieEntities.map { it.toModel() }

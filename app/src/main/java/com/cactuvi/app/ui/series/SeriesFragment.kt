@@ -7,6 +7,8 @@ import com.cactuvi.app.data.models.Series
 import com.cactuvi.app.ui.common.ContentNavigationFragment
 import com.cactuvi.app.ui.common.ContentViewModel
 import com.cactuvi.app.ui.common.SeriesPagingAdapter
+import com.cactuvi.app.utils.IdleDetectionHelper
+import com.cactuvi.app.utils.SourceManager
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
@@ -17,6 +19,14 @@ class SeriesFragment : ContentNavigationFragment<Series>() {
     private val viewModel: SeriesViewModel by viewModels()
 
     @Inject lateinit var database: com.cactuvi.app.data.db.AppDatabase
+    @Inject lateinit var _sourceManager: SourceManager
+    @Inject lateinit var _idleDetectionHelper: IdleDetectionHelper
+
+    override val sourceManager: SourceManager
+        get() = _sourceManager
+
+    override val idleDetectionHelper: IdleDetectionHelper
+        get() = _idleDetectionHelper
 
     override val contentAdapter: PagingDataAdapter<Series, *> by lazy {
         SeriesPagingAdapter { series -> onContentItemClick(series) }

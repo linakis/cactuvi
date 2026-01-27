@@ -1,20 +1,34 @@
 package com.cactuvi.app
 
 import android.app.Application
+import androidx.hilt.work.HiltWorkerFactory
+import androidx.work.Configuration
 import com.cactuvi.app.data.db.AppDatabase
-import com.cactuvi.app.data.repository.ContentRepository
+import com.cactuvi.app.domain.repository.ContentRepository
 import com.cactuvi.app.services.BackgroundSyncWorker
 import com.cactuvi.app.utils.PreferencesManager
 import com.cactuvi.app.utils.SourceManager
+import com.cactuvi.app.utils.SyncPreferencesManager
 import com.cactuvi.app.utils.VPNDetector
 import dagger.hilt.android.HiltAndroidApp
+import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
 @HiltAndroidApp
-class Cactuvi : Application() {
+class Cactuvi : Application(), Configuration.Provider {
+
+    @Inject lateinit var workerFactory: HiltWorkerFactory
+    @Inject lateinit var preferencesManager: PreferencesManager
+    @Inject lateinit var sourceManager: SourceManager
+    @Inject lateinit var database: AppDatabase
+    @Inject lateinit var contentRepository: ContentRepository
+    @Inject lateinit var syncPreferencesManager: SyncPreferencesManager
+
+    override val workManagerConfiguration: Configuration
+        get() = Configuration.Builder().setWorkerFactory(workerFactory).build()
 
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -38,7 +52,7 @@ class Cactuvi : Application() {
         checkVpnStatus()
 
         // Schedule background sync (periodic work)
-        BackgroundSyncWorker.schedule(this)
+        BackgroundSyncWorker.schedule(this, syncPreferencesManager)
 
         // Trigger immediate sync if cache exists (stale-while-revalidate pattern)
         applicationScope.launch { triggerInitialSync() }
@@ -104,9 +118,7 @@ class Cactuvi : Application() {
      * lets first visible activity handle it.
      */
     private fun checkVpnStatus() {
-        val prefsManager = PreferencesManager.getInstance(this)
-
-        if (prefsManager.isVpnWarningEnabled() && !VPNDetector.isVpnActive(this)) {
+        if (preferencesManager.isVpnWarningEnabled() && !VPNDetector.isVpnActive(this)) {
             needsVpnWarning = true
         }
     }
@@ -117,8 +129,6 @@ class Cactuvi : Application() {
      */
     private suspend fun triggerInitialSync() {
         try {
-            val database = AppDatabase.getInstance(this)
-
             // Check if any cache exists
             val hasMovies = (database.cacheMetadataDao().get("movies")?.itemCount ?: 0) > 0
             val hasSeries = (database.cacheMetadataDao().get("series")?.itemCount ?: 0) > 0
@@ -126,7 +136,7 @@ class Cactuvi : Application() {
 
             // If cache exists, trigger immediate one-time sync (background refresh)
             if (hasMovies || hasSeries || hasLive) {
-                BackgroundSyncWorker.syncNow(this)
+                BackgroundSyncWorker.syncNow(this, syncPreferencesManager)
             }
             // If no cache exists, trigger background pre-fetch (Phase 3 optimization)
             else {
@@ -157,22 +167,20 @@ class Cactuvi : Application() {
             // Brief delay to let app initialization complete
             kotlinx.coroutines.delay(1000)
 
-            val sourceManager = SourceManager.getInstance(this)
             val activeSource = sourceManager.getActiveSource()
 
             // Only pre-fetch if source is configured
             if (activeSource != null) {
                 // Check VPN requirement
-                val prefsManager = PreferencesManager.getInstance(this)
-                if (prefsManager.isVpnWarningEnabled() && !VPNDetector.isVpnActive(this)) {
+                if (preferencesManager.isVpnWarningEnabled() && !VPNDetector.isVpnActive(this)) {
                     // Skip pre-fetch if VPN required but not active
                     // User will see VPN warning dialog and can manually refresh
                     return
                 }
 
                 // Trigger parallel background load
-                val repository = ContentRepository.getInstance(this)
-                val (moviesResult, seriesResult, liveResult) = repository.loadAllContentParallel()
+                val (moviesResult, seriesResult, liveResult) =
+                    contentRepository.loadAllContentParallel()
 
                 // Log results (success/failure)
                 val moviesStatus =

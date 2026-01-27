@@ -19,11 +19,14 @@ import com.cactuvi.app.ui.player.PlayerActivity
 import com.cactuvi.app.utils.CredentialsManager
 import com.cactuvi.app.utils.StreamUrlBuilder
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
 class ContinueWatchingActivity : AppCompatActivity() {
+
+    @Inject lateinit var credentialsManager: CredentialsManager
 
     private val viewModel: ContinueWatchingViewModel by viewModels()
     private lateinit var modernToolbar: ModernToolbar
@@ -84,12 +87,6 @@ class ContinueWatchingActivity : AppCompatActivity() {
     }
 
     private fun resumePlayback(item: com.cactuvi.app.data.db.entities.WatchHistoryEntity) {
-        val credentials = CredentialsManager.getInstance(this)
-        if (credentials == null) {
-            Toast.makeText(this, "No credentials found", Toast.LENGTH_SHORT).show()
-            return
-        }
-
         val streamUrl =
             when (item.contentType) {
                 "movie" -> {
@@ -97,9 +94,9 @@ class ContinueWatchingActivity : AppCompatActivity() {
                     // Try to parse from contentId or default to mp4
                     val streamId = item.contentId.toIntOrNull() ?: return
                     StreamUrlBuilder.buildMovieUrl(
-                        server = credentials.getServer(),
-                        username = credentials.getUsername(),
-                        password = credentials.getPassword(),
+                        server = credentialsManager.getServer(),
+                        username = credentialsManager.getUsername(),
+                        password = credentialsManager.getPassword(),
                         streamId = streamId,
                         extension = "mp4", // Default extension
                     )
@@ -107,9 +104,9 @@ class ContinueWatchingActivity : AppCompatActivity() {
                 "series" -> {
                     // For series episodes, the contentId is the episode ID
                     StreamUrlBuilder.buildSeriesUrl(
-                        server = credentials.getServer(),
-                        username = credentials.getUsername(),
-                        password = credentials.getPassword(),
+                        server = credentialsManager.getServer(),
+                        username = credentialsManager.getUsername(),
+                        password = credentialsManager.getPassword(),
                         episodeId = item.contentId,
                         extension = "mp4", // Default extension
                     )
@@ -117,9 +114,9 @@ class ContinueWatchingActivity : AppCompatActivity() {
                 "live_channel" -> {
                     val streamId = item.contentId.toIntOrNull() ?: return
                     StreamUrlBuilder.buildLiveUrl(
-                        server = credentials.getServer(),
-                        username = credentials.getUsername(),
-                        password = credentials.getPassword(),
+                        server = credentialsManager.getServer(),
+                        username = credentialsManager.getUsername(),
+                        password = credentialsManager.getPassword(),
                         streamId = streamId,
                         extension = "ts",
                     )

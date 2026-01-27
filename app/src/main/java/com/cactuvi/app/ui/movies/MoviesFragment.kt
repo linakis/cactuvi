@@ -7,6 +7,8 @@ import com.cactuvi.app.data.models.Movie
 import com.cactuvi.app.ui.common.ContentNavigationFragment
 import com.cactuvi.app.ui.common.ContentViewModel
 import com.cactuvi.app.ui.common.MoviePagingAdapter
+import com.cactuvi.app.utils.IdleDetectionHelper
+import com.cactuvi.app.utils.SourceManager
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
@@ -17,6 +19,14 @@ class MoviesFragment : ContentNavigationFragment<Movie>() {
     private val viewModel: MoviesViewModel by viewModels()
 
     @Inject lateinit var database: com.cactuvi.app.data.db.AppDatabase
+    @Inject lateinit var _sourceManager: SourceManager
+    @Inject lateinit var _idleDetectionHelper: IdleDetectionHelper
+
+    override val sourceManager: SourceManager
+        get() = _sourceManager
+
+    override val idleDetectionHelper: IdleDetectionHelper
+        get() = _idleDetectionHelper
 
     override val contentAdapter: PagingDataAdapter<Movie, *> by lazy {
         MoviePagingAdapter { movie -> onContentItemClick(movie) }

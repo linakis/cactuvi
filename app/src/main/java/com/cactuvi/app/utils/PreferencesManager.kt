@@ -5,8 +5,12 @@ import android.content.SharedPreferences
 import com.cactuvi.app.data.models.ContentFilterSettings
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import dagger.hilt.android.qualifiers.ApplicationContext
+import javax.inject.Inject
+import javax.inject.Singleton
 
-class PreferencesManager private constructor(context: Context) {
+@Singleton
+class PreferencesManager @Inject constructor(@ApplicationContext context: Context) {
 
     private val prefs: SharedPreferences =
         context.getSharedPreferences(
@@ -45,16 +49,6 @@ class PreferencesManager private constructor(context: Context) {
 
         // VPN warning key
         private const val KEY_VPN_WARNING_ENABLED = "vpn_warning_enabled"
-
-        @Volatile private var instance: PreferencesManager? = null
-
-        fun getInstance(context: Context): PreferencesManager {
-            return instance
-                ?: synchronized(this) {
-                    instance
-                        ?: PreferencesManager(context.applicationContext).also { instance = it }
-                }
-        }
     }
 
     // Movies grouping settings
