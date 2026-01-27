@@ -3,7 +3,8 @@
     <!-- Splash Screen Theme (Android 12+ API) -->
     <style name="Theme.IPTVPlayer.Starting" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">@color/background_primary</item>
-        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_foreground</item>
+        <item name="windowSplashScreenIconBackgroundColor">@color/splash_icon_background</item>
         <item name="windowSplashScreenAnimationDuration">200</item>
         <item name="postSplashScreenTheme">@style/Theme.IPTVPlayer</item>
     </style>

@@ -46,6 +46,7 @@
 
     <!-- Launcher -->
     <color name="ic_launcher_background">@color/background_primary</color>
+    <color name="splash_icon_background">#0F3D2E</color>
 
     <!-- Surface Colors (Cactuvi Style) -->
     <color name="surface_cactuvi">#0F1815</color>
