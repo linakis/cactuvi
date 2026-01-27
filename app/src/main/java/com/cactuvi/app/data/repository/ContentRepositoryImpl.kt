@@ -883,6 +883,20 @@ private constructor(
 
                     // Emit success effect
                     _liveEffects.emit(LiveEffect.LoadSuccess(totalInserted))
+
+                    // Update category childrenCount after live channels are loaded
+                    try {
+                        val liveCategories = getLiveCategories().getOrNull() ?: emptyList()
+                        if (liveCategories.isNotEmpty()) {
+                            PerformanceLogger.log("loadLive: Updating category childrenCount")
+                            computeChildrenCounts(ContentType.LIVE, liveCategories)
+                        }
+                    } catch (countError: Exception) {
+                        android.util.Log.w(
+                            "ContentRepository",
+                            "Failed to update live category counts: ${countError.message}"
+                        )
+                    }
                 }
             } catch (e: Exception) {
                 android.util.Log.e("ContentRepository", "loadLive failed", e)
@@ -1392,6 +1406,22 @@ private constructor(
                                 "IPTV_DEBUG",
                                 "ContentRepository.loadMovies: Emitted Success (${writeResult.successCount} items)",
                             )
+
+                            // Update category childrenCount after movies are loaded
+                            try {
+                                val categories = getMovieCategories().getOrNull() ?: emptyList()
+                                if (categories.isNotEmpty()) {
+                                    PerformanceLogger.log(
+                                        "loadMovies: Updating category childrenCount"
+                                    )
+                                    computeChildrenCounts(ContentType.MOVIES, categories)
+                                }
+                            } catch (countError: Exception) {
+                                android.util.Log.w(
+                                    "ContentRepository",
+                                    "Failed to update movie category counts: ${countError.message}"
+                                )
+                            }
                         }
                     }
                 }
@@ -1915,6 +1945,20 @@ private constructor(
                             fromCache = false,
                         ),
                     )
+
+                    // Update category childrenCount after series are loaded
+                    try {
+                        val seriesCategories = getSeriesCategories().getOrNull() ?: emptyList()
+                        if (seriesCategories.isNotEmpty()) {
+                            PerformanceLogger.log("loadSeries: Updating category childrenCount")
+                            computeChildrenCounts(ContentType.SERIES, seriesCategories)
+                        }
+                    } catch (countError: Exception) {
+                        android.util.Log.w(
+                            "ContentRepository",
+                            "Failed to update series category counts: ${countError.message}"
+                        )
+                    }
                 }
             } catch (e: Exception) {
                 val duration = System.currentTimeMillis() - startTime
