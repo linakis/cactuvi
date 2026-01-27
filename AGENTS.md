@@ -228,18 +228,97 @@ This app is designed for TV screens and MUST support D-pad navigation. All UI el
 
 ## Build & Test Commands
 
+### Mock Server Development (Build Flavors)
+
+The app supports two build flavors for rapid development:
+
+**Mock Flavor (`mock`):**
+- Runs local MockWebServer on `localhost:8080`
+- Serves responses from `sample-api-responses/` JSON files
+- Instant responses (no network latency)
+- Works offline
+- Shows persistent "MOCK MODE" notification when app is active
+- App name: "Cactuvi"
+- Package: `com.cactuvi.app.mock`
+
+**Prod Flavor (`prod`):**
+- Uses real API endpoints
+- Standard network behavior
+- No mock notification
+- Default app name
+- Package: `com.cactuvi.app`
+
+#### Mock Flavor Build Commands
+```bash
+# Build mock debug APK
+./gradlew assembleMockDebug
+
+# Install mock app
+./gradlew installMockDebug
+# OR
+adb install -r app/build/outputs/apk/mock/debug/app-mock-debug.apk
+
+# Build and install mock (single command)
+./gradlew clean assembleMockDebug installMockDebug
+```
+
+#### Prod Flavor Build Commands
+```bash
+# Build prod debug APK
+./gradlew assembleProdDebug
+
+# Install prod app
+./gradlew installProdDebug
+# OR
+adb install -r app/build/outputs/apk/prod/debug/app-prod-debug.apk
+```
+
+#### Side-by-Side Installation
+Both mock and prod apps can be installed simultaneously (different package IDs):
+```bash
+# Install both apps for comparison
+./gradlew installMockDebug installProdDebug
+```
+
+#### Mock Mode Notification Behavior
+- **Appears:** When mock app is in foreground
+- **Disappears:** When app is backgrounded/closed
+- **Reappears:** When app returns to foreground
+- **Title:** "MOCK MODE"
+- **Text:** "Development Server Active"
+- **Priority:** Silent (no sound/vibration)
+- **Tap action:** Returns to app
+
+#### Mock Server Endpoints
+The mock server automatically serves responses for all 6 API actions:
+- `get_vod_streams` → Movies data (~54MB)
+- `get_live_streams` → Live TV data (~16MB)
+- `get_series` → Series data (~38MB)
+- `get_vod_categories` → Movie categories (~39KB)
+- `get_live_categories` → Live TV categories (~95KB)
+- `get_series_categories` → Series categories (~29KB)
+
+#### When to Use Mock Flavor
+✅ **Use mock for:**
+- Rapid UI development and iteration
+- Offline development (no VPN/internet needed)
+- Testing app flow without API delays
+- Working with large datasets locally
+- Demoing app without real credentials
+
+✅ **Use prod for:**
+- Testing real API integration
+- Verifying network error handling
+- Testing with live data updates
+- Performance testing with network latency
+- Final QA before release
+
 ### Standard Build Commands
 ```bash
 # Clean build
 ./gradlew clean
 
-# Debug build
-./gradlew assembleDebug
-
-# Release build (requires signing config)
-./gradlew assembleRelease
-
-# Install debug APK on connected device
+# Install debug APK on connected device (uses prod by default)
 ./gradlew installDebug
 
 # Build and install

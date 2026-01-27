@@ -19,6 +19,20 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    flavorDimensions += "environment"
+    productFlavors {
+        create("mock") {
+            dimension = "environment"
+            applicationIdSuffix = ".mock"
+            buildConfigField("int", "MOCK_SERVER_PORT", "8080")
+            resValue("string", "app_name", "MockCactuvi")
+        }
+        create("prod") {
+            dimension = "environment"
+            // No suffix - keeps default com.cactuvi.app
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -55,6 +69,7 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.7.0")
     implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.7.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
+    implementation("androidx.lifecycle:lifecycle-process:2.7.0")
 
     // Hilt Dependency Injection
     implementation("com.google.dagger:hilt-android:2.50")
@@ -77,6 +92,9 @@ dependencies {
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+
+    // MockWebServer for mock flavor only
+    "mockImplementation"("com.squareup.okhttp3:mockwebserver:4.12.0")
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")

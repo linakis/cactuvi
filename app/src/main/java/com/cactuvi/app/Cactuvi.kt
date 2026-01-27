@@ -29,6 +29,11 @@ class Cactuvi : Application() {
     override fun onCreate() {
         super.onCreate()
 
+        // Initialize mock components if in mock flavor
+        if (BuildConfig.FLAVOR == "mock") {
+            initializeMockMode()
+        }
+
         // Check VPN status on app start
         checkVpnStatus()
 
@@ -40,6 +45,61 @@ class Cactuvi : Application() {
 
         // Trigger immediate sync if cache exists (stale-while-revalidate pattern)
         applicationScope.launch { triggerInitialSync() }
+    }
+
+    override fun onTerminate() {
+        super.onTerminate()
+        // Cleanup mock components if in mock flavor
+        if (BuildConfig.FLAVOR == "mock") {
+            shutdownMockMode()
+        }
+    }
+
+    /**
+     * Initialize mock server and notification (mock flavor only). Uses reflection to avoid
+     * compile-time dependency on mock classes.
+     */
+    private fun initializeMockMode() {
+        try {
+            // Start MockWebServer
+            val mockServerClass = Class.forName("com.cactuvi.app.mock.MockServerManager")
+            val getInstance = mockServerClass.getMethod("getInstance")
+            val mockServerInstance = getInstance.invoke(null)
+            val startMethod =
+                mockServerClass.getMethod("start", android.content.Context::class.java)
+            startMethod.invoke(mockServerInstance, this)
+            android.util.Log.i("Cactuvi", "MockWebServer started (MOCK FLAVOR)")
+
+            // Initialize notification
+            val notificationClass =
+                Class.forName("com.cactuvi.app.mock.MockModeNotificationManager")
+            val initMethod =
+                notificationClass.getMethod("initialize", android.content.Context::class.java)
+            initMethod.invoke(null, this)
+            android.util.Log.i("Cactuvi", "Mock mode notification initialized")
+        } catch (e: Exception) {
+            android.util.Log.e("Cactuvi", "Failed to initialize mock mode", e)
+        }
+    }
+
+    /** Shutdown mock server and notification (mock flavor only). */
+    private fun shutdownMockMode() {
+        try {
+            // Shutdown notification
+            val notificationClass =
+                Class.forName("com.cactuvi.app.mock.MockModeNotificationManager")
+            val shutdownNotifMethod = notificationClass.getMethod("shutdown")
+            shutdownNotifMethod.invoke(null)
+
+            // Shutdown MockWebServer
+            val mockServerClass = Class.forName("com.cactuvi.app.mock.MockServerManager")
+            val getInstance = mockServerClass.getMethod("getInstance")
+            val mockServerInstance = getInstance.invoke(null)
+            val shutdownMethod = mockServerClass.getMethod("shutdown")
+            shutdownMethod.invoke(mockServerInstance)
+        } catch (e: Exception) {
+            android.util.Log.e("Cactuvi", "Failed to shutdown mock mode", e)
+        }
     }
 
     /**
