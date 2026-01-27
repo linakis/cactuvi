@@ -3,6 +3,8 @@ package com.cactuvi.app.mock
 import android.content.Context
 import android.util.Log
 import com.cactuvi.app.BuildConfig
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import okhttp3.mockwebserver.Dispatcher
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
@@ -24,6 +26,7 @@ class MockServerManager private constructor() {
 
         @Volatile private var instance: MockServerManager? = null
 
+        @JvmStatic
         fun getInstance(): MockServerManager {
             return instance
                 ?: synchronized(this) { instance ?: MockServerManager().also { instance = it } }
@@ -31,7 +34,8 @@ class MockServerManager private constructor() {
     }
 
     /**
-     * Initialize and start the mock web server.
+     * Initialize and start the mock web server. Starts the server on a background thread to avoid
+     * NetworkOnMainThreadException.
      *
      * @param context Application context
      */
@@ -43,20 +47,34 @@ class MockServerManager private constructor() {
 
         appContext = context.applicationContext
 
-        try {
-            mockWebServer =
-                MockWebServer().apply {
-                    dispatcher = MockApiDispatcher(appContext)
-                    start(SERVER_PORT)
-                }
+        // Start on background thread to avoid NetworkOnMainThreadException
+        val latch = CountDownLatch(1)
+        Thread {
+                try {
+                    mockWebServer =
+                        MockWebServer().apply {
+                            dispatcher = MockApiDispatcher(appContext)
+                            start(SERVER_PORT)
+                        }
 
-            isStarted = true
-            val url = mockWebServer?.url("")
-            Log.i(TAG, "MockWebServer started successfully at: $url")
-            Log.i(TAG, "Supported actions: ${MockResponseProvider.getSupportedActions()}")
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to start MockWebServer", e)
-            isStarted = false
+                    isStarted = true
+                    val url = mockWebServer?.url("")
+                    Log.i(TAG, "MockWebServer started successfully at: $url")
+                    Log.i(TAG, "Supported actions: ${MockResponseProvider.getSupportedActions()}")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to start MockWebServer", e)
+                    isStarted = false
+                } finally {
+                    latch.countDown()
+                }
+            }
+            .start()
+
+        // Wait for server to start (max 5 seconds)
+        try {
+            latch.await(5, TimeUnit.SECONDS)
+        } catch (e: InterruptedException) {
+            Log.w(TAG, "Interrupted while waiting for MockWebServer to start")
         }
     }
 

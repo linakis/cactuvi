@@ -34,6 +34,7 @@ object MockModeNotificationManager {
      *
      * @param context Application context
      */
+    @JvmStatic
     fun initialize(context: Context) {
         if (isInitialized) {
             Log.d(TAG, "Already initialized")
@@ -134,6 +135,7 @@ object MockModeNotificationManager {
     }
 
     /** Clean up resources. */
+    @JvmStatic
     fun shutdown() {
         hideNotification()
         notificationManager = null
