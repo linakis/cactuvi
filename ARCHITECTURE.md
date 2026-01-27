@@ -791,14 +791,155 @@ Migrated from singleton pattern (`getInstance()`) to full Hilt dependency inject
 2. Add comprehensive tests
 3. Update documentation
 
+## Algebraic Data Types (ADT) for State Modeling
+
+**MANDATORY:** All UI state classes MUST use sealed classes (Algebraic Data Types) to model mutually exclusive states.
+
+### Why ADT?
+
+Algebraic Data Types provide:
+1. **Compile-time exhaustiveness** - The compiler ensures all states are handled in `when` expressions
+2. **Impossible states are unrepresentable** - Can't have `isLoading = true` AND `error != null` simultaneously
+3. **Data co-location** - Each state variant carries only the data relevant to that state
+4. **Self-documenting** - State transitions are explicit and visible in the type hierarchy
+
+### ❌ DON'T: Boolean Flags + Nullable Fields
+
+```kotlin
+// BAD: Boolean flags representing mutually exclusive states
+data class MyUiState(
+    val isLoading: Boolean = true,
+    val data: List<Item> = emptyList(),
+    val error: String? = null,
+) {
+    // BAD: Computed properties to derive what to show
+    val showContent: Boolean get() = !isLoading && data.isNotEmpty()
+    val showEmpty: Boolean get() = !isLoading && data.isEmpty()
+    val showError: Boolean get() = !isLoading && error != null
+}
+
+// Problems:
+// 1. Invalid states possible: isLoading=true AND error="failed"
+// 2. When expressions on boolean combinations are error-prone
+// 3. Helper properties indicate states aren't properly modeled
+```
+
+### ✅ DO: Sealed Class Hierarchy
+
+```kotlin
+// GOOD: Each state is explicit and carries only relevant data
+sealed class MyUiState {
+    data object Initial : MyUiState()
+    data object Loading : MyUiState()
+    data class Content(val items: List<Item>) : MyUiState()
+    data object Empty : MyUiState()
+    data class Error(val message: String) : MyUiState()
+}
+
+// Benefits:
+// 1. Impossible to be Loading AND Error simultaneously
+// 2. Compiler enforces exhaustive when expressions
+// 3. Each state only has the fields it needs
+```
+
+### Pattern: Nested Sealed Classes for Complex States
+
+For screens with multiple content types, use nested sealed classes:
+
+```kotlin
+sealed class ContentUiState {
+    data object Initial : ContentUiState()
+    data class Syncing(val progress: Int?) : ContentUiState()
+    data object Loading : ContentUiState()
+    data class Error(val message: String) : ContentUiState()
+    
+    sealed class Content : ContentUiState() {
+        abstract val breadcrumbPath: List<BreadcrumbItem>
+        
+        data class Groups(
+            val groups: Map<String, List<Category>>,
+            override val breadcrumbPath: List<BreadcrumbItem>,
+        ) : Content()
+        
+        data class Categories(
+            val categories: List<Category>,
+            override val breadcrumbPath: List<BreadcrumbItem>,
+        ) : Content()
+        
+        data class Items(
+            val categoryId: String,
+            override val breadcrumbPath: List<BreadcrumbItem>,
+        ) : Content()
+    }
+}
+```
+
+### Pattern: Exhaustive When in UI
+
+Always use exhaustive `when` in Fragments/Activities - let the compiler catch missing cases:
+
+```kotlin
+private fun renderUiState(state: MyUiState) {
+    when (state) {
+        is MyUiState.Initial -> {
+            progressBar.isVisible = false
+            recyclerView.isVisible = false
+            errorText.isVisible = false
+        }
+        is MyUiState.Loading -> {
+            progressBar.isVisible = true
+            recyclerView.isVisible = false
+            errorText.isVisible = false
+        }
+        is MyUiState.Content -> {
+            progressBar.isVisible = false
+            recyclerView.isVisible = true
+            errorText.isVisible = false
+            adapter.submitList(state.items)
+        }
+        is MyUiState.Empty -> {
+            progressBar.isVisible = false
+            recyclerView.isVisible = false
+            emptyText.isVisible = true
+        }
+        is MyUiState.Error -> {
+            progressBar.isVisible = false
+            recyclerView.isVisible = false
+            errorText.isVisible = true
+            errorText.text = state.message
+        }
+    }
+    // No else branch needed - compiler enforces all cases handled
+}
+```
+
+### Code Smells Indicating Missing ADT
+
+Watch for these patterns - they indicate states should be modeled as sealed classes:
+
+| Code Smell | Example | Fix |
+|------------|---------|-----|
+| Boolean flags for exclusive states | `isLoading`, `hasError`, `isSuccess` | Sealed class with Loading/Error/Success variants |
+| Nullable fields for optional states | `error: String? = null` | Error variant in sealed class |
+| Computed `show*` properties | `val showLoading get() = isLoading && data == null` | Each state handles its own visibility |
+| `when` on boolean combinations | `when { isLoading -> ... hasError -> ... }` | `when (state) { is Loading -> ... }` |
+| Multiple mutually exclusive nullables | `val success: T?, val error: E?` | `sealed class Result { Success(T), Error(E) }` |
+
 ## Common Pitfalls
 
 ### ❌ DON'T
 
 ```kotlin
-// DON'T: Imperative state flags
+// DON'T: Imperative state flags (use sealed classes instead)
 var isLoading = false
 var hasCache = false
+
+// DON'T: Boolean + nullable combinations for exclusive states
+data class UiState(
+    val isLoading: Boolean,
+    val data: Data?,
+    val error: String?
+)
 
 // DON'T: Expose mutable state
 val uiState: MutableStateFlow<UiState>
@@ -817,16 +958,22 @@ if (System.currentTimeMillis() - lastUpdate < TTL) {
 ### ✅ DO
 
 ```kotlin
-// DO: Derive state from streams
-data class UiState(
-    val isLoading: Boolean,
-    val data: Data?
-) {
-    val showLoading get() = isLoading && data == null
+// DO: Use sealed classes for mutually exclusive states
+sealed class UiState {
+    data object Loading : UiState()
+    data class Content(val data: Data) : UiState()
+    data class Error(val message: String) : UiState()
 }
 
 // DO: Expose immutable state
 val uiState: StateFlow<UiState>
+
+// DO: Use exhaustive when in UI rendering
+when (state) {
+    is UiState.Loading -> showLoading()
+    is UiState.Content -> showContent(state.data)
+    is UiState.Error -> showError(state.message)
+}
 
 // DO: Use ViewModel + UseCase
 viewModel.refresh()

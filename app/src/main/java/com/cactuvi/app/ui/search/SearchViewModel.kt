@@ -6,8 +6,7 @@ import com.cactuvi.app.data.db.AppDatabase
 import com.cactuvi.app.data.db.mappers.toModel
 import com.cactuvi.app.data.models.Movie
 import com.cactuvi.app.data.models.Series
-import com.cactuvi.app.domain.usecase.RefreshMoviesUseCase
-import com.cactuvi.app.domain.usecase.RefreshSeriesUseCase
+import com.cactuvi.app.domain.repository.ContentRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
@@ -30,8 +29,7 @@ class SearchViewModel
 @Inject
 constructor(
     private val database: AppDatabase,
-    private val refreshMoviesUseCase: RefreshMoviesUseCase,
-    private val refreshSeriesUseCase: RefreshSeriesUseCase,
+    private val repository: ContentRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SearchUiState())
@@ -61,10 +59,10 @@ constructor(
 
             // Trigger background refresh if cache is empty
             if (allMovies.isEmpty()) {
-                refreshMoviesUseCase()
+                repository.loadMovies()
             }
             if (allSeries.isEmpty()) {
-                refreshSeriesUseCase()
+                repository.loadSeries()
             }
         }
     }

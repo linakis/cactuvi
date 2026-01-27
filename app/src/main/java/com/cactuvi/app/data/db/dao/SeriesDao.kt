@@ -71,4 +71,8 @@ interface SeriesDao {
     // Alias for consistency with navigation system
     @Query("SELECT COUNT(*) FROM series WHERE categoryId = :categoryId")
     suspend fun countByCategoryId(categoryId: String): Int
+
+    /** Observe count by category reactively */
+    @Query("SELECT COUNT(*) FROM series WHERE categoryId = :categoryId")
+    fun observeCountByCategoryId(categoryId: String): kotlinx.coroutines.flow.Flow<Int>
 }

@@ -2,6 +2,7 @@ package com.cactuvi.app.data.db.dao
 
 import androidx.room.*
 import com.cactuvi.app.data.db.entities.CategoryEntity
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface CategoryDao {
@@ -41,6 +42,43 @@ interface CategoryDao {
     """
     )
     suspend fun getById(type: String, categoryId: String): CategoryEntity?
+
+    // ========== REACTIVE FLOW METHODS ==========
+    // These return Flow<T> for reactive UI updates when DB changes
+
+    /** Observe all categories by type - emits on every DB change */
+    @Query("SELECT * FROM categories WHERE type = :type ORDER BY categoryName ASC")
+    fun observeAllByType(type: String): Flow<List<CategoryEntity>>
+
+    /** Observe top-level categories (parentId = 0) */
+    @Query(
+        """
+        SELECT * FROM categories
+        WHERE type = :type AND parentId = 0
+        ORDER BY categoryName ASC
+    """
+    )
+    fun observeTopLevel(type: String): Flow<List<CategoryEntity>>
+
+    /** Observe children of specific category */
+    @Query(
+        """
+        SELECT * FROM categories
+        WHERE type = :type AND parentId = :parentCategoryId
+        ORDER BY categoryName ASC
+    """
+    )
+    fun observeChildren(type: String, parentCategoryId: Int): Flow<List<CategoryEntity>>
+
+    /** Observe single category by ID */
+    @Query(
+        """
+        SELECT * FROM categories
+        WHERE type = :type AND categoryId = :categoryId
+        LIMIT 1
+    """
+    )
+    fun observeById(type: String, categoryId: String): Flow<CategoryEntity?>
 
     // NEW: Update children count
     @Query(

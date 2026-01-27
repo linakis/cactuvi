@@ -6,6 +6,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.HorizontalScrollView
+import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.core.view.isVisible
@@ -51,6 +52,12 @@ abstract class ContentNavigationFragment<T : Any> : Fragment() {
     protected lateinit var modernToolbar: ModernToolbar
     protected lateinit var breadcrumbScroll: HorizontalScrollView
     protected lateinit var breadcrumbChips: ChipGroup
+
+    // Sync loading UI components
+    protected lateinit var syncLoadingContainer: LinearLayout
+    protected lateinit var syncStatusText: TextView
+    protected lateinit var syncProgressBar: ProgressBar
+    protected lateinit var syncProgressText: TextView
 
     // Adapters
     protected lateinit var groupAdapter: GroupAdapter
@@ -106,6 +113,12 @@ abstract class ContentNavigationFragment<T : Any> : Fragment() {
         modernToolbar = view.findViewById(R.id.modernToolbar)
         breadcrumbScroll = view.findViewById(R.id.breadcrumbScroll)
         breadcrumbChips = view.findViewById(R.id.breadcrumbChips)
+
+        // Initialize sync loading views
+        syncLoadingContainer = view.findViewById(R.id.syncLoadingContainer)
+        syncStatusText = view.findViewById(R.id.syncStatusText)
+        syncProgressBar = view.findViewById(R.id.syncProgressBar)
+        syncProgressText = view.findViewById(R.id.syncProgressText)
 
         setupToolbar()
         setupRecyclerView()
@@ -193,28 +206,72 @@ abstract class ContentNavigationFragment<T : Any> : Fragment() {
 
     // ========== UI RENDERING ==========
 
-    /** Render UI based on current state. Pure UI rendering - no business logic. */
+    /** Render UI based on current state. Uses exhaustive when for compile-time safety. */
     private fun renderUiState(state: ContentUiState) {
-        // Update loading/error visibility
-        progressBar.isVisible = state.showLoading
-        errorText.isVisible = state.showError
-        recyclerView.isVisible = state.showContent
+        when (state) {
+            is ContentUiState.Initial -> {
+                // Initial state - hide everything, wait for data
+                progressBar.isVisible = false
+                errorText.isVisible = false
+                recyclerView.isVisible = false
+                syncLoadingContainer.isVisible = false
+                breadcrumbScroll.visibility = View.GONE
+            }
+            is ContentUiState.Syncing -> {
+                // Syncing - show sync progress UI
+                progressBar.isVisible = false
+                errorText.isVisible = false
+                recyclerView.isVisible = false
+                syncLoadingContainer.isVisible = true
+                breadcrumbScroll.visibility = View.GONE
 
-        if (state.showError) {
-            errorText.text = "${state.error}\n\nTap to retry"
-            errorText.setOnClickListener { getViewModel().refresh() }
-            return
+                syncStatusText.text = "Syncing ${getContentTitle()}..."
+                if (state.progress != null) {
+                    syncProgressBar.isIndeterminate = false
+                    syncProgressBar.progress = state.progress
+                    syncProgressText.text = "${state.progress}%"
+                } else {
+                    syncProgressBar.isIndeterminate = true
+                    syncProgressText.text = ""
+                }
+            }
+            is ContentUiState.Loading -> {
+                // Navigation loading - show spinner
+                progressBar.isVisible = true
+                errorText.isVisible = false
+                recyclerView.isVisible = false
+                syncLoadingContainer.isVisible = false
+                // Keep breadcrumbs visible during loading for context
+            }
+            is ContentUiState.Error -> {
+                // Error state - show error message with retry
+                progressBar.isVisible = false
+                errorText.isVisible = true
+                recyclerView.isVisible = false
+                syncLoadingContainer.isVisible = false
+                breadcrumbScroll.visibility = View.GONE
+
+                errorText.text = "${state.message}\n\nTap to retry"
+                errorText.setOnClickListener { getViewModel().refresh() }
+            }
+            is ContentUiState.Content -> {
+                // Content available - show appropriate view
+                progressBar.isVisible = false
+                errorText.isVisible = false
+                recyclerView.isVisible = true
+                syncLoadingContainer.isVisible = false
+
+                // Render specific content type
+                when (state) {
+                    is ContentUiState.Content.Groups -> showGroupsView(state.groups)
+                    is ContentUiState.Content.Categories -> showCategoriesView(state.categories)
+                    is ContentUiState.Content.Items -> showContentView()
+                }
+
+                // Update breadcrumb for all content states
+                updateBreadcrumb(state.breadcrumbPath)
+            }
         }
-
-        // Render content based on what we're showing
-        when {
-            state.isViewingGroups -> showGroupsView(state.currentGroups!!)
-            state.isViewingCategories -> showCategoriesView(state.currentCategories)
-            state.isViewingContent -> showContentView()
-        }
-
-        // Update breadcrumb
-        updateBreadcrumb(state.breadcrumbPath)
     }
 
     private fun showGroupsView(groups: Map<String, List<com.cactuvi.app.data.models.Category>>) {

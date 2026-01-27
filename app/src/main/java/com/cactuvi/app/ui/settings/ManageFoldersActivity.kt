@@ -14,6 +14,8 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.cactuvi.app.R
 import com.cactuvi.app.data.models.ContentFilterSettings
+import com.cactuvi.app.data.models.ContentType as ModelContentType
+import com.cactuvi.app.data.models.NavigationResult
 import com.cactuvi.app.domain.repository.ContentRepository
 import com.cactuvi.app.ui.common.HierarchicalFolderAdapter
 import com.cactuvi.app.ui.common.HierarchicalItem
@@ -25,6 +27,7 @@ import com.google.android.material.button.MaterialButton
 import com.google.android.material.switchmaterial.SwitchMaterial
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
@@ -117,21 +120,33 @@ class ManageFoldersActivity : AppCompatActivity() {
     private fun loadFolders() {
         lifecycleScope.launch {
             try {
-                // Load categories based on content type
-                val categories =
+                // Map ContentFilterSettings.ContentType to data models ContentType
+                val modelContentType =
                     when (contentType) {
-                        ContentFilterSettings.ContentType.MOVIES -> {
-                            val result = repository.getMovieCategories()
-                            result.getOrNull() ?: emptyList()
-                        }
-                        ContentFilterSettings.ContentType.SERIES -> {
-                            val result = repository.getSeriesCategories()
-                            result.getOrNull() ?: emptyList()
-                        }
-                        ContentFilterSettings.ContentType.LIVE_TV -> {
-                            val result = repository.getLiveCategories()
-                            result.getOrNull() ?: emptyList()
-                        }
+                        ContentFilterSettings.ContentType.MOVIES -> ModelContentType.MOVIES
+                        ContentFilterSettings.ContentType.SERIES -> ModelContentType.SERIES
+                        ContentFilterSettings.ContentType.LIVE_TV -> ModelContentType.LIVE
+                    }
+
+                // Get separator for this content type
+                val separator = preferencesManager.getCustomSeparator(contentType)
+
+                // Use the reactive navigation API to get categories
+                // We get them WITH grouping enabled to build the folder tree
+                val navResult =
+                    repository
+                        .observeTopLevelNavigation(
+                            contentType = modelContentType,
+                            groupingEnabled = true,
+                            separator = separator,
+                        )
+                        .first()
+
+                // Extract categories from the navigation result
+                val categories =
+                    when (navResult) {
+                        is NavigationResult.Groups -> navResult.groups.values.flatten()
+                        is NavigationResult.Categories -> navResult.categories
                     }
 
                 if (categories.isEmpty()) {
@@ -140,7 +155,6 @@ class ManageFoldersActivity : AppCompatActivity() {
                 }
 
                 // Build navigation tree to get groups with categories
-                val separator = preferencesManager.getCustomSeparator(contentType)
                 val newTree =
                     CategoryTreeBuilder.buildNavigationTree(
                         categories = categories,

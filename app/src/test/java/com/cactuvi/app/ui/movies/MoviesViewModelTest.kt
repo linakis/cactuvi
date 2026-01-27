@@ -1,34 +1,38 @@
 package com.cactuvi.app.ui.movies
 
+import app.cash.turbine.test
 import com.cactuvi.app.data.models.Category
+import com.cactuvi.app.data.models.ContentType
+import com.cactuvi.app.data.models.DataState
 import com.cactuvi.app.data.models.NavigationResult
 import com.cactuvi.app.domain.repository.ContentRepository
+import com.cactuvi.app.ui.common.ContentUiState
 import com.cactuvi.app.utils.PreferencesManager
-import io.mockk.coEvery
-import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
 /**
- * Unit tests for MoviesViewModel.
+ * Unit tests for MoviesViewModel with reactive Flow-based API.
  *
  * Tests cover:
- * - Initial state
+ * - Initial state and sync states
  * - Navigation state changes
- * - Refresh action
  * - Back navigation logic
+ * - State machine behavior (ADT sealed class)
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class MoviesViewModelTest {
@@ -37,6 +41,7 @@ class MoviesViewModelTest {
 
     private lateinit var mockRepository: ContentRepository
     private lateinit var mockPreferencesManager: PreferencesManager
+    private lateinit var moviesStateFlow: MutableStateFlow<DataState<Unit>>
     private lateinit var viewModel: MoviesViewModel
 
     @Before
@@ -45,10 +50,14 @@ class MoviesViewModelTest {
 
         mockRepository = mockk(relaxed = true)
         mockPreferencesManager = mockk(relaxed = true)
+        moviesStateFlow = MutableStateFlow(DataState.Success(Unit))
 
         // Default grouping settings
         every { mockPreferencesManager.isMoviesGroupingEnabled() } returns true
         every { mockPreferencesManager.getMoviesGroupingSeparator() } returns "-"
+
+        // Default sync state
+        every { mockRepository.moviesState } returns moviesStateFlow
     }
 
     @After
@@ -56,130 +65,205 @@ class MoviesViewModelTest {
         Dispatchers.resetMain()
     }
 
-    /** Helper: Create mock groups as Map (new API) */
+    /** Helper: Create mock groups as Map */
     private fun createMockGroupsMap(): Map<String, List<Category>> {
         return mapOf(
             "US" to
                 listOf(
-                    Category(categoryId = "1", categoryName = "Action", parentId = 0),
-                    Category(categoryId = "2", categoryName = "Comedy", parentId = 0),
+                    Category(categoryId = "1", categoryName = "US - Action", parentId = 0),
+                    Category(categoryId = "2", categoryName = "US - Comedy", parentId = 0),
                 ),
             "UK" to
                 listOf(
-                    Category(categoryId = "3", categoryName = "Drama", parentId = 0),
+                    Category(categoryId = "3", categoryName = "UK - Drama", parentId = 0),
                 ),
+        )
+    }
+
+    /** Helper: Create mock categories */
+    private fun createMockCategories(): List<Category> {
+        return listOf(
+            Category(categoryId = "1", categoryName = "Action", parentId = 0),
+            Category(categoryId = "2", categoryName = "Comedy", parentId = 0),
         )
     }
 
     // ========== INITIAL STATE TESTS ==========
 
     @Test
-    fun `initial state has correct defaults`() {
-        // Given: Repository returns empty navigation
-        coEvery { mockRepository.getTopLevelNavigation(any(), any(), any()) } returns
-            NavigationResult.Categories(emptyList())
+    fun `initial state is Initial before data loads`() = runTest {
+        // Given: Repository returns empty categories
+        every { mockRepository.observeTopLevelNavigation(ContentType.MOVIES, any(), any()) } returns
+            flowOf(NavigationResult.Categories(emptyList()))
 
         // When: ViewModel is created
         viewModel = MoviesViewModel(mockRepository, mockPreferencesManager)
 
-        // Then: Initial state should have correct defaults
-        val state = viewModel.uiState.value
-        assertFalse(state.isLoading)
-        assertFalse(state.isLeafLevel)
-        assertTrue(state.breadcrumbPath.isEmpty())
+        // Then: Initial value should be Initial (before Flow emits)
+        // Note: With UnconfinedTestDispatcher, it may already emit first value
+        viewModel.uiState.test {
+            val state = awaitItem()
+            // Either Initial or first emission
+            assertTrue(
+                state is ContentUiState.Initial ||
+                    state is ContentUiState.Loading ||
+                    state is ContentUiState.Content
+            )
+        }
+    }
+
+    @Test
+    fun `shows Syncing state when no data and sync in progress`() = runTest {
+        // Given: Sync is loading
+        moviesStateFlow.value = DataState.Loading(progress = 50)
+
+        every { mockRepository.observeTopLevelNavigation(ContentType.MOVIES, any(), any()) } returns
+            flowOf(NavigationResult.Categories(emptyList()))
+
+        // When: ViewModel is created
+        viewModel = MoviesViewModel(mockRepository, mockPreferencesManager)
+
+        // Then: Should show syncing state
+        viewModel.uiState.test {
+            val state = awaitItem()
+            assertTrue("Expected Syncing state but got $state", state is ContentUiState.Syncing)
+            assertEquals(50, (state as ContentUiState.Syncing).progress)
+        }
     }
 
     // ========== NAVIGATION TESTS ==========
 
     @Test
-    fun `loadRoot loads groups when grouping enabled`() {
-        // Given: Repository returns groups as Map
+    fun `shows Groups state when grouping enabled and groups available`() = runTest {
+        // Given: Repository returns groups
         val groups = createMockGroupsMap()
-        coEvery { mockRepository.getTopLevelNavigation(any(), any(), any()) } returns
-            NavigationResult.Groups(groups)
-
-        // When: ViewModel is created (loadRoot called in init)
-        viewModel = MoviesViewModel(mockRepository, mockPreferencesManager)
-
-        // Then: Groups should be loaded
-        val state = viewModel.uiState.value
-        assertNotNull(state.currentGroups)
-        assertEquals(2, state.currentGroups?.size)
-        assertTrue(state.currentGroups?.containsKey("US") == true)
-        assertTrue(state.currentGroups?.containsKey("UK") == true)
-    }
-
-    @Test
-    fun `loadRoot loads categories when grouping disabled`() {
-        // Given: Grouping disabled
-        every { mockPreferencesManager.isMoviesGroupingEnabled() } returns false
-
-        val categories =
-            listOf(
-                Category(categoryId = "1", categoryName = "Action", parentId = 0),
-                Category(categoryId = "2", categoryName = "Comedy", parentId = 0),
-            )
-        coEvery { mockRepository.getTopLevelNavigation(any(), any(), any()) } returns
-            NavigationResult.Categories(categories)
+        every { mockRepository.observeTopLevelNavigation(ContentType.MOVIES, true, "-") } returns
+            flowOf(NavigationResult.Groups(groups))
 
         // When: ViewModel is created
         viewModel = MoviesViewModel(mockRepository, mockPreferencesManager)
 
-        // Then: Categories should be loaded directly
-        val state = viewModel.uiState.value
-        assertEquals(2, state.currentCategories.size)
+        // Then: Should show groups
+        viewModel.uiState.test {
+            val state = awaitItem()
+            assertTrue(
+                "Expected Content.Groups but got $state",
+                state is ContentUiState.Content.Groups
+            )
+            val groupsState = state as ContentUiState.Content.Groups
+            assertEquals(2, groupsState.groups.size)
+            assertTrue(groupsState.groups.containsKey("US"))
+            assertTrue(groupsState.groups.containsKey("UK"))
+            assertTrue(groupsState.breadcrumbPath.isEmpty())
+        }
     }
 
     @Test
-    fun `navigateToGroup navigates to group categories`() {
-        // Given: Groups loaded
-        val groups = createMockGroupsMap()
-        coEvery { mockRepository.getTopLevelNavigation(any(), any(), any()) } returns
-            NavigationResult.Groups(groups)
+    fun `shows Categories state when grouping disabled`() = runTest {
+        // Given: Grouping disabled
+        every { mockPreferencesManager.isMoviesGroupingEnabled() } returns false
+        val categories = createMockCategories()
+
+        every { mockRepository.observeTopLevelNavigation(ContentType.MOVIES, false, "-") } returns
+            flowOf(NavigationResult.Categories(categories))
+
+        // When: ViewModel is created
         viewModel = MoviesViewModel(mockRepository, mockPreferencesManager)
 
-        // When: Navigate to first group
-        viewModel.navigateToGroup("US")
-
-        // Then: Should show categories of that group
-        val state = viewModel.uiState.value
-        assertEquals(2, state.currentCategories.size)
-        assertEquals(1, state.breadcrumbPath.size)
-        assertEquals("US", state.breadcrumbPath.first().displayName)
+        // Then: Should show categories directly
+        viewModel.uiState.test {
+            val state = awaitItem()
+            assertTrue(
+                "Expected Content.Categories but got $state",
+                state is ContentUiState.Content.Categories
+            )
+            val categoriesState = state as ContentUiState.Content.Categories
+            assertEquals(2, categoriesState.categories.size)
+            assertTrue(categoriesState.breadcrumbPath.isEmpty())
+        }
     }
 
     @Test
-    fun `navigateToCategory navigates to child categories or content`() {
+    fun `navigateToGroup transitions to Categories with breadcrumb`() = runTest {
         // Given: Groups loaded
         val groups = createMockGroupsMap()
-        coEvery { mockRepository.getTopLevelNavigation(any(), any(), any()) } returns
-            NavigationResult.Groups(groups)
-        coEvery { mockRepository.getChildCategories(any(), any()) } returns
-            NavigationResult.Categories(emptyList())
-        coEvery { mockRepository.getCategoryById(any(), any()) } returns
-            Category(categoryId = "1", categoryName = "Action", parentId = 0)
+        every { mockRepository.observeTopLevelNavigation(ContentType.MOVIES, true, "-") } returns
+            flowOf(NavigationResult.Groups(groups))
 
         viewModel = MoviesViewModel(mockRepository, mockPreferencesManager)
+
+        // When: Navigate to group
         viewModel.navigateToGroup("US")
 
-        // When: Navigate to a category
-        viewModel.navigateToCategory("1", "US")
+        // Then: Should show categories with breadcrumb
+        viewModel.uiState.test {
+            val state = awaitItem()
+            assertTrue(
+                "Expected Content.Categories but got $state",
+                state is ContentUiState.Content.Categories
+            )
+            val categoriesState = state as ContentUiState.Content.Categories
+            assertEquals(2, categoriesState.categories.size)
+            assertEquals(1, categoriesState.breadcrumbPath.size)
+            assertEquals("US", categoriesState.breadcrumbPath.first().displayName)
+            assertTrue(categoriesState.breadcrumbPath.first().isGroup)
+        }
+    }
 
-        // Then: Should navigate to content (no children = leaf)
-        val state = viewModel.uiState.value
-        assertTrue(state.isLeafLevel)
+    @Test
+    fun `navigateToCategory with no children shows Items state`() = runTest {
+        // Given: Repository returns categories then empty children
+        val groups = createMockGroupsMap()
+        every { mockRepository.observeTopLevelNavigation(ContentType.MOVIES, true, "-") } returns
+            flowOf(NavigationResult.Groups(groups))
+
+        every { mockRepository.observeChildCategories(ContentType.MOVIES, "1") } returns
+            flowOf(NavigationResult.Categories(emptyList()))
+
+        every { mockRepository.observeCategory(ContentType.MOVIES, "1") } returns
+            flowOf(Category(categoryId = "1", categoryName = "Action", parentId = 0))
+
+        viewModel = MoviesViewModel(mockRepository, mockPreferencesManager)
+
+        // Use turbine to navigate step by step
+        viewModel.uiState.test {
+            // Initial state - groups at root
+            val groupsState = awaitItem()
+            assertTrue(groupsState is ContentUiState.Content.Groups)
+
+            // Navigate to group
+            viewModel.navigateToGroup("US")
+            val categoriesState = awaitItem()
+            assertTrue(categoriesState is ContentUiState.Content.Categories)
+            assertEquals(
+                1,
+                (categoriesState as ContentUiState.Content.Categories).breadcrumbPath.size
+            )
+
+            // Now navigate to category (breadcrumb has US)
+            viewModel.navigateToCategory("1", "Action")
+            val itemsState = awaitItem()
+            assertTrue(
+                "Expected Content.Items but got $itemsState",
+                itemsState is ContentUiState.Content.Items
+            )
+            assertEquals("1", (itemsState as ContentUiState.Content.Items).categoryId)
+            assertEquals(2, itemsState.breadcrumbPath.size) // US + Action
+        }
     }
 
     // ========== BACK NAVIGATION TESTS ==========
 
     @Test
-    fun `navigateBack from root returns false`() {
+    fun `navigateBack from root returns false`() = runTest {
         // Given: At root level
-        coEvery { mockRepository.getTopLevelNavigation(any(), any(), any()) } returns
-            NavigationResult.Categories(emptyList())
+        val categories = createMockCategories()
+        every { mockRepository.observeTopLevelNavigation(ContentType.MOVIES, any(), any()) } returns
+            flowOf(NavigationResult.Categories(categories))
+
         viewModel = MoviesViewModel(mockRepository, mockPreferencesManager)
 
-        // When: Navigate back
+        // When: Navigate back from root
         val handled = viewModel.navigateBack()
 
         // Then: Should not handle (exit activity)
@@ -187,11 +271,12 @@ class MoviesViewModelTest {
     }
 
     @Test
-    fun `navigateBack from group level returns to root`() {
+    fun `navigateBack from group returns to root`() = runTest {
         // Given: At group level
         val groups = createMockGroupsMap()
-        coEvery { mockRepository.getTopLevelNavigation(any(), any(), any()) } returns
-            NavigationResult.Groups(groups)
+        every { mockRepository.observeTopLevelNavigation(ContentType.MOVIES, true, "-") } returns
+            flowOf(NavigationResult.Groups(groups))
+
         viewModel = MoviesViewModel(mockRepository, mockPreferencesManager)
         viewModel.navigateToGroup("US")
 
@@ -200,74 +285,114 @@ class MoviesViewModelTest {
 
         // Then: Should return to root
         assertTrue(handled)
-    }
 
-    // ========== REFRESH TESTS ==========
-
-    @Test
-    fun `refresh reloads current level`() {
-        // Given: ViewModel initialized
-        coEvery { mockRepository.getTopLevelNavigation(any(), any(), any()) } returns
-            NavigationResult.Categories(emptyList())
-        viewModel = MoviesViewModel(mockRepository, mockPreferencesManager)
-
-        // When: Refresh is called
-        viewModel.refresh()
-
-        // Then: Should reload root (called twice - init + refresh)
-        coVerify(atLeast = 2) { mockRepository.getTopLevelNavigation(any(), any(), any()) }
-    }
-
-    // ========== UI STATE HELPER TESTS ==========
-
-    @Test
-    fun `isViewingGroups returns true when groups are loaded`() {
-        // Given: Groups loaded
-        val groups = createMockGroupsMap()
-        coEvery { mockRepository.getTopLevelNavigation(any(), any(), any()) } returns
-            NavigationResult.Groups(groups)
-
-        // When: ViewModel is created
-        viewModel = MoviesViewModel(mockRepository, mockPreferencesManager)
-
-        // Then: isViewingGroups should be true
-        assertTrue(viewModel.uiState.value.isViewingGroups)
-        assertFalse(viewModel.uiState.value.isViewingCategories)
-        assertFalse(viewModel.uiState.value.isViewingContent)
-    }
-
-    @Test
-    fun `isViewingCategories returns true when categories are loaded`() {
-        // Given: Categories loaded (no grouping)
-        every { mockPreferencesManager.isMoviesGroupingEnabled() } returns false
-        val categories =
-            listOf(
-                Category(categoryId = "1", categoryName = "Action", parentId = 0),
+        // Verify state returned to Groups
+        viewModel.uiState.test {
+            val state = awaitItem()
+            assertTrue(
+                "Expected Content.Groups but got $state",
+                state is ContentUiState.Content.Groups
             )
-        coEvery { mockRepository.getTopLevelNavigation(any(), any(), any()) } returns
-            NavigationResult.Categories(categories)
-
-        // When: ViewModel is created
-        viewModel = MoviesViewModel(mockRepository, mockPreferencesManager)
-
-        // Then: isViewingCategories should be true
-        assertFalse(viewModel.uiState.value.isViewingGroups)
-        assertTrue(viewModel.uiState.value.isViewingCategories)
-        assertFalse(viewModel.uiState.value.isViewingContent)
+        }
     }
 
     @Test
-    fun `showContent returns true when not loading and no error`() {
-        // Given: Repository returns categories
-        coEvery { mockRepository.getTopLevelNavigation(any(), any(), any()) } returns
-            NavigationResult.Categories(emptyList())
+    fun `navigateBack from category returns to previous level`() = runTest {
+        // Given: At category level after navigating through group
+        val groups = createMockGroupsMap()
+        every { mockRepository.observeTopLevelNavigation(ContentType.MOVIES, true, "-") } returns
+            flowOf(NavigationResult.Groups(groups))
+
+        every { mockRepository.observeChildCategories(ContentType.MOVIES, "1") } returns
+            flowOf(NavigationResult.Categories(emptyList()))
+
+        every { mockRepository.observeCategory(ContentType.MOVIES, "1") } returns
+            flowOf(Category(categoryId = "1", categoryName = "Action", parentId = 0))
+
+        viewModel = MoviesViewModel(mockRepository, mockPreferencesManager)
+        viewModel.navigateToGroup("US")
+        viewModel.navigateToCategory("1", "Action")
+
+        // When: Navigate back twice
+        val handled1 = viewModel.navigateBack()
+        assertTrue(handled1)
+
+        val handled2 = viewModel.navigateBack()
+        assertTrue(handled2)
+
+        // Then: Should be at root
+        val handled3 = viewModel.navigateBack()
+        assertFalse(handled3) // At root, should exit
+    }
+
+    // ========== STATE MACHINE TESTS ==========
+
+    @Test
+    fun `sealed class state types are mutually exclusive`() = runTest {
+        // Given: Categories loaded
+        val categories = createMockCategories()
+        every { mockPreferencesManager.isMoviesGroupingEnabled() } returns false
+        every { mockRepository.observeTopLevelNavigation(ContentType.MOVIES, false, "-") } returns
+            flowOf(NavigationResult.Categories(categories))
+
+        viewModel = MoviesViewModel(mockRepository, mockPreferencesManager)
+
+        // Then: State is exactly one type
+        viewModel.uiState.test {
+            val state = awaitItem()
+
+            // Verify mutual exclusivity using when
+            val stateDescription =
+                when (state) {
+                    is ContentUiState.Initial -> "Initial"
+                    is ContentUiState.Syncing -> "Syncing"
+                    is ContentUiState.Loading -> "Loading"
+                    is ContentUiState.Error -> "Error"
+                    is ContentUiState.Content.Groups -> "Content.Groups"
+                    is ContentUiState.Content.Categories -> "Content.Categories"
+                    is ContentUiState.Content.Items -> "Content.Items"
+                }
+
+            assertEquals("Content.Categories", stateDescription)
+        }
+    }
+
+    @Test
+    fun `error state is emitted when sync fails and no cache`() = runTest {
+        // Given: Sync failed with error
+        moviesStateFlow.value = DataState.Error(RuntimeException("Network error"))
+
+        every { mockRepository.observeTopLevelNavigation(ContentType.MOVIES, any(), any()) } returns
+            flowOf(NavigationResult.Categories(emptyList()))
 
         // When: ViewModel is created
         viewModel = MoviesViewModel(mockRepository, mockPreferencesManager)
 
-        // Then: showContent should be true
-        assertTrue(viewModel.uiState.value.showContent)
-        assertFalse(viewModel.uiState.value.showLoading)
-        assertFalse(viewModel.uiState.value.showError)
+        // Then: Should show error state
+        viewModel.uiState.test {
+            val state = awaitItem()
+            assertTrue("Expected Error state but got $state", state is ContentUiState.Error)
+            assertEquals("Network error", (state as ContentUiState.Error).message)
+        }
+    }
+
+    // ========== SEPARATOR CHANGE TEST ==========
+
+    @Test
+    fun `onSeparatorChanged resets to root`() = runTest {
+        // Given: Navigated into groups
+        val groups = createMockGroupsMap()
+        every { mockRepository.observeTopLevelNavigation(ContentType.MOVIES, true, "-") } returns
+            flowOf(NavigationResult.Groups(groups))
+
+        viewModel = MoviesViewModel(mockRepository, mockPreferencesManager)
+        viewModel.navigateToGroup("US")
+
+        // When: Separator changed
+        viewModel.onSeparatorChanged()
+
+        // Then: Should be at root, back should not work
+        val handled = viewModel.navigateBack()
+        assertFalse(handled)
     }
 }

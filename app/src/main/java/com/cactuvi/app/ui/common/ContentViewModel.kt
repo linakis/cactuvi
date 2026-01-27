@@ -6,43 +6,59 @@ import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import com.cactuvi.app.data.models.Category
 import com.cactuvi.app.data.models.ContentType
+import com.cactuvi.app.data.models.DataState
 import com.cactuvi.app.data.models.NavigationResult
 import com.cactuvi.app.domain.repository.ContentRepository
 import com.cactuvi.app.utils.CategoryTreeBuilder
 import com.cactuvi.app.utils.PreferencesManager
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
 
 /**
- * Base ViewModel for content screens with dynamic level-by-level navigation.
+ * Base ViewModel for content screens with reactive navigation.
  *
- * Handles:
- * - Loading root level (groups or categories)
- * - Navigating to child categories
- * - Auto-skipping single-child levels
- * - Breadcrumb tracking
- * - Navigation stack management
+ * Uses Flow-based navigation that automatically updates when:
+ * - Database content changes (after sync)
+ * - User navigates to different levels
+ *
+ * No manual refresh needed - UI reacts to data changes automatically.
  *
  * @param T The content type (Movie, Series, or LiveChannel)
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 abstract class ContentViewModel<T : Any>(
     protected val repository: ContentRepository,
     protected val preferencesManager: PreferencesManager,
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(ContentUiState())
-    val uiState: StateFlow<ContentUiState> = _uiState.asStateFlow()
+    // Current navigation position
+    private val _navigationPosition = MutableStateFlow<NavigationPosition>(NavigationPosition.Root)
 
-    // Navigation stack (categoryIds, null = root)
-    private val navigationStack = mutableListOf<String?>()
+    // Navigation stack for back navigation
+    private val navigationStack = mutableListOf<NavigationPosition>()
+
+    /**
+     * UI state derived reactively from navigation position and database. Automatically updates when
+     * data changes.
+     */
+    val uiState: StateFlow<ContentUiState> =
+        combine(_navigationPosition, getSyncStateFlow()) { position, syncState ->
+                Pair(position, syncState)
+            }
+            .flatMapLatest { (position, syncState) -> observeNavigationState(position, syncState) }
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = ContentUiState.Initial
+            )
 
     /**
      * Paged content for the current leaf category. Automatically updates when navigating to a leaf
@@ -51,10 +67,9 @@ abstract class ContentViewModel<T : Any>(
     val pagedContent: StateFlow<PagingData<T>> by lazy {
         uiState
             .flatMapLatest { state ->
-                if (state.isLeafLevel && state.currentCategoryId != null) {
-                    getPagedContent(state.currentCategoryId)
-                } else {
-                    flowOf(PagingData.empty())
+                when (state) {
+                    is ContentUiState.Content.Items -> getPagedContent(state.categoryId)
+                    else -> flowOf(PagingData.empty())
                 }
             }
             .cachedIn(viewModelScope)
@@ -71,208 +86,206 @@ abstract class ContentViewModel<T : Any>(
     /** Subclasses provide paged data for a category */
     protected abstract fun getPagedContent(categoryId: String): Flow<PagingData<T>>
 
-    init {
-        loadRoot()
+    /** Get the appropriate sync state flow based on content type. */
+    private fun getSyncStateFlow(): StateFlow<DataState<Unit>> {
+        return when (getContentType()) {
+            ContentType.MOVIES -> repository.moviesState
+            ContentType.SERIES -> repository.seriesState
+            ContentType.LIVE -> repository.liveState
+        }
     }
 
-    /** Load root level (groups or top-level categories). */
-    fun loadRoot() {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true) }
+    /**
+     * Observe navigation state reactively. Returns a Flow that emits UI state based on current
+     * position and sync state.
+     */
+    private fun observeNavigationState(
+        position: NavigationPosition,
+        syncState: DataState<Unit>
+    ): Flow<ContentUiState> {
+        return when (position) {
+            is NavigationPosition.Root -> observeRootNavigation(syncState)
+            is NavigationPosition.Group -> observeGroupNavigation(position, syncState)
+            is NavigationPosition.Category -> observeCategoryNavigation(position, syncState)
+        }
+    }
 
-            try {
-                val contentType = getContentType()
-                val (groupingEnabled, separator) =
-                    getGroupingSettings(preferencesManager, contentType)
+    /** Observe root level navigation (groups or categories). */
+    private fun observeRootNavigation(syncState: DataState<Unit>): Flow<ContentUiState> {
+        val contentType = getContentType()
+        val (groupingEnabled, separator) = getGroupingSettings(preferencesManager, contentType)
 
-                when (
-                    val result =
-                        repository.getTopLevelNavigation(contentType, groupingEnabled, separator)
-                ) {
-                    is NavigationResult.Groups -> {
-                        _uiState.update {
-                            it.copy(
-                                isLoading = false,
-                                currentGroups = result.groups,
-                                currentCategories = emptyList(),
-                                currentCategoryId = null,
-                                breadcrumbPath = emptyList(),
-                                isLeafLevel = false,
-                                error = null,
-                            )
-                        }
-                    }
-                    is NavigationResult.Categories -> {
-                        _uiState.update {
-                            it.copy(
-                                isLoading = false,
-                                currentCategories = result.categories,
-                                currentGroups = null,
-                                currentCategoryId = null,
-                                breadcrumbPath = emptyList(),
-                                isLeafLevel = false,
-                                error = null,
-                            )
-                        }
+        return repository.observeTopLevelNavigation(contentType, groupingEnabled, separator).map {
+            result ->
+            when (result) {
+                is NavigationResult.Groups -> {
+                    if (result.groups.isEmpty()) {
+                        // Empty - check sync state
+                        mapEmptyToSyncState(syncState)
+                    } else {
+                        ContentUiState.Content.Groups(
+                            groups = result.groups,
+                            breadcrumbPath = emptyList()
+                        )
                     }
                 }
+                is NavigationResult.Categories -> {
+                    if (result.categories.isEmpty()) {
+                        mapEmptyToSyncState(syncState)
+                    } else {
+                        ContentUiState.Content.Categories(
+                            categories = result.categories,
+                            breadcrumbPath = emptyList()
+                        )
+                    }
+                }
+            }
+        }
+    }
 
-                navigationStack.clear()
-            } catch (e: Exception) {
-                _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        error = e.message ?: "Failed to load content",
+    /** Observe group navigation (categories within a group). */
+    private fun observeGroupNavigation(
+        position: NavigationPosition.Group,
+        syncState: DataState<Unit>
+    ): Flow<ContentUiState> {
+        val contentType = getContentType()
+        val (groupingEnabled, separator) = getGroupingSettings(preferencesManager, contentType)
+
+        return repository.observeTopLevelNavigation(contentType, groupingEnabled, separator).map {
+            result ->
+            when (result) {
+                is NavigationResult.Groups -> {
+                    val categories = result.groups[position.groupName] ?: emptyList()
+                    if (categories.isEmpty()) {
+                        mapEmptyToSyncState(syncState)
+                    } else {
+                        // Strip group prefix from category names
+                        val strippedCategories =
+                            categories.map { category ->
+                                category.copy(
+                                    categoryName =
+                                        CategoryTreeBuilder.stripGroupPrefix(
+                                            category.categoryName,
+                                            separator
+                                        )
+                                )
+                            }
+                        ContentUiState.Content.Categories(
+                            categories = strippedCategories,
+                            breadcrumbPath =
+                                listOf(BreadcrumbItem(null, position.groupName, isGroup = true))
+                        )
+                    }
+                }
+                is NavigationResult.Categories -> {
+                    // Grouping was disabled - go back to root
+                    ContentUiState.Content.Categories(
+                        categories = result.categories,
+                        breadcrumbPath = emptyList()
                     )
                 }
             }
+        }
+    }
+
+    /** Observe category navigation (children of a category). */
+    private fun observeCategoryNavigation(
+        position: NavigationPosition.Category,
+        syncState: DataState<Unit>
+    ): Flow<ContentUiState> {
+        val contentType = getContentType()
+
+        return combine(
+            repository.observeCategory(contentType, position.categoryId),
+            repository.observeChildCategories(contentType, position.categoryId)
+        ) { category, result ->
+            when (result) {
+                is NavigationResult.Categories -> {
+                    val children = result.categories
+
+                    if (children.isEmpty()) {
+                        // Leaf level - show content items
+                        ContentUiState.Content.Items(
+                            categoryId = position.categoryId,
+                            breadcrumbPath = position.breadcrumbPath
+                        )
+                    } else if (children.first().isLeaf) {
+                        // Children are leaves - show content items
+                        ContentUiState.Content.Items(
+                            categoryId = position.categoryId,
+                            breadcrumbPath = position.breadcrumbPath
+                        )
+                    } else {
+                        // Has non-leaf children - show categories
+                        ContentUiState.Content.Categories(
+                            categories = children,
+                            breadcrumbPath = position.breadcrumbPath
+                        )
+                    }
+                }
+                is NavigationResult.Groups -> {
+                    // Shouldn't happen at category level
+                    mapEmptyToSyncState(syncState)
+                }
+            }
+        }
+    }
+
+    /** Map empty results to appropriate UI state based on sync state. */
+    private fun mapEmptyToSyncState(syncState: DataState<Unit>): ContentUiState {
+        return when (syncState) {
+            is DataState.Loading -> ContentUiState.Syncing(syncState.progress)
+            is DataState.Error -> ContentUiState.Error(syncState.error.message ?: "Sync failed")
+            else -> ContentUiState.Loading
         }
     }
 
     /** Navigate to a group (when showing groups at root level). */
     fun navigateToGroup(groupName: String) {
-        val groups = _uiState.value.currentGroups ?: return
-        val categories = groups[groupName] ?: return
-
-        // Apply prefix stripping
-        val separator =
-            when (getContentType()) {
-                ContentType.MOVIES -> preferencesManager.getMoviesGroupingSeparator()
-                ContentType.SERIES -> preferencesManager.getSeriesGroupingSeparator()
-                ContentType.LIVE -> preferencesManager.getLiveGroupingSeparator()
-            }
-
-        val strippedCategories =
-            categories.map { category ->
-                category.copy(
-                    categoryName =
-                        CategoryTreeBuilder.stripGroupPrefix(category.categoryName, separator)
-                )
-            }
-
-        // Check for single-child skip (auto-navigate if only 1 category that's not a leaf)
-        if (strippedCategories.size == 1 && !strippedCategories.first().isLeaf) {
-            navigationStack.add(null) // Mark that we came from root
-            navigateToCategory(strippedCategories.first().categoryId, groupName)
-            return
-        }
-
-        navigationStack.add(null) // Mark that we came from root
-        _uiState.update {
-            it.copy(
-                currentCategories = strippedCategories,
-                currentGroups = null,
-                breadcrumbPath = listOf(BreadcrumbItem(null, groupName, isGroup = true)),
-                isLeafLevel = false,
-            )
-        }
+        navigationStack.add(_navigationPosition.value)
+        _navigationPosition.value = NavigationPosition.Group(groupName)
     }
 
     /** Navigate to a category. */
-    fun navigateToCategory(categoryId: String, groupName: String? = null) {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true) }
-
-            try {
-                val category = repository.getCategoryById(getContentType(), categoryId)
-                val result = repository.getChildCategories(getContentType(), categoryId)
-
-                when (result) {
-                    is NavigationResult.Categories -> {
-                        val children = result.categories
-
-                        if (children.isEmpty() || children.first().isLeaf) {
-                            // Leaf level - show content
-                            navigationStack.add(categoryId)
-                            val breadcrumbs = buildBreadcrumbs(groupName, category)
-
-                            _uiState.update {
-                                it.copy(
-                                    isLoading = false,
-                                    currentCategoryId = categoryId,
-                                    isLeafLevel = true,
-                                    breadcrumbPath = breadcrumbs,
-                                    currentCategories = emptyList(),
-                                )
-                            }
-                        } else {
-                            // Has children - show categories
-                            navigationStack.add(categoryId)
-                            val breadcrumbs = buildBreadcrumbs(groupName, category)
-
-                            _uiState.update {
-                                it.copy(
-                                    isLoading = false,
-                                    currentCategories = children,
-                                    isLeafLevel = false,
-                                    breadcrumbPath = breadcrumbs,
-                                )
-                            }
-                        }
-                    }
-                    is NavigationResult.Groups -> {
-                        // Shouldn't happen at this level
-                        _uiState.update { it.copy(isLoading = false) }
-                    }
-                }
-            } catch (e: Exception) {
-                _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        error = e.message ?: "Failed to load category",
-                    )
-                }
+    fun navigateToCategory(categoryId: String, categoryName: String? = null) {
+        val currentBreadcrumbs =
+            when (val state = uiState.value) {
+                is ContentUiState.Content -> state.breadcrumbPath.toMutableList()
+                else -> mutableListOf()
             }
+
+        // Add category to breadcrumbs
+        if (categoryName != null) {
+            currentBreadcrumbs.add(BreadcrumbItem(categoryId, categoryName, isGroup = false))
         }
+
+        navigationStack.add(_navigationPosition.value)
+        _navigationPosition.value =
+            NavigationPosition.Category(
+                categoryId = categoryId,
+                breadcrumbPath = currentBreadcrumbs
+            )
     }
 
     /** Navigate back. Returns true if handled, false if should exit. */
     fun navigateBack(): Boolean {
         if (navigationStack.isEmpty()) return false
 
-        navigationStack.removeLastOrNull()
-
-        if (navigationStack.isEmpty()) {
-            loadRoot()
-        } else {
-            val previousCategoryId = navigationStack.lastOrNull()
-            if (previousCategoryId == null) {
-                loadRoot()
-            } else {
-                navigateToCategory(previousCategoryId)
-            }
-        }
-
+        _navigationPosition.value = navigationStack.removeAt(navigationStack.lastIndex)
         return true
     }
 
     /** Handle separator change (reload root with new grouping). */
     fun onSeparatorChanged() {
         navigationStack.clear()
-        loadRoot()
+        _navigationPosition.value = NavigationPosition.Root
     }
 
-    /** Refresh current content. */
+    /** Refresh current content (no-op for reactive - data auto-updates). */
     fun refresh() {
-        // For now, just reload root
-        // TODO: Could be smarter and reload current level
-        loadRoot()
-    }
-
-    private fun buildBreadcrumbs(groupName: String?, category: Category?): List<BreadcrumbItem> {
-        val breadcrumbs = _uiState.value.breadcrumbPath.toMutableList()
-
-        // Add group if not already in breadcrumbs
-        if (groupName != null && breadcrumbs.none { it.isGroup }) {
-            breadcrumbs.add(BreadcrumbItem(null, groupName, isGroup = true))
-        }
-
-        // Add category if provided
-        category?.let {
-            breadcrumbs.add(BreadcrumbItem(it.categoryId, it.categoryName, isGroup = false))
-        }
-
-        return breadcrumbs
+        // With reactive Flows, UI auto-updates when data changes.
+        // This is kept for API compatibility.
+        // Could trigger a repository refresh if needed.
     }
 
     private fun getGroupingSettings(
@@ -297,4 +310,17 @@ abstract class ContentViewModel<T : Any>(
             }
         }
     }
+}
+
+/** Navigation position sealed class. Represents where the user is in the navigation hierarchy. */
+sealed class NavigationPosition {
+    /** At root level (groups or top-level categories) */
+    data object Root : NavigationPosition()
+
+    /** Viewing categories within a specific group */
+    data class Group(val groupName: String) : NavigationPosition()
+
+    /** Viewing a specific category (children or content) */
+    data class Category(val categoryId: String, val breadcrumbPath: List<BreadcrumbItem>) :
+        NavigationPosition()
 }

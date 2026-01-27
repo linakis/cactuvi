@@ -1,12 +1,18 @@
 package com.cactuvi.app.data.sync
 
 import com.cactuvi.app.data.db.AppDatabase
+import com.cactuvi.app.data.models.ContentType
+import com.cactuvi.app.data.models.NavigationResult
 import com.cactuvi.app.domain.repository.ContentRepository
+import com.cactuvi.app.utils.CategoryGrouper
+import com.cactuvi.app.utils.CategoryTreeBuilder
+import com.cactuvi.app.utils.PreferencesManager
 import com.cactuvi.app.utils.SyncPreferencesManager
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.first
 
 /**
  * Coordinates background sync with parallel API execution. Implements stale-while-revalidate
@@ -28,6 +34,7 @@ constructor(
     private val repository: ContentRepository,
     private val database: AppDatabase,
     private val syncPrefs: SyncPreferencesManager,
+    private val preferencesManager: PreferencesManager,
     private val reactiveUpdateManager: ReactiveUpdateManager,
 ) {
 
@@ -41,9 +48,9 @@ constructor(
             val (oldMoviesTree, oldSeriesTree, oldLiveTree) =
                 coroutineScope {
                         Triple(
-                            async { repository.getCachedVodNavigationTree() },
-                            async { repository.getCachedSeriesNavigationTree() },
-                            async { repository.getCachedLiveNavigationTree() },
+                            async { captureNavigationTree(ContentType.MOVIES) },
+                            async { captureNavigationTree(ContentType.SERIES) },
+                            async { captureNavigationTree(ContentType.LIVE) },
                         )
                     }
                     .let { (m, s, l) -> Triple(m.await(), s.await(), l.await()) }
@@ -68,9 +75,9 @@ constructor(
             val (newMoviesTree, newSeriesTree, newLiveTree) =
                 coroutineScope {
                         Triple(
-                            async { repository.getCachedVodNavigationTree() },
-                            async { repository.getCachedSeriesNavigationTree() },
-                            async { repository.getCachedLiveNavigationTree() },
+                            async { captureNavigationTree(ContentType.MOVIES) },
+                            async { captureNavigationTree(ContentType.SERIES) },
+                            async { captureNavigationTree(ContentType.LIVE) },
                         )
                     }
                     .let { (m, s, l) -> Triple(m.await(), s.await(), l.await()) }
@@ -175,6 +182,66 @@ constructor(
             }
         } catch (e: Exception) {
             SyncResult.Failure(e)
+        }
+    }
+
+    /**
+     * Capture navigation tree snapshot for diffing. Uses the reactive Flow API with first() to get
+     * current state.
+     */
+    private suspend fun captureNavigationTree(
+        contentType: ContentType
+    ): CategoryGrouper.NavigationTree? {
+        return try {
+            val (groupingEnabled, separator) =
+                when (contentType) {
+                    ContentType.MOVIES ->
+                        Pair(
+                            preferencesManager.isMoviesGroupingEnabled(),
+                            preferencesManager.getMoviesGroupingSeparator()
+                        )
+                    ContentType.SERIES ->
+                        Pair(
+                            preferencesManager.isSeriesGroupingEnabled(),
+                            preferencesManager.getSeriesGroupingSeparator()
+                        )
+                    ContentType.LIVE ->
+                        Pair(
+                            preferencesManager.isLiveGroupingEnabled(),
+                            preferencesManager.getLiveGroupingSeparator()
+                        )
+                }
+
+            when (
+                val result =
+                    repository
+                        .observeTopLevelNavigation(contentType, groupingEnabled, separator)
+                        .first()
+            ) {
+                is NavigationResult.Groups -> {
+                    val groups =
+                        result.groups.map { (groupName, categories) ->
+                            val strippedCategories =
+                                categories.map { category ->
+                                    category.copy(
+                                        categoryName =
+                                            CategoryTreeBuilder.stripGroupPrefix(
+                                                category.categoryName,
+                                                separator
+                                            )
+                                    )
+                                }
+                            CategoryGrouper.GroupNode(groupName, strippedCategories)
+                        }
+                    CategoryGrouper.NavigationTree(groups)
+                }
+                is NavigationResult.Categories -> {
+                    val group = CategoryGrouper.GroupNode("All", result.categories)
+                    CategoryGrouper.NavigationTree(listOf(group))
+                }
+            }
+        } catch (e: Exception) {
+            null
         }
     }
 

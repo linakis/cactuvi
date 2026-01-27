@@ -10,53 +10,79 @@ data class BreadcrumbItem(
 )
 
 /**
- * Unified UI state for dynamic level-by-level content navigation.
+ * Sealed class representing the UI state for content navigation screens.
  *
- * Navigation is computed on-the-fly from category hierarchy:
- * - Root level: Groups (if grouping enabled) or top-level categories
- * - Child levels: Subcategories (arbitrary depth supported)
- * - Leaf level: Content items (movies/series/channels)
+ * Uses algebraic data types (ADT) to ensure exhaustive handling of all states. Each state variant
+ * contains exactly the data needed for that state.
  *
- * Auto-skip behavior:
- * - Single-child levels are automatically skipped
- * - Empty categories are hidden (childrenCount = 0)
- * - Breadcrumbs show full path including skipped levels
+ * State transitions:
+ * - Initial → Syncing (when no cache and sync starts)
+ * - Initial → Loading (when navigating)
+ * - Syncing → Content (when sync completes and data available)
+ * - Loading → Content (when navigation completes)
+ * - Any → Error (when errors occur)
  */
-data class ContentUiState(
-    // Current navigation state
-    val currentCategoryId: String? = null, // null = root level
-    val currentCategories: List<Category> = emptyList(), // Categories at current level
-    val currentGroups: Map<String, List<Category>>? = null, // Non-null when showing groups
-    val isLeafLevel: Boolean = false, // True when showing content (movies/series/channels)
+sealed class ContentUiState {
 
-    // Breadcrumb navigation
-    val breadcrumbPath: List<BreadcrumbItem> = emptyList(),
+    /** Initial state before any data is loaded. */
+    data object Initial : ContentUiState()
 
-    // Loading/error states
-    val isLoading: Boolean = false,
-    val error: String? = null,
-) {
-    /** Helper: Should show loading indicator */
-    val showLoading: Boolean
-        get() = isLoading && currentCategories.isEmpty() && currentGroups == null
+    /**
+     * Syncing state - initial data sync in progress, no cached data available. Shows progress
+     * indicator to user.
+     *
+     * @param progress Sync progress percentage (0-100), null for indeterminate
+     */
+    data class Syncing(val progress: Int?) : ContentUiState()
 
-    /** Helper: Should show error message */
-    val showError: Boolean
-        get() = error != null && currentCategories.isEmpty() && currentGroups == null
+    /** Loading state - navigation or refresh in progress. */
+    data object Loading : ContentUiState()
 
-    /** Helper: Should show content */
-    val showContent: Boolean
-        get() = !isLoading && error == null
+    /**
+     * Error state - an error occurred.
+     *
+     * @param message Error message to display
+     */
+    data class Error(val message: String) : ContentUiState()
 
-    /** Determine if user is currently viewing groups list */
-    val isViewingGroups: Boolean
-        get() = currentGroups != null
+    /**
+     * Content state - data is available to display. Uses sealed subclasses to represent what type
+     * of content is being shown.
+     */
+    sealed class Content : ContentUiState() {
+        abstract val breadcrumbPath: List<BreadcrumbItem>
 
-    /** Determine if user is currently viewing categories list */
-    val isViewingCategories: Boolean
-        get() = !isLeafLevel && currentCategories.isNotEmpty() && currentGroups == null
+        /**
+         * Showing groups at root level.
+         *
+         * @param groups Map of group name to categories in that group
+         * @param breadcrumbPath Current navigation path (empty at root)
+         */
+        data class Groups(
+            val groups: Map<String, List<Category>>,
+            override val breadcrumbPath: List<BreadcrumbItem> = emptyList(),
+        ) : Content()
 
-    /** Determine if user is currently viewing content items */
-    val isViewingContent: Boolean
-        get() = isLeafLevel
+        /**
+         * Showing categories list.
+         *
+         * @param categories List of categories to display
+         * @param breadcrumbPath Current navigation path
+         */
+        data class Categories(
+            val categories: List<Category>,
+            override val breadcrumbPath: List<BreadcrumbItem>,
+        ) : Content()
+
+        /**
+         * Showing content items (movies, series, channels).
+         *
+         * @param categoryId The category ID for content paging
+         * @param breadcrumbPath Current navigation path
+         */
+        data class Items(
+            val categoryId: String,
+            override val breadcrumbPath: List<BreadcrumbItem>,
+        ) : Content()
+    }
 }

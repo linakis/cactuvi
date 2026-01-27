@@ -64,4 +64,8 @@ interface LiveChannelDao {
     // Alias for consistency with navigation system
     @Query("SELECT COUNT(*) FROM live_channels WHERE categoryId = :categoryId")
     suspend fun countByCategoryId(categoryId: String): Int
+
+    /** Observe count by category reactively */
+    @Query("SELECT COUNT(*) FROM live_channels WHERE categoryId = :categoryId")
+    fun observeCountByCategoryId(categoryId: String): kotlinx.coroutines.flow.Flow<Int>
 }

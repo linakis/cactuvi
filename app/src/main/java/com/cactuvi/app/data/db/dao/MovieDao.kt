@@ -74,4 +74,8 @@ interface MovieDao {
     // Alias for consistency with navigation system
     @Query("SELECT COUNT(*) FROM movies WHERE categoryId = :categoryId")
     suspend fun countByCategoryId(categoryId: String): Int
+
+    /** Observe count by category reactively */
+    @Query("SELECT COUNT(*) FROM movies WHERE categoryId = :categoryId")
+    fun observeCountByCategoryId(categoryId: String): kotlinx.coroutines.flow.Flow<Int>
 }
