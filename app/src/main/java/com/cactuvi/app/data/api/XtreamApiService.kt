@@ -75,4 +75,28 @@ interface XtreamApiService {
         @Query("action") action: String = "get_vod_info",
         @Query("vod_id") vodId: Int,
     ): MovieInfo
+
+    @GET("player_api.php")
+    suspend fun getServerInfo(
+        @Query("username") username: String,
+        @Query("password") password: String,
+        @Query("action") action: String = "get_server_info",
+    ): LoginResponse
+
+    @GET("player_api.php")
+    suspend fun getShortEPG(
+        @Query("username") username: String,
+        @Query("password") password: String,
+        @Query("action") action: String = "get_short_epg",
+        @Query("stream_id") streamId: Int,
+        @Query("limit") limit: Int? = null,
+    ): EPGResponse
+
+    @GET("player_api.php")
+    suspend fun getFullEPG(
+        @Query("username") username: String,
+        @Query("password") password: String,
+        @Query("action") action: String = "get_simple_data_table",
+        @Query("stream_id") streamId: Int,
+    ): EPGResponse
 }

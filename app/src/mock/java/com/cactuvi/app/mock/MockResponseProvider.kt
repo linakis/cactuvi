@@ -25,6 +25,9 @@ object MockResponseProvider {
             "get_account_info" to "get_account_info.json",
             "get_vod_info" to "get_vod_info.json",
             "get_series_info" to "get_series_info.json",
+            "get_server_info" to "get_server_info.json",
+            "get_short_epg" to "get_short_epg.json",
+            "get_simple_data_table" to "get_simple_data_table.json",
         )
 
     /**
