@@ -39,6 +39,23 @@ class LiveTvFragment : ContentNavigationFragment<LiveChannel>() {
         database.liveChannelDao().getCountByCategory(categoryId)
 
     override fun onContentItemClick(item: LiveChannel) {
+        // Build stream URL
+        val credentialsManager =
+            com.cactuvi.app.utils.CredentialsManager.getInstance(requireContext())
+        val server = credentialsManager.getServer()
+        val username = credentialsManager.getUsername()
+        val password = credentialsManager.getPassword()
+
+        // Live streams typically use .ts extension
+        val streamUrl =
+            com.cactuvi.app.utils.StreamUrlBuilder.buildLiveUrl(
+                server = server,
+                username = username,
+                password = password,
+                streamId = item.streamId,
+                extension = "ts"
+            )
+
         // Navigate to player
         val intent =
             Intent(
@@ -46,12 +63,15 @@ class LiveTvFragment : ContentNavigationFragment<LiveChannel>() {
                     com.cactuvi.app.ui.player.PlayerActivity::class.java,
                 )
                 .apply {
+                    putExtra("STREAM_URL", streamUrl)
                     putExtra("STREAM_ID", item.streamId)
                     putExtra("STREAM_TYPE", "live")
                     putExtra("TITLE", item.name)
                     putExtra("STREAM_ICON", item.streamIcon)
                     putExtra("EPG_CHANNEL_ID", item.epgChannelId)
                     putExtra("CATEGORY_ID", item.categoryId)
+                    putExtra("CONTENT_ID", item.streamId.toString())
+                    putExtra("CONTENT_TYPE", "live")
                 }
         startActivity(intent)
     }

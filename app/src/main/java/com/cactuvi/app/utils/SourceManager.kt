@@ -15,7 +15,6 @@ class SourceManager private constructor(context: Context) {
     private val database = AppDatabase.getInstance(context)
     private val prefs: SharedPreferences =
         context.getSharedPreferences("source_prefs", Context.MODE_PRIVATE)
-    private val credentialsManager = CredentialsManager.getInstance(context)
 
     companion object {
         @Volatile private var INSTANCE: SourceManager? = null
@@ -30,7 +29,6 @@ class SourceManager private constructor(context: Context) {
         }
 
         private const val KEY_ACTIVE_SOURCE_ID = "active_source_id"
-        private const val KEY_MIGRATED = "has_migrated_credentials"
     }
 
     // ========== PUBLIC API ==========
@@ -62,38 +60,6 @@ class SourceManager private constructor(context: Context) {
             val source = database.streamSourceDao().getById(id)
             if (source != null) {
                 database.streamSourceDao().delete(source)
-            }
-        }
-
-    suspend fun migrateCurrentCredentialsToSource() =
-        withContext(Dispatchers.IO) {
-            if (prefs.getBoolean(KEY_MIGRATED, false)) {
-                return@withContext // Already migrated
-            }
-
-            val server = credentialsManager.getServer()
-            val username = credentialsManager.getUsername()
-            val password = credentialsManager.getPassword()
-
-            // Only migrate if credentials exist
-            if (server.isNotEmpty() && username.isNotEmpty()) {
-                val defaultSource =
-                    StreamSource(
-                        id = "default",
-                        nickname = "Default Provider",
-                        server = server,
-                        username = username,
-                        password = password,
-                        isActive = true,
-                        isPrimary = true,
-                    )
-
-                database.streamSourceDao().insert(defaultSource.toEntity())
-                prefs
-                    .edit()
-                    .putString(KEY_ACTIVE_SOURCE_ID, "default")
-                    .putBoolean(KEY_MIGRATED, true)
-                    .apply()
             }
         }
 }

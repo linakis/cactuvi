@@ -37,9 +37,6 @@ class Cactuvi : Application() {
         // Check VPN status on app start
         checkVpnStatus()
 
-        // Migrate existing credentials to source if needed
-        applicationScope.launch { migrateToMultiSource() }
-
         // Schedule background sync (periodic work)
         BackgroundSyncWorker.schedule(this)
 
@@ -111,19 +108,6 @@ class Cactuvi : Application() {
 
         if (prefsManager.isVpnWarningEnabled() && !VPNDetector.isVpnActive(this)) {
             needsVpnWarning = true
-        }
-    }
-
-    /**
-     * Migrate existing single-source credentials to multi-source system on first run. Creates a
-     * "default" source from CredentialsManager if no sources exist.
-     */
-    private suspend fun migrateToMultiSource() {
-        try {
-            val sourceManager = SourceManager.getInstance(this)
-            sourceManager.migrateCurrentCredentialsToSource()
-        } catch (e: Exception) {
-            // Silently fail - user can manually add source later
         }
     }
 

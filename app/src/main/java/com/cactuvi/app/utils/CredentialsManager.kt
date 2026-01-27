@@ -1,22 +1,21 @@
 package com.cactuvi.app.utils
 
 import android.content.Context
-import android.content.SharedPreferences
+import com.cactuvi.app.data.db.AppDatabase
+import kotlinx.coroutines.runBlocking
 
+/**
+ * Provides access to credentials from the active source in the database. This is a compatibility
+ * layer that reads from the database instead of SharedPreferences.
+ *
+ * Note: Methods use runBlocking for synchronous access. For async operations, use
+ * SourceManager.getActiveSource() directly.
+ */
 class CredentialsManager(context: Context) {
 
-    private val prefs: SharedPreferences =
-        context.getSharedPreferences(
-            "iptv_credentials",
-            Context.MODE_PRIVATE,
-        )
+    private val database = AppDatabase.getInstance(context.applicationContext)
 
     companion object {
-        private const val KEY_SERVER = "server"
-        private const val KEY_USERNAME = "username"
-        private const val KEY_PASSWORD = "password"
-        private const val KEY_IS_CONFIGURED = "is_configured"
-
         @Volatile private var instance: CredentialsManager? = null
 
         fun getInstance(context: Context): CredentialsManager {
@@ -28,34 +27,20 @@ class CredentialsManager(context: Context) {
         }
     }
 
-    fun saveCredentials(server: String, username: String, password: String) {
-        prefs.edit().apply {
-            putString(KEY_SERVER, server)
-            putString(KEY_USERNAME, username)
-            putString(KEY_PASSWORD, password)
-            putBoolean(KEY_IS_CONFIGURED, true)
-            apply()
-        }
-    }
-
     fun getServer(): String {
-        return prefs.getString(KEY_SERVER, "") ?: ""
+        return runBlocking { database.streamSourceDao().getActive()?.server ?: "" }
     }
 
     fun getUsername(): String {
-        return prefs.getString(KEY_USERNAME, "") ?: ""
+        return runBlocking { database.streamSourceDao().getActive()?.username ?: "" }
     }
 
     fun getPassword(): String {
-        return prefs.getString(KEY_PASSWORD, "") ?: ""
+        return runBlocking { database.streamSourceDao().getActive()?.password ?: "" }
     }
 
     fun isConfigured(): Boolean {
-        return prefs.getBoolean(KEY_IS_CONFIGURED, false)
-    }
-
-    fun clear() {
-        prefs.edit().clear().apply()
+        return runBlocking { database.streamSourceDao().getActive() != null }
     }
 
     data class Credentials(
@@ -65,10 +50,25 @@ class CredentialsManager(context: Context) {
     )
 
     fun getCredentials(): Credentials? {
-        return if (isConfigured()) {
-            Credentials(getServer(), getUsername(), getPassword())
-        } else {
-            null
+        return runBlocking {
+            val activeSource = database.streamSourceDao().getActive()
+            if (activeSource != null) {
+                Credentials(activeSource.server, activeSource.username, activeSource.password)
+            } else {
+                null
+            }
         }
+    }
+
+    // Legacy method - no longer needed, but kept for compatibility
+    @Deprecated("Credentials are now stored in database only", ReplaceWith("Use SourceManager"))
+    fun saveCredentials(server: String, username: String, password: String) {
+        // No-op - credentials are managed through SourceManager
+    }
+
+    // Legacy method - no longer needed
+    @Deprecated("Credentials are now stored in database only", ReplaceWith("Use SourceManager"))
+    fun clear() {
+        // No-op - sources are managed through SourceManager
     }
 }
