@@ -42,6 +42,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
@@ -294,33 +295,38 @@ constructor(
     private val repositoryScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     /**
-     * Unified movies content state - combines DataState (sync) + NavigationResult (DB). Eliminates
-     * race condition where UI skips syncing states on first launch.
+     * Unified movies content state - combines DataState (sync) + NavigationResult (DB) + reactive
+     * preferences. Automatically recomputes navigation structure when grouping preferences change.
      */
     override val moviesContentState: StateFlow<ContentState<NavigationResult>> =
-        combine(
-                _moviesState,
-                observeTopLevelNavigation(
-                    contentType = ContentType.MOVIES,
-                    groupingEnabled = preferencesManager.isMoviesGroupingEnabled(),
-                    separator = preferencesManager.getMoviesGroupingSeparator()
-                )
-            ) { syncState, dbNavigation ->
-                android.util.Log.d(
-                    "IPTV_STATE",
-                    "Repository.moviesContentState: combine inputs - syncState=${syncState.javaClass.simpleName}" +
-                        (if (syncState is DataState.Error) " error='${syncState.error.message}'"
-                        else "") +
-                        ", dbNavigation=${dbNavigation.javaClass.simpleName}"
-                )
-                val result = deriveContentState(syncState, dbNavigation)
-                android.util.Log.d(
-                    "IPTV_STATE",
-                    "Repository.moviesContentState: derived ContentState=${result.javaClass.simpleName}" +
-                        (if (result is ContentState.Error) " error='${result.error.message}'"
-                        else "")
-                )
-                result
+        preferencesManager
+            .observeMoviesGrouping()
+            .flatMapLatest { groupingPrefs ->
+                combine(
+                    _moviesState,
+                    observeTopLevelNavigation(
+                        contentType = ContentType.MOVIES,
+                        groupingEnabled = groupingPrefs.enabled,
+                        separator = groupingPrefs.separator
+                    )
+                ) { syncState, dbNavigation ->
+                    android.util.Log.d(
+                        "IPTV_STATE",
+                        "Repository.moviesContentState: combine inputs - syncState=${syncState.javaClass.simpleName}" +
+                            (if (syncState is DataState.Error) " error='${syncState.error.message}'"
+                            else "") +
+                            ", dbNavigation=${dbNavigation.javaClass.simpleName}, " +
+                            "grouping=${groupingPrefs.enabled}, separator=${groupingPrefs.separator}"
+                    )
+                    val result = deriveContentState(syncState, dbNavigation)
+                    android.util.Log.d(
+                        "IPTV_STATE",
+                        "Repository.moviesContentState: derived ContentState=${result.javaClass.simpleName}" +
+                            (if (result is ContentState.Error) " error='${result.error.message}'"
+                            else "")
+                    )
+                    result
+                }
             }
             .stateIn(
                 scope = repositoryScope,
@@ -328,17 +334,24 @@ constructor(
                 initialValue = ContentState.Initial
             )
 
-    /** Unified series content state - combines DataState (sync) + NavigationResult (DB). */
+    /**
+     * Unified series content state - combines DataState (sync) + NavigationResult (DB) + reactive
+     * preferences. Automatically recomputes navigation structure when grouping preferences change.
+     */
     override val seriesContentState: StateFlow<ContentState<NavigationResult>> =
-        combine(
-                _seriesState,
-                observeTopLevelNavigation(
-                    contentType = ContentType.SERIES,
-                    groupingEnabled = preferencesManager.isSeriesGroupingEnabled(),
-                    separator = preferencesManager.getSeriesGroupingSeparator()
-                )
-            ) { syncState, dbNavigation ->
-                deriveContentState(syncState, dbNavigation)
+        preferencesManager
+            .observeSeriesGrouping()
+            .flatMapLatest { groupingPrefs ->
+                combine(
+                    _seriesState,
+                    observeTopLevelNavigation(
+                        contentType = ContentType.SERIES,
+                        groupingEnabled = groupingPrefs.enabled,
+                        separator = groupingPrefs.separator
+                    )
+                ) { syncState, dbNavigation ->
+                    deriveContentState(syncState, dbNavigation)
+                }
             }
             .stateIn(
                 scope = repositoryScope,
@@ -346,17 +359,24 @@ constructor(
                 initialValue = ContentState.Initial
             )
 
-    /** Unified live TV content state - combines DataState (sync) + NavigationResult (DB). */
+    /**
+     * Unified live TV content state - combines DataState (sync) + NavigationResult (DB) + reactive
+     * preferences. Automatically recomputes navigation structure when grouping preferences change.
+     */
     override val liveContentState: StateFlow<ContentState<NavigationResult>> =
-        combine(
-                _liveState,
-                observeTopLevelNavigation(
-                    contentType = ContentType.LIVE,
-                    groupingEnabled = preferencesManager.isLiveGroupingEnabled(),
-                    separator = preferencesManager.getLiveGroupingSeparator()
-                )
-            ) { syncState, dbNavigation ->
-                deriveContentState(syncState, dbNavigation)
+        preferencesManager
+            .observeLiveGrouping()
+            .flatMapLatest { groupingPrefs ->
+                combine(
+                    _liveState,
+                    observeTopLevelNavigation(
+                        contentType = ContentType.LIVE,
+                        groupingEnabled = groupingPrefs.enabled,
+                        separator = groupingPrefs.separator
+                    )
+                ) { syncState, dbNavigation ->
+                    deriveContentState(syncState, dbNavigation)
+                }
             }
             .stateIn(
                 scope = repositoryScope,

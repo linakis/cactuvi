@@ -14,10 +14,12 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
 /**
  * Base ViewModel for content screens with reactive navigation.
@@ -92,6 +94,25 @@ abstract class ContentViewModel<T : Any>(
                 started = SharingStarted.Lazily,
                 initialValue = PagingData.empty(),
             )
+    }
+
+    init {
+        // Observe preference changes and reset navigation to root when they change.
+        // This ensures the new grouping structure is applied immediately.
+        // We drop(1) to skip the initial emission (already loaded at root).
+        viewModelScope.launch {
+            val preferenceFlow =
+                when (getContentType()) {
+                    ContentType.MOVIES -> preferencesManager.observeMoviesGrouping()
+                    ContentType.SERIES -> preferencesManager.observeSeriesGrouping()
+                    ContentType.LIVE -> preferencesManager.observeLiveGrouping()
+                }
+
+            preferenceFlow.drop(1).collect {
+                // Preferences changed - reset navigation to root to show new grouping
+                onSeparatorChanged()
+            }
+        }
     }
 
     /** Subclasses provide their content type */

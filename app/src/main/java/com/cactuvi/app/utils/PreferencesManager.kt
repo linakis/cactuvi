@@ -8,6 +8,10 @@ import com.google.gson.reflect.TypeToken
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 
 @Singleton
 class PreferencesManager @Inject constructor(@ApplicationContext context: Context) {
@@ -50,6 +54,117 @@ class PreferencesManager @Inject constructor(@ApplicationContext context: Contex
         // VPN warning key
         private const val KEY_VPN_WARNING_ENABLED = "vpn_warning_enabled"
     }
+
+    // ========== REACTIVE PREFERENCE OBSERVATION ==========
+
+    /** Data class representing grouping preferences for a content type. */
+    data class GroupingPreferences(val enabled: Boolean, val separator: String)
+
+    /**
+     * Observe movies grouping preferences reactively. Emits current value immediately, then emits
+     * whenever either grouping enabled or separator changes.
+     */
+    fun observeMoviesGrouping(): Flow<GroupingPreferences> =
+        callbackFlow {
+                val listener =
+                    SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+                        if (
+                            key == KEY_MOVIES_GROUPING_ENABLED ||
+                                key == KEY_MOVIES_GROUPING_SEPARATOR
+                        ) {
+                            trySend(
+                                GroupingPreferences(
+                                    enabled = isMoviesGroupingEnabled(),
+                                    separator = getMoviesGroupingSeparator()
+                                )
+                            )
+                        }
+                    }
+
+                prefs.registerOnSharedPreferenceChangeListener(listener)
+
+                // Emit current value immediately
+                send(
+                    GroupingPreferences(
+                        enabled = isMoviesGroupingEnabled(),
+                        separator = getMoviesGroupingSeparator()
+                    )
+                )
+
+                awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+            }
+            .distinctUntilChanged()
+
+    /**
+     * Observe series grouping preferences reactively. Emits current value immediately, then emits
+     * whenever either grouping enabled or separator changes.
+     */
+    fun observeSeriesGrouping(): Flow<GroupingPreferences> =
+        callbackFlow {
+                val listener =
+                    SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+                        if (
+                            key == KEY_SERIES_GROUPING_ENABLED ||
+                                key == KEY_SERIES_GROUPING_SEPARATOR
+                        ) {
+                            trySend(
+                                GroupingPreferences(
+                                    enabled = isSeriesGroupingEnabled(),
+                                    separator = getSeriesGroupingSeparator()
+                                )
+                            )
+                        }
+                    }
+
+                prefs.registerOnSharedPreferenceChangeListener(listener)
+
+                // Emit current value immediately
+                send(
+                    GroupingPreferences(
+                        enabled = isSeriesGroupingEnabled(),
+                        separator = getSeriesGroupingSeparator()
+                    )
+                )
+
+                awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+            }
+            .distinctUntilChanged()
+
+    /**
+     * Observe live TV grouping preferences reactively. Emits current value immediately, then emits
+     * whenever either grouping enabled or separator changes.
+     */
+    fun observeLiveGrouping(): Flow<GroupingPreferences> =
+        callbackFlow {
+                val listener =
+                    SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+                        if (
+                            key == KEY_LIVE_GROUPING_ENABLED || key == KEY_LIVE_GROUPING_SEPARATOR
+                        ) {
+                            trySend(
+                                GroupingPreferences(
+                                    enabled = isLiveGroupingEnabled(),
+                                    separator = getLiveGroupingSeparator()
+                                )
+                            )
+                        }
+                    }
+
+                prefs.registerOnSharedPreferenceChangeListener(listener)
+
+                // Emit current value immediately
+                send(
+                    GroupingPreferences(
+                        enabled = isLiveGroupingEnabled(),
+                        separator = getLiveGroupingSeparator()
+                    )
+                )
+
+                awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+            }
+            .distinctUntilChanged()
+
+    // ========== IMPERATIVE PREFERENCE ACCESS ==========
 
     // Movies grouping settings
     fun isMoviesGroupingEnabled(): Boolean {
