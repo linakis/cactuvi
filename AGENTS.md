@@ -1094,6 +1094,122 @@ adb logcat | grep "com.cactuvi.app"
 - Check `~/.opencode` logs
 - Verify `npx @mobilenext/mobile-mcp@latest` works standalone
 
+## App Deployment & Testing (Physical Devices)
+
+### Quick Deploy to Connected Device
+
+**Check connected devices:**
+```bash
+adb devices
+# List of devices attached
+# 41051JEHN02383	device  ← Your Pixel phone
+```
+
+**Deploy mock flavor (recommended for testing):**
+```bash
+# Build and install mock debug APK
+./gradlew assembleMockDebug
+adb install -r app/build/outputs/apk/mock/debug/app-mock-debug.apk
+
+# Launch app
+adb shell am start -n com.cactuvi.app.mock/com.cactuvi.app.ui.LoadingActivity
+```
+
+**Deploy prod flavor:**
+```bash
+# Build and install prod debug APK
+./gradlew assembleProdDebug
+adb install -r app/build/outputs/apk/prod/debug/app-prod-debug.apk
+
+# Launch app
+adb shell am start -n com.cactuvi.app/com.cactuvi.app.ui.LoadingActivity
+```
+
+### Key Package & Activity Names
+
+**Mock Flavor:**
+- Package: `com.cactuvi.app.mock`
+- Main Activity: `com.cactuvi.app.ui.LoadingActivity`
+- Launch: `adb shell am start -n com.cactuvi.app.mock/com.cactuvi.app.ui.LoadingActivity`
+
+**Prod Flavor:**
+- Package: `com.cactuvi.app`
+- Main Activity: `com.cactuvi.app.ui.LoadingActivity`
+- Launch: `adb shell am start -n com.cactuvi.app/com.cactuvi.app.ui.LoadingActivity`
+
+### Common Testing Operations
+
+**Clear app data (fresh start):**
+```bash
+adb shell pm clear com.cactuvi.app.mock  # or com.cactuvi.app for prod
+adb shell am start -n com.cactuvi.app.mock/com.cactuvi.app.ui.LoadingActivity
+```
+
+**Restart app:**
+```bash
+adb shell am force-stop com.cactuvi.app.mock
+adb shell am start -n com.cactuvi.app.mock/com.cactuvi.app.ui.LoadingActivity
+```
+
+**Take screenshot:**
+```bash
+adb exec-out screencap -p > screenshot_$(date +%Y%m%d_%H%M%S).png
+```
+
+**View app info:**
+```bash
+# Check if app is installed
+adb shell pm list packages | grep cactuvi
+
+# Get app details
+adb shell pm dump com.cactuvi.app.mock | grep -E "versionName|versionCode"
+
+# Find main activity
+adb shell pm dump com.cactuvi.app.mock | grep -A 5 "MAIN:"
+```
+
+**Monitor logs:**
+```bash
+# Watch app logs
+adb logcat | grep -E "com.cactuvi.app|IPTV"
+
+# Clear and watch
+adb logcat -c && adb logcat | grep "com.cactuvi.app"
+
+# Filter by tag
+adb logcat -s "IPTV_STATE" "IPTV_PERF"
+```
+
+### Testing Reactive Features
+
+**Test preference changes (e.g., grouping separator):**
+```bash
+# 1. Deploy app
+./gradlew assembleMockDebug && adb install -r app/build/outputs/apk/mock/debug/app-mock-debug.apk
+
+# 2. Launch and monitor logs
+adb logcat -c
+adb shell am start -n com.cactuvi.app.mock/com.cactuvi.app.ui.LoadingActivity
+adb logcat | grep "IPTV_STATE" &
+
+# 3. Manually test on device:
+#    - Navigate to Movies
+#    - Open Settings → Movies Filter Settings
+#    - Change separator (e.g., "-" to "|")
+#    - Verify: Immediately navigate to root with new grouping
+#    - Logs should show: "grouping=true, separator=|"
+```
+
+### Uninstall Apps
+
+```bash
+# Uninstall mock flavor
+adb uninstall com.cactuvi.app.mock
+
+# Uninstall prod flavor
+adb uninstall com.cactuvi.app
+```
+
 ## Landing the Plane (Session Completion)
 
 **When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.
