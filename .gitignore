@@ -104,3 +104,7 @@ output.json
 
 # Environment variables
 .env
+
+# Agent skills (local development only)
+.agents/skills/
+.opencode/skills/
