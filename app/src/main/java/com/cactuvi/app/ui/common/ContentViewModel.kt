@@ -87,7 +87,7 @@ abstract class ContentViewModel<T : Any>(
     protected abstract fun getPagedContent(categoryId: String): Flow<PagingData<T>>
 
     /** Get the appropriate sync state flow based on content type. */
-    private fun getSyncStateFlow(): StateFlow<DataState<Unit>> {
+    private fun getSyncStateFlow(): StateFlow<DataState<*>> {
         return when (getContentType()) {
             ContentType.MOVIES -> repository.moviesState
             ContentType.SERIES -> repository.seriesState
@@ -101,7 +101,7 @@ abstract class ContentViewModel<T : Any>(
      */
     private fun observeNavigationState(
         position: NavigationPosition,
-        syncState: DataState<Unit>
+        syncState: DataState<*>
     ): Flow<ContentUiState> {
         return when (position) {
             is NavigationPosition.Root -> observeRootNavigation(syncState)
@@ -111,7 +111,7 @@ abstract class ContentViewModel<T : Any>(
     }
 
     /** Observe root level navigation (groups or categories). */
-    private fun observeRootNavigation(syncState: DataState<Unit>): Flow<ContentUiState> {
+    private fun observeRootNavigation(syncState: DataState<*>): Flow<ContentUiState> {
         val contentType = getContentType()
         val (groupingEnabled, separator) = getGroupingSettings(preferencesManager, contentType)
 
@@ -146,7 +146,7 @@ abstract class ContentViewModel<T : Any>(
     /** Observe group navigation (categories within a group). */
     private fun observeGroupNavigation(
         position: NavigationPosition.Group,
-        syncState: DataState<Unit>
+        syncState: DataState<*>
     ): Flow<ContentUiState> {
         val contentType = getContentType()
         val (groupingEnabled, separator) = getGroupingSettings(preferencesManager, contentType)
@@ -191,7 +191,7 @@ abstract class ContentViewModel<T : Any>(
     /** Observe category navigation (children of a category). */
     private fun observeCategoryNavigation(
         position: NavigationPosition.Category,
-        syncState: DataState<Unit>
+        syncState: DataState<*>
     ): Flow<ContentUiState> {
         val contentType = getContentType()
 
@@ -232,11 +232,21 @@ abstract class ContentViewModel<T : Any>(
     }
 
     /** Map empty results to appropriate UI state based on sync state. */
-    private fun mapEmptyToSyncState(syncState: DataState<Unit>): ContentUiState {
+    private fun mapEmptyToSyncState(syncState: DataState<*>): ContentUiState {
         return when (syncState) {
-            is DataState.Loading -> ContentUiState.Syncing(syncState.progress)
+            is DataState.Idle -> {
+                if (syncState.hasCachedData) {
+                    ContentUiState.Loading // Has cache, loading navigation tree
+                } else {
+                    ContentUiState.Syncing(null) // Not started yet, show syncing
+                }
+            }
+            is DataState.Fetching -> ContentUiState.Syncing(syncState.getOverallProgress())
+            is DataState.Parsing -> ContentUiState.Syncing(syncState.getOverallProgress())
+            is DataState.Persisting -> ContentUiState.Syncing(syncState.getOverallProgress())
+            is DataState.Indexing -> ContentUiState.Syncing(syncState.getOverallProgress())
             is DataState.Error -> ContentUiState.Error(syncState.error.message ?: "Sync failed")
-            else -> ContentUiState.Loading
+            is DataState.Success -> ContentUiState.Loading // Sync done, loading navigation tree
         }
     }
 

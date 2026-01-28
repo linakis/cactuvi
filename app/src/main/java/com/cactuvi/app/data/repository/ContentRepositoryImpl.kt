@@ -263,20 +263,20 @@ constructor(
     // ========== REACTIVE STATE MANAGEMENT ==========
 
     // Series: State (what to display) + Effects (one-time actions)
-    private val _seriesState = MutableStateFlow<DataState<Unit>>(DataState.Success(Unit))
-    override val seriesState: StateFlow<DataState<Unit>> = _seriesState.asStateFlow()
+    private val _seriesState = MutableStateFlow<DataState<*>>(DataState.Idle())
+    override val seriesState: StateFlow<DataState<*>> = _seriesState.asStateFlow()
     private val _seriesEffects = MutableSharedFlow<SeriesEffect>()
     val seriesEffects: SharedFlow<SeriesEffect> = _seriesEffects.asSharedFlow()
 
     // Movies: State (what to display) + Effects (one-time actions)
-    private val _moviesState = MutableStateFlow<DataState<Unit>>(DataState.Success(Unit))
-    override val moviesState: StateFlow<DataState<Unit>> = _moviesState.asStateFlow()
+    private val _moviesState = MutableStateFlow<DataState<*>>(DataState.Idle())
+    override val moviesState: StateFlow<DataState<*>> = _moviesState.asStateFlow()
     private val _moviesEffects = MutableSharedFlow<MoviesEffect>()
     val moviesEffects: SharedFlow<MoviesEffect> = _moviesEffects.asSharedFlow()
 
     // Live: State (what to display) + Effects (one-time actions)
-    private val _liveState = MutableStateFlow<DataState<Unit>>(DataState.Success(Unit))
-    override val liveState: StateFlow<DataState<Unit>> = _liveState.asStateFlow()
+    private val _liveState = MutableStateFlow<DataState<*>>(DataState.Idle())
+    override val liveState: StateFlow<DataState<*>> = _liveState.asStateFlow()
     private val _liveEffects = MutableSharedFlow<LiveEffect>()
     val liveEffects: SharedFlow<LiveEffect> = _liveEffects.asSharedFlow()
 
@@ -451,21 +451,23 @@ constructor(
      */
     override suspend fun loadLive(forceRefresh: Boolean) =
         withContext(Dispatchers.IO) {
+            val startTime = System.currentTimeMillis()
+
             // Race condition check - BEFORE mutex acquisition
-            if (_liveState.value.isLoading() && !forceRefresh) {
-                PerformanceLogger.log("loadLive: Already loading, skipping duplicate call")
+            if (_liveState.value.isSyncing() && !forceRefresh) {
+                PerformanceLogger.log("loadLive: Already syncing, skipping duplicate call")
                 return@withContext
             }
 
             try {
                 liveMutex.withLock {
                     // Double-check inside mutex
-                    if (_liveState.value.isLoading() && !forceRefresh) {
+                    if (_liveState.value.isSyncing() && !forceRefresh) {
                         return@withLock
                     }
 
-                    // Emit Loading state
-                    _liveState.value = DataState.Loading(progress = null)
+                    // Emit Fetching state
+                    _liveState.value = DataState.Fetching()
 
                     // Check cache first (unless forcing refresh)
                     if (!forceRefresh) {
@@ -479,7 +481,11 @@ constructor(
                                 !isCacheValid(metadata.lastUpdated, CACHE_TTL_FALLBACK)
                             if (!isExtremelyStale) {
                                 PerformanceLogger.log("loadLive: Cache valid, skipping API fetch")
-                                _liveState.value = DataState.Success(Unit)
+                                _liveState.value =
+                                    DataState.Success(
+                                        itemCount = metadata.itemCount,
+                                        durationMs = System.currentTimeMillis() - startTime
+                                    )
                                 return@withLock
                             }
                         }
@@ -584,7 +590,11 @@ constructor(
                     )
 
                     // Emit Success state
-                    _liveState.value = DataState.Success(Unit)
+                    _liveState.value =
+                        DataState.Success(
+                            itemCount = totalInserted,
+                            durationMs = System.currentTimeMillis() - startTime
+                        )
 
                     // Emit success effect
                     _liveEffects.emit(LiveEffect.LoadSuccess(totalInserted))
@@ -614,7 +624,8 @@ constructor(
                 _liveState.value =
                     DataState.Error(
                         error = e,
-                        cachedData = if (hasCache) Unit else null,
+                        phase = com.cactuvi.app.data.models.SyncPhase.FETCHING,
+                        hasCachedData = hasCache,
                     )
 
                 // Emit error effect
@@ -822,10 +833,12 @@ constructor(
      */
     override suspend fun loadMovies(forceRefresh: Boolean) =
         withContext(Dispatchers.IO) {
+            val startTime = System.currentTimeMillis()
+
             // Race condition check - BEFORE mutex acquisition
             val currentState = _moviesState.value
-            if (currentState is DataState.Loading && !forceRefresh) {
-                PerformanceLogger.log("loadMovies: Already loading, skipping duplicate call")
+            if (currentState.isSyncing() && !forceRefresh) {
+                PerformanceLogger.log("loadMovies: Already syncing, skipping duplicate call")
                 return@withContext
             }
 
@@ -833,15 +846,19 @@ constructor(
                 moviesMutex.withLock {
                     // Double-check inside mutex
                     val stateInsideMutex = _moviesState.value
-                    if (stateInsideMutex is DataState.Loading && !forceRefresh) {
+                    if (stateInsideMutex.isSyncing() && !forceRefresh) {
                         return@withLock
                     }
 
-                    // Emit Loading state with indeterminate progress
-                    _moviesState.value = DataState.Loading(progress = null)
+                    // Check if we have cached data
+                    val cachedCount = database.cacheMetadataDao().get("movies")?.itemCount ?: 0
+                    val hasCachedData = cachedCount > 0
+
+                    // Emit Fetching state
+                    _moviesState.value = DataState.Fetching()
                     android.util.Log.d(
                         "IPTV_DEBUG",
-                        "ContentRepository.loadMovies: Emitted Loading state"
+                        "ContentRepository.loadMovies: Emitted Fetching state"
                     )
 
                     // Check cache first (unless forcing refresh)
@@ -856,7 +873,11 @@ constructor(
                                 !isCacheValid(metadata.lastUpdated, CACHE_TTL_FALLBACK)
                             if (!isExtremelyStale) {
                                 PerformanceLogger.log("loadMovies: Cache valid, skipping API fetch")
-                                _moviesState.value = DataState.Success(Unit)
+                                _moviesState.value =
+                                    DataState.Success(
+                                        itemCount = metadata.itemCount,
+                                        durationMs = System.currentTimeMillis() - startTime
+                                    )
                                 android.util.Log.d(
                                     "IPTV_DEBUG",
                                     "ContentRepository.loadMovies: Emitted Success (cache valid)",
@@ -876,6 +897,13 @@ constructor(
                     val responseBody = retryWithExponentialBackoff {
                         getApiService().getVodStreams(username, password)
                     }
+
+                    // Transition to Parsing state
+                    _moviesState.value = DataState.Parsing()
+                    android.util.Log.d(
+                        "IPTV_DEBUG",
+                        "ContentRepository.loadMovies: Emitted Parsing state"
+                    )
 
                     // Load categories for mapping
                     val categories = getMovieCategories().getOrNull() ?: emptyList()
@@ -915,33 +943,36 @@ constructor(
                         async(Dispatchers.IO) {
                             var successCount = 0
                             var failedCount = 0
-                            var lastProgressPercent = 0
                             val errors = mutableListOf<Exception>()
+                            var persistingEmitted = false
 
                             try {
                                 for (batch in writeChannel) {
                                     try {
+                                        // Emit Persisting state on first batch
+                                        if (!persistingEmitted && totalParsed > 0) {
+                                            _moviesState.value =
+                                                DataState.Persisting(
+                                                    itemsWritten = 0,
+                                                    totalItems = totalParsed
+                                                )
+                                            persistingEmitted = true
+                                        }
+
                                         // Write batch to database
                                         dbWriter.writeMovies(batch)
                                         successCount += batch.size
 
-                                        // Emit progress every 10%
+                                        // Emit Persisting progress
                                         if (totalParsed > 0) {
-                                            val progressPercent = (successCount * 100) / totalParsed
-                                            if (
-                                                progressPercent >= lastProgressPercent + 10 &&
-                                                    progressPercent <= 100
-                                            ) {
-                                                lastProgressPercent =
-                                                    (progressPercent / 10) * 10 // Round to 10%
-                                                _moviesState.value =
-                                                    DataState.Loading(
-                                                        progress = lastProgressPercent
-                                                    )
-                                                PerformanceLogger.log(
-                                                    "loadMovies: Progress $lastProgressPercent% ($successCount/$totalParsed)",
+                                            _moviesState.value =
+                                                DataState.Persisting(
+                                                    itemsWritten = successCount,
+                                                    totalItems = totalParsed
                                                 )
-                                            }
+                                            PerformanceLogger.log(
+                                                "loadMovies: Progress ${(successCount * 100) / totalParsed}% ($successCount/$totalParsed)",
+                                            )
                                         }
                                     } catch (e: Exception) {
                                         PerformanceLogger.log(
@@ -996,6 +1027,8 @@ constructor(
                                     }
                                 },
                                 onProgress = { count ->
+                                    // Update Parsing state with progress
+                                    _moviesState.value = DataState.Parsing(itemsParsed = count)
                                     PerformanceLogger.log("Progress: $count movies parsed")
                                 },
                             )
@@ -1017,6 +1050,13 @@ constructor(
 
                     // Wait for background writes to complete
                     val writeResult = writerJob.await()
+
+                    // Emit Indexing state before rebuilding indices
+                    _moviesState.value = DataState.Indexing
+                    android.util.Log.d(
+                        "IPTV_DEBUG",
+                        "ContentRepository.loadMovies: Emitted Indexing state"
+                    )
 
                     // Rebuild indices
                     com.cactuvi.app.data.db.OptimizedBulkInsert.endMoviesInsert(
@@ -1070,13 +1110,12 @@ constructor(
                                     ),
                                 )
 
-                            // Emit PartialSuccess state (silent to user, logged)
+                            // Emit Success state (partial success is still success, logged for
+                            // debugging)
                             _moviesState.value =
-                                DataState.PartialSuccess(
-                                    data = Unit,
-                                    successCount = writeResult.successCount,
-                                    failedCount = writeResult.failedCount,
-                                    error = writeResult.errors.first(),
+                                DataState.Success(
+                                    itemCount = writeResult.successCount,
+                                    durationMs = System.currentTimeMillis() - startTime
                                 )
 
                             _moviesEffects.emit(
@@ -1102,7 +1141,11 @@ constructor(
                                     ),
                                 )
 
-                            _moviesState.value = DataState.Success(Unit)
+                            _moviesState.value =
+                                DataState.Success(
+                                    itemCount = writeResult.successCount,
+                                    durationMs = System.currentTimeMillis() - startTime
+                                )
                             _moviesEffects.emit(MoviesEffect.LoadSuccess(writeResult.successCount))
 
                             PerformanceLogger.log(
@@ -1142,7 +1185,8 @@ constructor(
                 _moviesState.value =
                     DataState.Error(
                         error = e,
-                        cachedData = if (hasCache) Unit else null,
+                        phase = com.cactuvi.app.data.models.SyncPhase.FETCHING,
+                        hasCachedData = hasCache,
                     )
                 android.util.Log.d(
                     "IPTV_DEBUG",
@@ -1498,20 +1542,20 @@ constructor(
             val startTime = System.currentTimeMillis()
 
             // Race condition check - BEFORE mutex acquisition
-            if (_seriesState.value.isLoading() && !forceRefresh) {
-                PerformanceLogger.log("loadSeries: Already loading, skipping duplicate call")
+            if (_seriesState.value.isSyncing() && !forceRefresh) {
+                PerformanceLogger.log("loadSeries: Already syncing, skipping duplicate call")
                 return@withContext
             }
 
             try {
                 seriesMutex.withLock {
                     // Double-check inside mutex
-                    if (_seriesState.value.isLoading() && !forceRefresh) {
+                    if (_seriesState.value.isSyncing() && !forceRefresh) {
                         return@withLock
                     }
 
-                    // Emit Loading state
-                    _seriesState.value = DataState.Loading(progress = null)
+                    // Emit Fetching state
+                    _seriesState.value = DataState.Fetching()
 
                     // Check cache first (unless forcing refresh)
                     if (!forceRefresh) {
@@ -1528,7 +1572,11 @@ constructor(
                                 PerformanceLogger.log(
                                     "loadSeries: Cache valid, skipping API fetch (${duration}ms)"
                                 )
-                                _seriesState.value = DataState.Success(Unit)
+                                _seriesState.value =
+                                    DataState.Success(
+                                        itemCount = metadata.itemCount,
+                                        durationMs = duration
+                                    )
                                 _seriesEffects.emit(
                                     SeriesEffect.LoadSuccess(
                                         itemCount = metadata.itemCount,
@@ -1642,7 +1690,8 @@ constructor(
                     PerformanceLogger.log("loadSeries: API fetch completed (${duration}ms)")
 
                     // Emit Success state
-                    _seriesState.value = DataState.Success(Unit)
+                    _seriesState.value =
+                        DataState.Success(itemCount = totalInserted, durationMs = duration)
 
                     // Emit success effect with performance metrics
                     _seriesEffects.emit(
@@ -1679,7 +1728,8 @@ constructor(
                 _seriesState.value =
                     DataState.Error(
                         error = e,
-                        cachedData = if (hasCache) Unit else null,
+                        phase = com.cactuvi.app.data.models.SyncPhase.FETCHING,
+                        hasCachedData = hasCache,
                     )
 
                 // Emit error effect with performance metrics

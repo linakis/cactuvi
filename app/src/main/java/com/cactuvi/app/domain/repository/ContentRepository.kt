@@ -20,7 +20,8 @@ import kotlinx.coroutines.flow.StateFlow
  * Repository interface for content data.
  *
  * Uses REACTIVE patterns throughout:
- * - StateFlow for sync state (Loading/Success/Error)
+ * - StateFlow for sync state (explicit phases:
+ *   Idle/Fetching/Parsing/Persisting/Indexing/Success/Error)
  * - Flow for navigation data (auto-updates when DB changes)
  * - Flow for paged content
  */
@@ -28,14 +29,14 @@ interface ContentRepository {
     // ========== SYNC STATE ==========
     // StateFlows for observing loading state of each content type
 
-    /** Current loading state for movies data */
-    val moviesState: StateFlow<DataState<Unit>>
+    /** Current sync state for movies data */
+    val moviesState: StateFlow<DataState<*>>
 
-    /** Current loading state for series data */
-    val seriesState: StateFlow<DataState<Unit>>
+    /** Current sync state for series data */
+    val seriesState: StateFlow<DataState<*>>
 
-    /** Current loading state for live channels data */
-    val liveState: StateFlow<DataState<Unit>>
+    /** Current sync state for live channels data */
+    val liveState: StateFlow<DataState<*>>
 
     // ========== AUTHENTICATION ==========
 
