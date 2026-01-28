@@ -380,10 +380,23 @@ open app/build/reports/detekt/detekt.html  # HTML report (best for browsing)
 cat app/build/reports/detekt/detekt.md     # Markdown report
 cat app/build/reports/detekt/detekt.xml    # XML report (for CI/CD)
 
-# Pre-commit hook
-# Automatically runs: BD sync + Spotless check on staged Kotlin files
-# Skip hook (use sparingly): git commit --no-verify
+# Git Hooks
+# Pre-commit: BD sync + Spotless check on staged Kotlin files
+# Pre-push: Unit tests (currently disabled) + BD JSONL sync check
+# Skip hooks (use sparingly): git commit --no-verify / git push --no-verify
 ```
+
+**Git Hooks:**
+- **Pre-commit**: Runs automatically before commit
+  - Syncs BD task changes to `.beads/issues.jsonl`
+  - Checks code formatting with Spotless on staged Kotlin files
+  - Skip with: `git commit --no-verify`
+
+- **Pre-push**: Runs automatically before push (at `.git/hooks/pre-push`)
+  - **Currently disabled**: Unit tests check (needs MoviesViewModelTest updates)
+  - Checks BD JSONL is in sync before push
+  - To enable unit tests: Edit `.git/hooks/pre-push` and uncomment test block
+  - Skip with: `git push --no-verify`
 
 **Code Quality Configuration Files:**
 - `.editorconfig` - IDE settings (4 spaces, 120 chars, trailing commas)
