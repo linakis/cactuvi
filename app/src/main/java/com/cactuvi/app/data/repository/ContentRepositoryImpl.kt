@@ -23,9 +23,12 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.time.Duration.Companion.minutes
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
@@ -33,14 +36,17 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map as flowMap
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -264,21 +270,85 @@ constructor(
 
     // Series: State (what to display) + Effects (one-time actions)
     private val _seriesState = MutableStateFlow<DataState<*>>(DataState.Idle())
+    @Deprecated("Use seriesContentState for unified sync + DB state")
     override val seriesState: StateFlow<DataState<*>> = _seriesState.asStateFlow()
     private val _seriesEffects = MutableSharedFlow<SeriesEffect>()
     val seriesEffects: SharedFlow<SeriesEffect> = _seriesEffects.asSharedFlow()
 
     // Movies: State (what to display) + Effects (one-time actions)
     private val _moviesState = MutableStateFlow<DataState<*>>(DataState.Idle())
+    @Deprecated("Use moviesContentState for unified sync + DB state")
     override val moviesState: StateFlow<DataState<*>> = _moviesState.asStateFlow()
     private val _moviesEffects = MutableSharedFlow<MoviesEffect>()
     val moviesEffects: SharedFlow<MoviesEffect> = _moviesEffects.asSharedFlow()
 
     // Live: State (what to display) + Effects (one-time actions)
     private val _liveState = MutableStateFlow<DataState<*>>(DataState.Idle())
+    @Deprecated("Use liveContentState for unified sync + DB state")
     override val liveState: StateFlow<DataState<*>> = _liveState.asStateFlow()
     private val _liveEffects = MutableSharedFlow<LiveEffect>()
     val liveEffects: SharedFlow<LiveEffect> = _liveEffects.asSharedFlow()
+
+    // ========== UNIFIED CONTENT STATE (NEW ARCHITECTURE) ==========
+    // Repository-level scope for StateFlows (independent of ViewModels)
+    private val repositoryScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    /**
+     * Unified movies content state - combines DataState (sync) + NavigationResult (DB). Eliminates
+     * race condition where UI skips syncing states on first launch.
+     */
+    override val moviesContentState: StateFlow<ContentState<NavigationResult>> =
+        combine(
+                _moviesState,
+                observeTopLevelNavigation(
+                    contentType = ContentType.MOVIES,
+                    groupingEnabled = preferencesManager.isMoviesGroupingEnabled(),
+                    separator = preferencesManager.getMoviesGroupingSeparator()
+                )
+            ) { syncState, dbNavigation ->
+                deriveContentState(syncState, dbNavigation)
+            }
+            .stateIn(
+                scope = repositoryScope,
+                started = SharingStarted.Eagerly,
+                initialValue = ContentState.Initial
+            )
+
+    /** Unified series content state - combines DataState (sync) + NavigationResult (DB). */
+    override val seriesContentState: StateFlow<ContentState<NavigationResult>> =
+        combine(
+                _seriesState,
+                observeTopLevelNavigation(
+                    contentType = ContentType.SERIES,
+                    groupingEnabled = preferencesManager.isSeriesGroupingEnabled(),
+                    separator = preferencesManager.getSeriesGroupingSeparator()
+                )
+            ) { syncState, dbNavigation ->
+                deriveContentState(syncState, dbNavigation)
+            }
+            .stateIn(
+                scope = repositoryScope,
+                started = SharingStarted.Eagerly,
+                initialValue = ContentState.Initial
+            )
+
+    /** Unified live TV content state - combines DataState (sync) + NavigationResult (DB). */
+    override val liveContentState: StateFlow<ContentState<NavigationResult>> =
+        combine(
+                _liveState,
+                observeTopLevelNavigation(
+                    contentType = ContentType.LIVE,
+                    groupingEnabled = preferencesManager.isLiveGroupingEnabled(),
+                    separator = preferencesManager.getLiveGroupingSeparator()
+                )
+            ) { syncState, dbNavigation ->
+                deriveContentState(syncState, dbNavigation)
+            }
+            .stateIn(
+                scope = repositoryScope,
+                started = SharingStarted.Eagerly,
+                initialValue = ContentState.Initial
+            )
 
     // Mutexes to prevent concurrent data loading and database corruption
     private val moviesMutex = Mutex()
@@ -2418,4 +2488,122 @@ constructor(
                 Result.failure(e)
             }
         }
+
+    // ========== CONTENT STATE DERIVATION (NEW ARCHITECTURE) ==========
+
+    /**
+     * Derive ContentState from sync state + database state. Pure function implementing the state
+     * derivation truth table.
+     *
+     * Rules:
+     * - DB has data → Ready or ErrorWithCache (show content, silent background sync)
+     * - DB empty + syncing → SyncingFirstTime (show progress, blocking)
+     * - DB empty + idle → Initial (no sync started)
+     * - DB empty + error (no cache) → Error (fatal, show error screen)
+     * - DB empty + error (has cache) → Initial (cache metadata but no visible data)
+     *
+     * @param syncState The current DataState from API sync operation
+     * @param dbNavigation The current NavigationResult from database query
+     * @return ContentState combining both states
+     */
+    private fun deriveContentState(
+        syncState: DataState<*>,
+        dbNavigation: NavigationResult
+    ): ContentState<NavigationResult> {
+        // Check if DB has data
+        val hasData =
+            when (dbNavigation) {
+                is NavigationResult.Groups -> dbNavigation.groups.isNotEmpty()
+                is NavigationResult.Categories -> dbNavigation.categories.isNotEmpty()
+            }
+
+        return when {
+            // CASE 1: DB has data - show it (silent background sync per requirements)
+            hasData -> {
+                when (syncState) {
+                    is DataState.Error -> {
+                        // Sync failed but we have cached data - show it
+                        ContentState.ErrorWithCache(
+                            data = dbNavigation,
+                            error = syncState.error,
+                            phase = syncState.phase
+                        )
+                    }
+                    is DataState.Fetching,
+                    is DataState.Parsing,
+                    is DataState.Persisting,
+                    is DataState.Indexing -> {
+                        // Background sync in progress - show data with sync indicator
+                        ContentState.Ready(
+                            data = dbNavigation,
+                            backgroundSync =
+                                BackgroundSyncState(
+                                    phase = syncState.toSyncPhase(),
+                                    progress = syncState.getOverallProgress()
+                                )
+                        )
+                    }
+                    else -> {
+                        // Idle or Success with data - show it
+                        ContentState.Ready(data = dbNavigation, backgroundSync = null)
+                    }
+                }
+            }
+
+            // CASE 2: DB empty - check sync state to determine why
+            else -> {
+                when (syncState) {
+                    is DataState.Idle -> {
+                        // No sync started or sync not applicable to this level
+                        ContentState.Initial
+                    }
+                    is DataState.Fetching,
+                    is DataState.Parsing,
+                    is DataState.Persisting,
+                    is DataState.Indexing -> {
+                        // First-time sync in progress - show blocking progress UI
+                        ContentState.SyncingFirstTime(
+                            phase = syncState.toSyncPhase(),
+                            progress = syncState.getOverallProgress()
+                        )
+                    }
+                    is DataState.Success -> {
+                        // Edge case: sync succeeded but DB empty at this nav level
+                        // (could be filtered out by grouping/empty categories)
+                        ContentState.Initial
+                    }
+                    is DataState.Error -> {
+                        if (syncState.hasCachedData) {
+                            // Has cache metadata but no visible data at this level
+                            ContentState.Initial
+                        } else {
+                            // Fatal error, no cache available
+                            ContentState.Error(error = syncState.error, phase = syncState.phase)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Convert DataState to SyncPhase for ContentState. Used when mapping sync states to
+     * ContentState phases.
+     */
+    private fun DataState<*>.toSyncPhase(): SyncPhase =
+        when (this) {
+            is DataState.Fetching -> SyncPhase.FETCHING
+            is DataState.Parsing -> SyncPhase.PARSING
+            is DataState.Persisting -> SyncPhase.PERSISTING
+            is DataState.Indexing -> SyncPhase.INDEXING
+            else -> SyncPhase.FETCHING // Fallback (shouldn't happen in practice)
+        }
+
+    /**
+     * Cancel repository scope when repository is no longer needed. Call this from Application
+     * cleanup or dependency injection teardown.
+     */
+    fun cleanup() {
+        repositoryScope.cancel()
+    }
 }

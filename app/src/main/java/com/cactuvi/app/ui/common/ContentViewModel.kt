@@ -4,19 +4,16 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
-import com.cactuvi.app.data.models.Category
+import com.cactuvi.app.data.models.ContentState
 import com.cactuvi.app.data.models.ContentType
-import com.cactuvi.app.data.models.DataState
 import com.cactuvi.app.data.models.NavigationResult
 import com.cactuvi.app.domain.repository.ContentRepository
-import com.cactuvi.app.utils.CategoryTreeBuilder
 import com.cactuvi.app.utils.PreferencesManager
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -46,14 +43,31 @@ abstract class ContentViewModel<T : Any>(
     private val navigationStack = mutableListOf<NavigationPosition>()
 
     /**
-     * UI state derived reactively from navigation position and database. Automatically updates when
-     * data changes.
+     * UI state derived reactively from navigation position and ContentState. ContentState combines
+     * sync state + database state at Repository layer (root level only). For nested navigation
+     * (Group/Category), we query database separately. Automatically updates when data changes or
+     * user navigates.
      */
     val uiState: StateFlow<ContentUiState> =
-        combine(_navigationPosition, getSyncStateFlow()) { position, syncState ->
-                Pair(position, syncState)
+        _navigationPosition
+            .flatMapLatest { position ->
+                when (position) {
+                    is NavigationPosition.Root -> {
+                        // Root level: Use unified ContentState from repository
+                        getContentStateFlow().map { contentState ->
+                            mapContentStateToUi(contentState)
+                        }
+                    }
+                    is NavigationPosition.Group -> {
+                        // Group level: Query database for categories in this group
+                        observeGroupNavigation(position)
+                    }
+                    is NavigationPosition.Category -> {
+                        // Category level: Query database for children or show content items
+                        observeCategoryNavigation(position)
+                    }
+                }
             }
-            .flatMapLatest { (position, syncState) -> observeNavigationState(position, syncState) }
             .stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.WhileSubscribed(5000),
@@ -86,55 +100,60 @@ abstract class ContentViewModel<T : Any>(
     /** Subclasses provide paged data for a category */
     protected abstract fun getPagedContent(categoryId: String): Flow<PagingData<T>>
 
-    /** Get the appropriate sync state flow based on content type. */
-    private fun getSyncStateFlow(): StateFlow<DataState<*>> {
+    /** Get the unified ContentState flow based on content type. */
+    private fun getContentStateFlow(): StateFlow<ContentState<NavigationResult>> {
         return when (getContentType()) {
-            ContentType.MOVIES -> repository.moviesState
-            ContentType.SERIES -> repository.seriesState
-            ContentType.LIVE -> repository.liveState
+            ContentType.MOVIES -> repository.moviesContentState
+            ContentType.SERIES -> repository.seriesContentState
+            ContentType.LIVE -> repository.liveContentState
         }
     }
 
-    /**
-     * Observe navigation state reactively. Returns a Flow that emits UI state based on current
-     * position and sync state.
-     */
-    private fun observeNavigationState(
-        position: NavigationPosition,
-        syncState: DataState<*>
-    ): Flow<ContentUiState> {
-        return when (position) {
-            is NavigationPosition.Root -> observeRootNavigation(syncState)
-            is NavigationPosition.Group -> observeGroupNavigation(position, syncState)
-            is NavigationPosition.Category -> observeCategoryNavigation(position, syncState)
-        }
-    }
-
-    /** Observe root level navigation (groups or categories). */
-    private fun observeRootNavigation(syncState: DataState<*>): Flow<ContentUiState> {
-        val contentType = getContentType()
-        val (groupingEnabled, separator) = getGroupingSettings(preferencesManager, contentType)
-
-        return repository.observeTopLevelNavigation(contentType, groupingEnabled, separator).map {
-            result ->
-            when (result) {
-                is NavigationResult.Groups -> {
-                    if (result.groups.isEmpty()) {
-                        // Empty - check sync state
-                        mapEmptyToSyncState(syncState)
-                    } else {
+    /** Map ContentState (root level only) to UI-specific ContentUiState. */
+    private fun mapContentStateToUi(contentState: ContentState<NavigationResult>): ContentUiState {
+        return when (contentState) {
+            is ContentState.Initial -> {
+                // No sync started, no data
+                ContentUiState.Syncing(null)
+            }
+            is ContentState.SyncingFirstTime -> {
+                // First-time sync in progress - show blocking progress
+                ContentUiState.Syncing(contentState.progress)
+            }
+            is ContentState.Ready -> {
+                // Data available at root level - map to groups or categories
+                // Note: backgroundSync is ignored per requirements (silent background sync)
+                when (contentState.data) {
+                    is NavigationResult.Groups -> {
                         ContentUiState.Content.Groups(
-                            groups = result.groups,
+                            groups = contentState.data.groups,
+                            breadcrumbPath = emptyList()
+                        )
+                    }
+                    is NavigationResult.Categories -> {
+                        ContentUiState.Content.Categories(
+                            categories = contentState.data.categories,
                             breadcrumbPath = emptyList()
                         )
                     }
                 }
-                is NavigationResult.Categories -> {
-                    if (result.categories.isEmpty()) {
-                        mapEmptyToSyncState(syncState)
-                    } else {
+            }
+            is ContentState.Error -> {
+                // Fatal error, no cached data
+                ContentUiState.Error(contentState.error.message ?: "Sync failed")
+            }
+            is ContentState.ErrorWithCache -> {
+                // Error but cached data available - show cached data (silent error)
+                when (contentState.data) {
+                    is NavigationResult.Groups -> {
+                        ContentUiState.Content.Groups(
+                            groups = contentState.data.groups,
+                            breadcrumbPath = emptyList()
+                        )
+                    }
+                    is NavigationResult.Categories -> {
                         ContentUiState.Content.Categories(
-                            categories = result.categories,
+                            categories = contentState.data.categories,
                             breadcrumbPath = emptyList()
                         )
                     }
@@ -144,10 +163,7 @@ abstract class ContentViewModel<T : Any>(
     }
 
     /** Observe group navigation (categories within a group). */
-    private fun observeGroupNavigation(
-        position: NavigationPosition.Group,
-        syncState: DataState<*>
-    ): Flow<ContentUiState> {
+    private fun observeGroupNavigation(position: NavigationPosition.Group): Flow<ContentUiState> {
         val contentType = getContentType()
         val (groupingEnabled, separator) = getGroupingSettings(preferencesManager, contentType)
 
@@ -156,29 +172,14 @@ abstract class ContentViewModel<T : Any>(
             when (result) {
                 is NavigationResult.Groups -> {
                     val categories = result.groups[position.groupName] ?: emptyList()
-                    if (categories.isEmpty()) {
-                        mapEmptyToSyncState(syncState)
-                    } else {
-                        // Strip group prefix from category names
-                        val strippedCategories =
-                            categories.map { category ->
-                                category.copy(
-                                    categoryName =
-                                        CategoryTreeBuilder.stripGroupPrefix(
-                                            category.categoryName,
-                                            separator
-                                        )
-                                )
-                            }
-                        ContentUiState.Content.Categories(
-                            categories = strippedCategories,
-                            breadcrumbPath =
-                                listOf(BreadcrumbItem(null, position.groupName, isGroup = true))
-                        )
-                    }
+                    ContentUiState.Content.Categories(
+                        categories = categories,
+                        breadcrumbPath =
+                            listOf(BreadcrumbItem(null, position.groupName, isGroup = true))
+                    )
                 }
                 is NavigationResult.Categories -> {
-                    // Grouping was disabled - go back to root
+                    // Grouping was disabled - show all categories
                     ContentUiState.Content.Categories(
                         categories = result.categories,
                         breadcrumbPath = emptyList()
@@ -190,27 +191,17 @@ abstract class ContentViewModel<T : Any>(
 
     /** Observe category navigation (children of a category). */
     private fun observeCategoryNavigation(
-        position: NavigationPosition.Category,
-        syncState: DataState<*>
+        position: NavigationPosition.Category
     ): Flow<ContentUiState> {
         val contentType = getContentType()
 
-        return combine(
-            repository.observeCategory(contentType, position.categoryId),
-            repository.observeChildCategories(contentType, position.categoryId)
-        ) { category, result ->
+        return repository.observeChildCategories(contentType, position.categoryId).map { result ->
             when (result) {
                 is NavigationResult.Categories -> {
                     val children = result.categories
 
-                    if (children.isEmpty()) {
+                    if (children.isEmpty() || children.first().isLeaf) {
                         // Leaf level - show content items
-                        ContentUiState.Content.Items(
-                            categoryId = position.categoryId,
-                            breadcrumbPath = position.breadcrumbPath
-                        )
-                    } else if (children.first().isLeaf) {
-                        // Children are leaves - show content items
                         ContentUiState.Content.Items(
                             categoryId = position.categoryId,
                             breadcrumbPath = position.breadcrumbPath
@@ -225,28 +216,9 @@ abstract class ContentViewModel<T : Any>(
                 }
                 is NavigationResult.Groups -> {
                     // Shouldn't happen at category level
-                    mapEmptyToSyncState(syncState)
+                    ContentUiState.Loading
                 }
             }
-        }
-    }
-
-    /** Map empty results to appropriate UI state based on sync state. */
-    private fun mapEmptyToSyncState(syncState: DataState<*>): ContentUiState {
-        return when (syncState) {
-            is DataState.Idle -> {
-                if (syncState.hasCachedData) {
-                    ContentUiState.Loading // Has cache, loading navigation tree
-                } else {
-                    ContentUiState.Syncing(null) // Not started yet, show syncing
-                }
-            }
-            is DataState.Fetching -> ContentUiState.Syncing(syncState.getOverallProgress())
-            is DataState.Parsing -> ContentUiState.Syncing(syncState.getOverallProgress())
-            is DataState.Persisting -> ContentUiState.Syncing(syncState.getOverallProgress())
-            is DataState.Indexing -> ContentUiState.Syncing(syncState.getOverallProgress())
-            is DataState.Error -> ContentUiState.Error(syncState.error.message ?: "Sync failed")
-            is DataState.Success -> ContentUiState.Loading // Sync done, loading navigation tree
         }
     }
 

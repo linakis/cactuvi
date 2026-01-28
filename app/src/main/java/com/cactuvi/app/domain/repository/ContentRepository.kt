@@ -4,6 +4,7 @@ import androidx.paging.PagingData
 import com.cactuvi.app.data.db.entities.FavoriteEntity
 import com.cactuvi.app.data.db.entities.WatchHistoryEntity
 import com.cactuvi.app.data.models.Category
+import com.cactuvi.app.data.models.ContentState
 import com.cactuvi.app.data.models.ContentType
 import com.cactuvi.app.data.models.DataState
 import com.cactuvi.app.data.models.LiveChannel
@@ -26,16 +27,31 @@ import kotlinx.coroutines.flow.StateFlow
  * - Flow for paged content
  */
 interface ContentRepository {
-    // ========== SYNC STATE ==========
-    // StateFlows for observing loading state of each content type
+    // ========== UNIFIED CONTENT STATE ==========
+    // StateFlows combining sync state + database state into single ContentState
 
-    /** Current sync state for movies data */
+    /** Unified content state for movies (combines DataState + NavigationResult) */
+    val moviesContentState: StateFlow<ContentState<NavigationResult>>
+
+    /** Unified content state for series (combines DataState + NavigationResult) */
+    val seriesContentState: StateFlow<ContentState<NavigationResult>>
+
+    /** Unified content state for live TV (combines DataState + NavigationResult) */
+    val liveContentState: StateFlow<ContentState<NavigationResult>>
+
+    // ========== LEGACY SYNC STATE (DEPRECATED) ==========
+    // TODO: Remove these once all consumers migrate to ContentState
+
+    /** @deprecated Use moviesContentState instead */
+    @Deprecated("Use moviesContentState for unified sync + DB state")
     val moviesState: StateFlow<DataState<*>>
 
-    /** Current sync state for series data */
+    /** @deprecated Use seriesContentState instead */
+    @Deprecated("Use seriesContentState for unified sync + DB state")
     val seriesState: StateFlow<DataState<*>>
 
-    /** Current sync state for live channels data */
+    /** @deprecated Use liveContentState instead */
+    @Deprecated("Use liveContentState for unified sync + DB state")
     val liveState: StateFlow<DataState<*>>
 
     // ========== AUTHENTICATION ==========
