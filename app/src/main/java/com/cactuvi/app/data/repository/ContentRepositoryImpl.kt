@@ -2411,23 +2411,56 @@ constructor(
             ContentType.LIVE -> database.liveChannelDao().observeCountByCategoryId(categoryId)
         }.flowOn(Dispatchers.IO)
 
-    /** Group categories by separator (helper for getTopLevelNavigation). */
+    /**
+     * Group categories by separator and strip the matched prefix from category names.
+     *
+     * Examples:
+     * - "EN | Action" with separator "|" → group "EN", display name "Action"
+     * - "US - Comedy" with separator "-" → group "US", display name "Comedy"
+     * - "Action Movies" with separator "FIRST_WORD" → group "Action", display name "Movies"
+     */
     private fun groupCategories(
         categories: List<Category>,
         separator: String
     ): Map<String, List<Category>> {
-        return categories.groupBy { category ->
-            when (separator) {
-                "FIRST_WORD" -> category.categoryName.split(" ").firstOrNull()?.trim() ?: "Other"
-                "|",
-                "-",
-                "/" -> {
-                    val parts = category.categoryName.split(separator, limit = 2)
-                    if (parts.size > 1) parts[0].trim() else "Other"
+        return categories
+            .groupBy { category ->
+                when (separator) {
+                    "FIRST_WORD" ->
+                        category.categoryName.split(" ").firstOrNull()?.trim() ?: "Other"
+                    "|",
+                    "-",
+                    "/" -> {
+                        val parts = category.categoryName.split(separator, limit = 2)
+                        if (parts.size > 1) parts[0].trim() else "Other"
+                    }
+                    else -> "Other"
                 }
-                else -> "Other"
             }
-        }
+            .mapValues { (_, categoriesInGroup) ->
+                // Strip the matched prefix from category names in this group
+                categoriesInGroup.map { category ->
+                    val strippedName =
+                        when (separator) {
+                            "FIRST_WORD" -> {
+                                // Strip first word: "Action Movies" → "Movies"
+                                val parts = category.categoryName.split(" ", limit = 2)
+                                if (parts.size > 1) parts[1].trim() else category.categoryName
+                            }
+                            "|",
+                            "-",
+                            "/" -> {
+                                // Strip prefix before separator: "EN | Action" → "Action"
+                                val parts = category.categoryName.split(separator, limit = 2)
+                                if (parts.size > 1) parts[1].trim() else category.categoryName
+                            }
+                            else -> category.categoryName
+                        }
+
+                    // Return category with updated display name
+                    category.copy(categoryName = strippedName)
+                }
+            }
     }
 
     /**
