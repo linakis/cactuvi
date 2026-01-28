@@ -306,11 +306,25 @@ constructor(
                     separator = preferencesManager.getMoviesGroupingSeparator()
                 )
             ) { syncState, dbNavigation ->
-                deriveContentState(syncState, dbNavigation)
+                android.util.Log.d(
+                    "IPTV_STATE",
+                    "Repository.moviesContentState: combine inputs - syncState=${syncState.javaClass.simpleName}" +
+                        (if (syncState is DataState.Error) " error='${syncState.error.message}'"
+                        else "") +
+                        ", dbNavigation=${dbNavigation.javaClass.simpleName}"
+                )
+                val result = deriveContentState(syncState, dbNavigation)
+                android.util.Log.d(
+                    "IPTV_STATE",
+                    "Repository.moviesContentState: derived ContentState=${result.javaClass.simpleName}" +
+                        (if (result is ContentState.Error) " error='${result.error.message}'"
+                        else "")
+                )
+                result
             }
             .stateIn(
                 scope = repositoryScope,
-                started = SharingStarted.Eagerly,
+                started = SharingStarted.Lazily,
                 initialValue = ContentState.Initial
             )
 
@@ -328,7 +342,7 @@ constructor(
             }
             .stateIn(
                 scope = repositoryScope,
-                started = SharingStarted.Eagerly,
+                started = SharingStarted.Lazily,
                 initialValue = ContentState.Initial
             )
 
@@ -346,7 +360,7 @@ constructor(
             }
             .stateIn(
                 scope = repositoryScope,
-                started = SharingStarted.Eagerly,
+                started = SharingStarted.Lazily,
                 initialValue = ContentState.Initial
             )
 

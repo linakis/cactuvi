@@ -7,6 +7,7 @@ import com.cactuvi.app.data.db.AppDatabase
 import com.cactuvi.app.domain.repository.ContentRepository
 import com.cactuvi.app.services.BackgroundSyncWorker
 import com.cactuvi.app.utils.PreferencesManager
+import com.cactuvi.app.utils.SourceEvent
 import com.cactuvi.app.utils.SourceManager
 import com.cactuvi.app.utils.SyncPreferencesManager
 import com.cactuvi.app.utils.VPNDetector
@@ -56,6 +57,9 @@ class Cactuvi : Application(), Configuration.Provider {
 
         // Trigger immediate sync if cache exists (stale-while-revalidate pattern)
         applicationScope.launch { triggerInitialSync() }
+
+        // Listen for source changes and trigger immediate prefetch
+        applicationScope.launch { collectSourceEvents() }
     }
 
     override fun onTerminate() {
@@ -129,6 +133,13 @@ class Cactuvi : Application(), Configuration.Provider {
      */
     private suspend fun triggerInitialSync() {
         try {
+            // Check if source is configured first
+            val activeSource = sourceManager.getActiveSource()
+            if (activeSource == null) {
+                // No source configured - skip background sync entirely
+                return
+            }
+
             // Check if any cache exists
             val hasMovies = (database.cacheMetadataDao().get("movies")?.itemCount ?: 0) > 0
             val hasSeries = (database.cacheMetadataDao().get("series")?.itemCount ?: 0) > 0
@@ -148,6 +159,25 @@ class Cactuvi : Application(), Configuration.Provider {
     }
 
     /**
+     * Listen for source addition/activation events and trigger immediate prefetch. This ensures
+     * content loading starts before user navigates to content screens.
+     */
+    private suspend fun collectSourceEvents() {
+        sourceManager.sourceEvents.collect { event ->
+            when (event) {
+                is SourceEvent.SourceAdded,
+                is SourceEvent.SourceActivated -> {
+                    // Trigger immediate prefetch (no delay)
+                    triggerBackgroundPrefetch(immediate = true)
+                }
+                else -> {
+                    // Ignore updates/deletes - don't trigger prefetch
+                }
+            }
+        }
+    }
+
+    /**
      * Phase 3 optimization: Background pre-fetch of all content on app launch.
      *
      * This provides perceived instant load times when user navigates to content screens. Runs
@@ -161,11 +191,15 @@ class Cactuvi : Application(), Configuration.Provider {
      * Expected result:
      * - Content available in 75-90s (parallel load)
      * - User navigation shows instant cached results
+     *
+     * @param immediate If true, skip the 1-second delay (used when triggered by source save event)
      */
-    private suspend fun triggerBackgroundPrefetch() {
+    private suspend fun triggerBackgroundPrefetch(immediate: Boolean = false) {
         try {
-            // Brief delay to let app initialization complete
-            kotlinx.coroutines.delay(1000)
+            // Brief delay to let app initialization complete (skip if triggered by source save)
+            if (!immediate) {
+                kotlinx.coroutines.delay(1000)
+            }
 
             val activeSource = sourceManager.getActiveSource()
 

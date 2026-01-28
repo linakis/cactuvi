@@ -17,6 +17,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -38,6 +40,7 @@ import org.junit.Test
  * - Setting active source
  * - Adding/updating/deleting sources
  * - Observing active source flow
+ * - Source event emission (SourceAdded, SourceActivated, SourceUpdated, SourceDeleted)
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class SourceManagerTest {
@@ -291,5 +294,152 @@ class SourceManagerTest {
 
         // Then
         assertNull(result)
+    }
+
+    // ========== SOURCE EVENT EMISSION ==========
+
+    @Test
+    fun `addSource emits SourceAdded event`() = runTest {
+        // Given
+        val newSource = createTestSource("new-1", "New Source")
+        coEvery { mockStreamSourceDao.insert(any()) } just Runs
+
+        val events = mutableListOf<SourceEvent>()
+        val job = launch { sourceManager.sourceEvents.toList(events) }
+
+        // When
+        sourceManager.addSource(newSource)
+        testScheduler.advanceUntilIdle()
+
+        // Then
+        assertEquals(1, events.size)
+        assertTrue(events[0] is SourceEvent.SourceAdded)
+        assertEquals("new-1", (events[0] as SourceEvent.SourceAdded).sourceId)
+
+        job.cancel()
+    }
+
+    @Test
+    fun `setActiveSource emits SourceActivated event`() = runTest {
+        // Given
+        val sourceId = "active-source-1"
+        coEvery { mockStreamSourceDao.setActive(any()) } just Runs
+
+        val events = mutableListOf<SourceEvent>()
+        val job = launch { sourceManager.sourceEvents.toList(events) }
+
+        // When
+        sourceManager.setActiveSource(sourceId)
+        testScheduler.advanceUntilIdle()
+
+        // Then
+        assertEquals(1, events.size)
+        assertTrue(events[0] is SourceEvent.SourceActivated)
+        assertEquals(sourceId, (events[0] as SourceEvent.SourceActivated).sourceId)
+
+        job.cancel()
+    }
+
+    @Test
+    fun `updateSource emits SourceUpdated event`() = runTest {
+        // Given
+        val updatedSource = createTestSource("update-1", "Updated Source")
+        coEvery { mockStreamSourceDao.update(any()) } just Runs
+
+        val events = mutableListOf<SourceEvent>()
+        val job = launch { sourceManager.sourceEvents.toList(events) }
+
+        // When
+        sourceManager.updateSource(updatedSource)
+        testScheduler.advanceUntilIdle()
+
+        // Then
+        assertEquals(1, events.size)
+        assertTrue(events[0] is SourceEvent.SourceUpdated)
+        assertEquals("update-1", (events[0] as SourceEvent.SourceUpdated).sourceId)
+
+        job.cancel()
+    }
+
+    @Test
+    fun `deleteSource emits SourceDeleted event when source exists`() = runTest {
+        // Given
+        val sourceEntity = createTestSourceEntity("delete-1", "To Delete")
+        coEvery { mockStreamSourceDao.getById("delete-1") } returns sourceEntity
+        coEvery { mockStreamSourceDao.delete(any()) } just Runs
+
+        val events = mutableListOf<SourceEvent>()
+        val job = launch { sourceManager.sourceEvents.toList(events) }
+
+        // When
+        sourceManager.deleteSource("delete-1")
+        testScheduler.advanceUntilIdle()
+
+        // Then
+        assertEquals(1, events.size)
+        assertTrue(events[0] is SourceEvent.SourceDeleted)
+        assertEquals("delete-1", (events[0] as SourceEvent.SourceDeleted).sourceId)
+
+        job.cancel()
+    }
+
+    @Test
+    fun `deleteSource does not emit event when source not found`() = runTest {
+        // Given
+        coEvery { mockStreamSourceDao.getById("nonexistent") } returns null
+
+        val events = mutableListOf<SourceEvent>()
+        val job = launch { sourceManager.sourceEvents.toList(events) }
+
+        // When
+        sourceManager.deleteSource("nonexistent")
+        testScheduler.advanceUntilIdle()
+
+        // Then
+        assertEquals(0, events.size)
+
+        job.cancel()
+    }
+
+    @Test
+    fun `multiple operations emit correct sequence of events`() = runTest {
+        // Given
+        val source1 = createTestSource("source-1", "Source 1")
+        val source2 = createTestSource("source-2", "Source 2")
+        coEvery { mockStreamSourceDao.insert(any()) } just Runs
+        coEvery { mockStreamSourceDao.setActive(any()) } just Runs
+        coEvery { mockStreamSourceDao.update(any()) } just Runs
+
+        val events = mutableListOf<SourceEvent>()
+        val job = launch { sourceManager.sourceEvents.toList(events) }
+
+        // When: Add source, activate it, update it
+        sourceManager.addSource(source1)
+        testScheduler.advanceUntilIdle()
+
+        sourceManager.setActiveSource("source-1")
+        testScheduler.advanceUntilIdle()
+
+        sourceManager.updateSource(source1.copy(nickname = "Updated Source 1"))
+        testScheduler.advanceUntilIdle()
+
+        sourceManager.addSource(source2)
+        testScheduler.advanceUntilIdle()
+
+        // Then: Verify event sequence
+        assertEquals(4, events.size)
+        assertTrue(events[0] is SourceEvent.SourceAdded)
+        assertEquals("source-1", (events[0] as SourceEvent.SourceAdded).sourceId)
+
+        assertTrue(events[1] is SourceEvent.SourceActivated)
+        assertEquals("source-1", (events[1] as SourceEvent.SourceActivated).sourceId)
+
+        assertTrue(events[2] is SourceEvent.SourceUpdated)
+        assertEquals("source-1", (events[2] as SourceEvent.SourceUpdated).sourceId)
+
+        assertTrue(events[3] is SourceEvent.SourceAdded)
+        assertEquals("source-2", (events[3] as SourceEvent.SourceAdded).sourceId)
+
+        job.cancel()
     }
 }

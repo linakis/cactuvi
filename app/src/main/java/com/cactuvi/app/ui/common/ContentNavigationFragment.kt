@@ -210,12 +210,17 @@ abstract class ContentNavigationFragment<T : Any> : Fragment() {
     private fun renderUiState(state: ContentUiState) {
         when (state) {
             is ContentUiState.Initial -> {
-                // Initial state - hide everything, wait for data
+                // Initial state - show sync loading UI (same as Syncing with null progress)
+                // This handles the brief moment before actual sync state arrives
                 progressBar.isVisible = false
                 errorText.isVisible = false
                 recyclerView.isVisible = false
-                syncLoadingContainer.isVisible = false
+                syncLoadingContainer.isVisible = true
                 breadcrumbScroll.visibility = View.GONE
+
+                syncStatusText.text = "Loading ${getContentTitle()}..."
+                syncProgressBar.isIndeterminate = true
+                syncProgressText.text = ""
             }
             is ContentUiState.Syncing -> {
                 // Syncing - show sync progress UI

@@ -10,8 +10,25 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
+
+/**
+ * Events emitted by SourceManager when sources are added, updated, activated, or deleted. Used by
+ * Cactuvi to trigger immediate content prefetch when new sources are added.
+ */
+sealed class SourceEvent {
+    data class SourceAdded(val sourceId: String) : SourceEvent()
+
+    data class SourceActivated(val sourceId: String) : SourceEvent()
+
+    data class SourceUpdated(val sourceId: String) : SourceEvent()
+
+    data class SourceDeleted(val sourceId: String) : SourceEvent()
+}
 
 @Singleton
 class SourceManager
@@ -23,6 +40,10 @@ constructor(@ApplicationContext context: Context, private val database: AppDatab
     companion object {
         private const val KEY_ACTIVE_SOURCE_ID = "active_source_id"
     }
+
+    // Event emission for source changes
+    private val _sourceEvents = MutableSharedFlow<SourceEvent>(replay = 0, extraBufferCapacity = 1)
+    val sourceEvents: SharedFlow<SourceEvent> = _sourceEvents.asSharedFlow()
 
     // ========== PUBLIC API ==========
 
@@ -40,19 +61,27 @@ constructor(@ApplicationContext context: Context, private val database: AppDatab
         withContext(Dispatchers.IO) {
             database.streamSourceDao().setActive(id)
             prefs.edit().putString(KEY_ACTIVE_SOURCE_ID, id).apply()
+            _sourceEvents.emit(SourceEvent.SourceActivated(id))
         }
 
     suspend fun addSource(source: StreamSource) =
-        withContext(Dispatchers.IO) { database.streamSourceDao().insert(source.toEntity()) }
+        withContext(Dispatchers.IO) {
+            database.streamSourceDao().insert(source.toEntity())
+            _sourceEvents.emit(SourceEvent.SourceAdded(source.id))
+        }
 
     suspend fun updateSource(source: StreamSource) =
-        withContext(Dispatchers.IO) { database.streamSourceDao().update(source.toEntity()) }
+        withContext(Dispatchers.IO) {
+            database.streamSourceDao().update(source.toEntity())
+            _sourceEvents.emit(SourceEvent.SourceUpdated(source.id))
+        }
 
     suspend fun deleteSource(id: String) =
         withContext(Dispatchers.IO) {
             val source = database.streamSourceDao().getById(id)
             if (source != null) {
                 database.streamSourceDao().delete(source)
+                _sourceEvents.emit(SourceEvent.SourceDeleted(id))
             }
         }
 }
