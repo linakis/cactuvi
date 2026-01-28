@@ -68,4 +68,40 @@ interface LiveChannelDao {
     /** Observe count by category reactively */
     @Query("SELECT COUNT(*) FROM live_channels WHERE categoryId = :categoryId")
     fun observeCountByCategoryId(categoryId: String): kotlinx.coroutines.flow.Flow<Int>
+
+    // ========== SEARCH QUERIES ==========
+
+    /** Search live channels by name (all channels) - limited to 50 results */
+    @Query(
+        "SELECT * FROM live_channels WHERE LOWER(name) LIKE '%' || LOWER(:query) || '%' ORDER BY name ASC LIMIT 50"
+    )
+    suspend fun searchByName(query: String): List<LiveChannelEntity>
+
+    /** Search live channels by name within a specific category - limited to 50 results */
+    @Query(
+        """
+        SELECT * FROM live_channels
+        WHERE categoryId = :categoryId
+        AND LOWER(name) LIKE '%' || LOWER(:query) || '%'
+        ORDER BY name ASC
+        LIMIT 50
+    """
+    )
+    suspend fun searchByNameInCategory(query: String, categoryId: String): List<LiveChannelEntity>
+
+    /**
+     * Search live channels by name where category name matches group filter - limited to 50 results
+     */
+    @Query(
+        """
+        SELECT l.* FROM live_channels l
+        INNER JOIN categories c ON l.categoryId = c.categoryId
+        WHERE c.type = 'live'
+        AND LOWER(c.categoryName) LIKE :groupPattern
+        AND LOWER(l.name) LIKE '%' || LOWER(:query) || '%'
+        ORDER BY l.name ASC
+        LIMIT 50
+    """
+    )
+    suspend fun searchByNameInGroup(query: String, groupPattern: String): List<LiveChannelEntity>
 }

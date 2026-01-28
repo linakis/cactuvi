@@ -21,12 +21,16 @@ class MoviesFragment : ContentNavigationFragment<Movie>() {
     @Inject lateinit var database: com.cactuvi.app.data.db.AppDatabase
     @Inject lateinit var _sourceManager: SourceManager
     @Inject lateinit var _idleDetectionHelper: IdleDetectionHelper
+    @Inject lateinit var _preferencesManager: com.cactuvi.app.utils.PreferencesManager
 
     override val sourceManager: SourceManager
         get() = _sourceManager
 
     override val idleDetectionHelper: IdleDetectionHelper
         get() = _idleDetectionHelper
+
+    override val preferencesManager: com.cactuvi.app.utils.PreferencesManager
+        get() = _preferencesManager
 
     override val contentAdapter: PagingDataAdapter<Movie, *> by lazy {
         MoviePagingAdapter { movie -> onContentItemClick(movie) }

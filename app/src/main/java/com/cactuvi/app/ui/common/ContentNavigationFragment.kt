@@ -43,6 +43,7 @@ abstract class ContentNavigationFragment<T : Any> : Fragment() {
     // Abstract properties that subclasses must inject and provide
     protected abstract val sourceManager: SourceManager
     protected abstract val idleDetectionHelper: IdleDetectionHelper
+    protected abstract val preferencesManager: com.cactuvi.app.utils.PreferencesManager
 
     // UI Components
     protected lateinit var recyclerView: RecyclerView
@@ -138,21 +139,7 @@ abstract class ContentNavigationFragment<T : Any> : Fragment() {
                 requireActivity().finish()
             }
         }
-        modernToolbar.onActionClick = {
-            val intent =
-                android.content
-                    .Intent(
-                        requireContext(),
-                        com.cactuvi.app.ui.search.SearchActivity::class.java,
-                    )
-                    .apply {
-                        putExtra(
-                            com.cactuvi.app.ui.search.SearchActivity.EXTRA_CONTENT_TYPE,
-                            getSearchType(),
-                        )
-                    }
-            startActivity(intent)
-        }
+        modernToolbar.onActionClick = { launchSearchWithContext() }
 
         // Observe active source and update title
         lifecycleScope.launch {
@@ -163,6 +150,114 @@ abstract class ContentNavigationFragment<T : Any> : Fragment() {
                 }
             }
         }
+    }
+
+    /**
+     * Launch search with current navigation context. Context includes: content type, group name,
+     * category, and filtering settings.
+     */
+    private fun launchSearchWithContext() {
+        val currentState = getViewModel().uiState.value
+        val contentType = getSearchType()
+
+        // Extract navigation context
+        val groupName: String? =
+            when (currentState) {
+                is ContentUiState.Content -> {
+                    currentState.breadcrumbPath.firstOrNull { it.isGroup }?.displayName
+                }
+                else -> null
+            }
+
+        val categoryContext: Pair<String?, String?>? =
+            when (currentState) {
+                is ContentUiState.Content.Items -> {
+                    Pair(
+                        currentState.categoryId,
+                        currentState.breadcrumbPath.lastOrNull()?.displayName
+                    )
+                }
+                is ContentUiState.Content.Categories -> {
+                    // If viewing categories within a category, use last non-group breadcrumb
+                    val lastCategory = currentState.breadcrumbPath.lastOrNull { !it.isGroup }
+                    if (lastCategory != null) {
+                        Pair(lastCategory.categoryId, lastCategory.displayName)
+                    } else {
+                        null
+                    }
+                }
+                else -> null
+            }
+
+        // Get grouping settings from PreferencesManager
+        val contentTypeEnum =
+            when (contentType) {
+                com.cactuvi.app.ui.search.SearchActivity.TYPE_MOVIES ->
+                    com.cactuvi.app.data.models.ContentType.MOVIES
+                com.cactuvi.app.ui.search.SearchActivity.TYPE_SERIES ->
+                    com.cactuvi.app.data.models.ContentType.SERIES
+                com.cactuvi.app.ui.search.SearchActivity.TYPE_LIVE ->
+                    com.cactuvi.app.data.models.ContentType.LIVE
+                else -> com.cactuvi.app.data.models.ContentType.MOVIES
+            }
+
+        val (groupingEnabled, groupingSeparator) =
+            when (contentTypeEnum) {
+                com.cactuvi.app.data.models.ContentType.MOVIES -> {
+                    Pair(
+                        preferencesManager.isMoviesGroupingEnabled(),
+                        preferencesManager.getMoviesGroupingSeparator()
+                    )
+                }
+                com.cactuvi.app.data.models.ContentType.SERIES -> {
+                    Pair(
+                        preferencesManager.isSeriesGroupingEnabled(),
+                        preferencesManager.getSeriesGroupingSeparator()
+                    )
+                }
+                com.cactuvi.app.data.models.ContentType.LIVE -> {
+                    Pair(
+                        preferencesManager.isLiveGroupingEnabled(),
+                        preferencesManager.getLiveGroupingSeparator()
+                    )
+                }
+            }
+
+        val intent =
+            android.content
+                .Intent(
+                    requireContext(),
+                    com.cactuvi.app.ui.search.SearchActivity::class.java,
+                )
+                .apply {
+                    putExtra(
+                        com.cactuvi.app.ui.search.SearchActivity.EXTRA_CONTENT_TYPE,
+                        contentType,
+                    )
+                    groupName?.let {
+                        putExtra(com.cactuvi.app.ui.search.SearchActivity.EXTRA_GROUP_NAME, it)
+                    }
+                    categoryContext?.let { (catId, catName) ->
+                        catId?.let {
+                            putExtra(com.cactuvi.app.ui.search.SearchActivity.EXTRA_CATEGORY_ID, it)
+                        }
+                        catName?.let {
+                            putExtra(
+                                com.cactuvi.app.ui.search.SearchActivity.EXTRA_CATEGORY_NAME,
+                                it
+                            )
+                        }
+                    }
+                    putExtra(
+                        com.cactuvi.app.ui.search.SearchActivity.EXTRA_GROUPING_ENABLED,
+                        groupingEnabled
+                    )
+                    putExtra(
+                        com.cactuvi.app.ui.search.SearchActivity.EXTRA_GROUPING_SEPARATOR,
+                        groupingSeparator
+                    )
+                }
+        startActivity(intent)
     }
 
     private fun setupRecyclerView() {

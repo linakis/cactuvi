@@ -26,12 +26,16 @@ class LiveTvFragment : ContentNavigationFragment<LiveChannel>() {
     @Inject lateinit var credentialsManager: CredentialsManager
     @Inject lateinit var _sourceManager: SourceManager
     @Inject lateinit var _idleDetectionHelper: IdleDetectionHelper
+    @Inject lateinit var _preferencesManager: com.cactuvi.app.utils.PreferencesManager
 
     override val sourceManager: SourceManager
         get() = _sourceManager
 
     override val idleDetectionHelper: IdleDetectionHelper
         get() = _idleDetectionHelper
+
+    override val preferencesManager: com.cactuvi.app.utils.PreferencesManager
+        get() = _preferencesManager
 
     override val contentAdapter: PagingDataAdapter<LiveChannel, *> by lazy {
         LiveChannelPagingAdapter { channel -> onContentItemClick(channel) }

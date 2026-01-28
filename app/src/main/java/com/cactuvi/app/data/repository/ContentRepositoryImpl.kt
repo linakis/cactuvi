@@ -232,7 +232,8 @@ constructor(
     private val sourceManager: SourceManager,
     private val preferencesManager: PreferencesManager,
     private val credentialsManager: CredentialsManager,
-    private val syncPreferencesManager: SyncPreferencesManager
+    private val syncPreferencesManager: SyncPreferencesManager,
+    private val injectedApiService: XtreamApiService
 ) : com.cactuvi.app.domain.repository.ContentRepository {
 
     private var apiService: XtreamApiService? = null
@@ -404,6 +405,12 @@ constructor(
     }
 
     private suspend fun getApiService(): XtreamApiService {
+        // In mock flavor, always use injected MockWebServer service
+        if (com.cactuvi.app.BuildConfig.FLAVOR == "mock") {
+            return injectedApiService
+        }
+
+        // In prod flavor, use dynamic service based on active source
         val activeSource = sourceManager.getActiveSource()
 
         // Recreate service if source changed or doesn't exist
@@ -419,11 +426,21 @@ constructor(
     }
 
     private suspend fun getActiveSourceId(): String {
+        // In mock flavor, return mock source ID
+        if (com.cactuvi.app.BuildConfig.FLAVOR == "mock") {
+            return "mock_source"
+        }
+
         return sourceManager.getActiveSource()?.id
             ?: throw IllegalStateException("No active source configured")
     }
 
     private suspend fun getCredentials(): Triple<String, String, String> {
+        // In mock flavor, return mock credentials
+        if (com.cactuvi.app.BuildConfig.FLAVOR == "mock") {
+            return Triple("mockuser", "mockpass", "mock_source")
+        }
+
         val source =
             sourceManager.getActiveSource()
                 ?: throw IllegalStateException("No active source configured")

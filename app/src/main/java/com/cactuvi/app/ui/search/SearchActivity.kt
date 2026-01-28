@@ -26,6 +26,12 @@ class SearchActivity : AppCompatActivity() {
 
     companion object {
         const val EXTRA_CONTENT_TYPE = "content_type"
+        const val EXTRA_GROUP_NAME = "group_name"
+        const val EXTRA_CATEGORY_ID = "category_id"
+        const val EXTRA_CATEGORY_NAME = "category_name"
+        const val EXTRA_GROUPING_ENABLED = "grouping_enabled"
+        const val EXTRA_GROUPING_SEPARATOR = "grouping_separator"
+
         const val TYPE_ALL = "all"
         const val TYPE_MOVIES = "movies"
         const val TYPE_SERIES = "series"
@@ -44,8 +50,25 @@ class SearchActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_search)
 
-        val contentTypeFilter = intent.getStringExtra(EXTRA_CONTENT_TYPE) ?: TYPE_ALL
-        viewModel.setContentType(contentTypeFilter)
+        // Extract search context from intent
+        val contentType = intent.getStringExtra(EXTRA_CONTENT_TYPE) ?: TYPE_ALL
+        val groupName = intent.getStringExtra(EXTRA_GROUP_NAME)
+        val categoryId = intent.getStringExtra(EXTRA_CATEGORY_ID)
+        val categoryName = intent.getStringExtra(EXTRA_CATEGORY_NAME)
+        val groupingEnabled = intent.getBooleanExtra(EXTRA_GROUPING_ENABLED, false)
+        val groupingSeparator = intent.getStringExtra(EXTRA_GROUPING_SEPARATOR) ?: "-"
+
+        val searchContext =
+            SearchContext(
+                contentType = contentType,
+                groupName = groupName,
+                categoryId = categoryId,
+                categoryName = categoryName,
+                groupingEnabled = groupingEnabled,
+                groupingSeparator = groupingSeparator
+            )
+
+        viewModel.setSearchContext(searchContext)
 
         initViews()
         setupSearch()
@@ -61,10 +84,34 @@ class SearchActivity : AppCompatActivity() {
 
         modernToolbar.onBackClick = { finish() }
 
+        // Update toolbar title based on context
+        lifecycleScope.launch {
+            viewModel.uiState.collectLatest { uiState ->
+                val context = uiState.context
+                val titleParts = mutableListOf<String>()
+
+                when (context.contentType) {
+                    TYPE_MOVIES -> titleParts.add("Movies")
+                    TYPE_SERIES -> titleParts.add("Series")
+                    TYPE_LIVE -> titleParts.add("Live TV")
+                    TYPE_ALL -> titleParts.add("All")
+                }
+
+                context.groupName?.let { titleParts.add(it) }
+                context.categoryName?.let { titleParts.add(it) }
+
+                modernToolbar.title = "Search: ${titleParts.joinToString(" > ")}"
+            }
+        }
+
         resultsRecyclerView.layoutManager = GridLayoutManager(this, 3)
     }
 
     private fun setupSearch() {
+        // Request focus and show keyboard immediately
+        searchView.requestFocus()
+        searchView.isIconified = false
+
         searchView.setOnQueryTextListener(
             object : SearchView.OnQueryTextListener {
                 override fun onQueryTextSubmit(query: String?): Boolean {
@@ -93,6 +140,7 @@ class SearchActivity : AppCompatActivity() {
             }
             else -> {
                 when (val results = uiState.results) {
+                    is SearchResults.MultiSection -> displayMultiSection(results)
                     is SearchResults.MovieList -> displayMovies(results.movies)
                     is SearchResults.SeriesList -> displaySeries(results.series)
                     null -> showEmptyState(uiState.emptyMessage)
@@ -101,19 +149,43 @@ class SearchActivity : AppCompatActivity() {
         }
     }
 
-    private fun displayMovies(movies: List<com.cactuvi.app.data.models.Movie>) {
+    private fun displayMultiSection(results: SearchResults.MultiSection) {
         val adapter =
-            MovieAdapter(movies) { movie ->
-                val intent =
-                    Intent(this, MovieDetailActivity::class.java).apply {
-                        putExtra("VOD_ID", movie.streamId)
-                        putExtra("STREAM_ID", movie.streamId)
-                        putExtra("TITLE", movie.name)
-                        putExtra("POSTER_URL", movie.streamIcon)
-                        putExtra("CONTAINER_EXTENSION", movie.containerExtension)
-                    }
-                startActivity(intent)
+            SectionedSearchAdapter(
+                onMovieClick = { movie -> navigateToMovieDetail(movie) },
+                onSeriesClick = { series -> navigateToSeriesDetail(series) }
+            )
+        adapter.updateResults(results.movies, results.series)
+        resultsRecyclerView.adapter = adapter
+
+        resultsRecyclerView.visibility = View.VISIBLE
+        emptyState.visibility = View.GONE
+    }
+
+    private fun navigateToMovieDetail(movie: com.cactuvi.app.data.models.Movie) {
+        val intent =
+            Intent(this, MovieDetailActivity::class.java).apply {
+                putExtra("VOD_ID", movie.streamId)
+                putExtra("STREAM_ID", movie.streamId)
+                putExtra("TITLE", movie.name)
+                putExtra("POSTER_URL", movie.streamIcon)
+                putExtra("CONTAINER_EXTENSION", movie.containerExtension)
             }
+        startActivity(intent)
+    }
+
+    private fun navigateToSeriesDetail(seriesItem: com.cactuvi.app.data.models.Series) {
+        val intent =
+            Intent(this, SeriesDetailActivity::class.java).apply {
+                putExtra("SERIES_ID", seriesItem.seriesId)
+                putExtra("TITLE", seriesItem.name)
+                putExtra("COVER_URL", seriesItem.cover)
+            }
+        startActivity(intent)
+    }
+
+    private fun displayMovies(movies: List<com.cactuvi.app.data.models.Movie>) {
+        val adapter = MovieAdapter(movies) { movie -> navigateToMovieDetail(movie) }
         resultsRecyclerView.adapter = adapter
 
         resultsRecyclerView.visibility = View.VISIBLE
@@ -121,16 +193,7 @@ class SearchActivity : AppCompatActivity() {
     }
 
     private fun displaySeries(series: List<com.cactuvi.app.data.models.Series>) {
-        val adapter =
-            SeriesAdapter(series) { seriesItem ->
-                val intent =
-                    Intent(this, SeriesDetailActivity::class.java).apply {
-                        putExtra("SERIES_ID", seriesItem.seriesId)
-                        putExtra("TITLE", seriesItem.name)
-                        putExtra("COVER_URL", seriesItem.cover)
-                    }
-                startActivity(intent)
-            }
+        val adapter = SeriesAdapter(series) { seriesItem -> navigateToSeriesDetail(seriesItem) }
         resultsRecyclerView.adapter = adapter
 
         resultsRecyclerView.visibility = View.VISIBLE

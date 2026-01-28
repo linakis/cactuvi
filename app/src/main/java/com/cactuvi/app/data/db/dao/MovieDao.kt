@@ -78,4 +78,38 @@ interface MovieDao {
     /** Observe count by category reactively */
     @Query("SELECT COUNT(*) FROM movies WHERE categoryId = :categoryId")
     fun observeCountByCategoryId(categoryId: String): kotlinx.coroutines.flow.Flow<Int>
+
+    // ========== SEARCH QUERIES ==========
+
+    /** Search movies by name (all movies) - limited to 50 results */
+    @Query(
+        "SELECT * FROM movies WHERE LOWER(name) LIKE '%' || LOWER(:query) || '%' ORDER BY name ASC LIMIT 50"
+    )
+    suspend fun searchByName(query: String): List<MovieEntity>
+
+    /** Search movies by name within a specific category - limited to 50 results */
+    @Query(
+        """
+        SELECT * FROM movies
+        WHERE categoryId = :categoryId
+        AND LOWER(name) LIKE '%' || LOWER(:query) || '%'
+        ORDER BY name ASC
+        LIMIT 50
+    """
+    )
+    suspend fun searchByNameInCategory(query: String, categoryId: String): List<MovieEntity>
+
+    /** Search movies by name where category name matches group filter - limited to 50 results */
+    @Query(
+        """
+        SELECT m.* FROM movies m
+        INNER JOIN categories c ON m.categoryId = c.categoryId
+        WHERE c.type = 'movies'
+        AND LOWER(c.categoryName) LIKE :groupPattern
+        AND LOWER(m.name) LIKE '%' || LOWER(:query) || '%'
+        ORDER BY m.name ASC
+        LIMIT 50
+    """
+    )
+    suspend fun searchByNameInGroup(query: String, groupPattern: String): List<MovieEntity>
 }

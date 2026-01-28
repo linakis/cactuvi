@@ -75,4 +75,38 @@ interface SeriesDao {
     /** Observe count by category reactively */
     @Query("SELECT COUNT(*) FROM series WHERE categoryId = :categoryId")
     fun observeCountByCategoryId(categoryId: String): kotlinx.coroutines.flow.Flow<Int>
+
+    // ========== SEARCH QUERIES ==========
+
+    /** Search series by name (all series) - limited to 50 results */
+    @Query(
+        "SELECT * FROM series WHERE LOWER(name) LIKE '%' || LOWER(:query) || '%' ORDER BY name ASC LIMIT 50"
+    )
+    suspend fun searchByName(query: String): List<SeriesEntity>
+
+    /** Search series by name within a specific category - limited to 50 results */
+    @Query(
+        """
+        SELECT * FROM series
+        WHERE categoryId = :categoryId
+        AND LOWER(name) LIKE '%' || LOWER(:query) || '%'
+        ORDER BY name ASC
+        LIMIT 50
+    """
+    )
+    suspend fun searchByNameInCategory(query: String, categoryId: String): List<SeriesEntity>
+
+    /** Search series by name where category name matches group filter - limited to 50 results */
+    @Query(
+        """
+        SELECT s.* FROM series s
+        INNER JOIN categories c ON s.categoryId = c.categoryId
+        WHERE c.type = 'series'
+        AND LOWER(c.categoryName) LIKE :groupPattern
+        AND LOWER(s.name) LIKE '%' || LOWER(:query) || '%'
+        ORDER BY s.name ASC
+        LIMIT 50
+    """
+    )
+    suspend fun searchByNameInGroup(query: String, groupPattern: String): List<SeriesEntity>
 }
