@@ -2,8 +2,8 @@ package com.cactuvi.app.ui.movies
 
 import app.cash.turbine.test
 import com.cactuvi.app.data.models.Category
+import com.cactuvi.app.data.models.ContentState
 import com.cactuvi.app.data.models.ContentType
-import com.cactuvi.app.data.models.DataState
 import com.cactuvi.app.data.models.NavigationResult
 import com.cactuvi.app.data.models.SyncPhase
 import com.cactuvi.app.domain.repository.ContentRepository
@@ -27,7 +27,7 @@ import org.junit.Before
 import org.junit.Test
 
 /**
- * Unit tests for MoviesViewModel with reactive Flow-based API.
+ * Unit tests for MoviesViewModel with ContentState architecture.
  *
  * Tests cover:
  * - Initial state and sync states
@@ -42,7 +42,7 @@ class MoviesViewModelTest {
 
     private lateinit var mockRepository: ContentRepository
     private lateinit var mockPreferencesManager: PreferencesManager
-    private lateinit var moviesStateFlow: MutableStateFlow<DataState<*>>
+    private lateinit var moviesContentStateFlow: MutableStateFlow<ContentState<NavigationResult>>
     private lateinit var viewModel: MoviesViewModel
 
     @Before
@@ -51,14 +51,21 @@ class MoviesViewModelTest {
 
         mockRepository = mockk(relaxed = true)
         mockPreferencesManager = mockk(relaxed = true)
-        moviesStateFlow = MutableStateFlow(DataState.Success(itemCount = 0, durationMs = 0))
+
+        // Default: Ready state with empty categories
+        moviesContentStateFlow =
+            MutableStateFlow(ContentState.Ready(NavigationResult.Categories(emptyList())))
 
         // Default grouping settings
         every { mockPreferencesManager.isMoviesGroupingEnabled() } returns true
         every { mockPreferencesManager.getMoviesGroupingSeparator() } returns "-"
 
-        // Default sync state
-        every { mockRepository.moviesState } returns moviesStateFlow
+        // Mock moviesContentState (not moviesState!)
+        every { mockRepository.moviesContentState } returns moviesContentStateFlow
+
+        // Mock observeTopLevelNavigation for navigation tests
+        every { mockRepository.observeTopLevelNavigation(ContentType.MOVIES, any(), any()) } returns
+            flowOf(NavigationResult.Categories(emptyList()))
     }
 
     @After
@@ -93,43 +100,33 @@ class MoviesViewModelTest {
 
     @Test
     fun `initial state is Initial before data loads`() = runTest {
-        // Given: Repository returns empty categories
-        every { mockRepository.observeTopLevelNavigation(ContentType.MOVIES, any(), any()) } returns
-            flowOf(NavigationResult.Categories(emptyList()))
+        // Given: ContentState is Initial
+        moviesContentStateFlow.value = ContentState.Initial
 
         // When: ViewModel is created
         viewModel = MoviesViewModel(mockRepository, mockPreferencesManager)
 
-        // Then: Initial value should be Initial (before Flow emits)
-        // Note: With UnconfinedTestDispatcher, it may already emit first value
+        // Then: Should show Syncing (Initial maps to Syncing in UI)
         viewModel.uiState.test {
             val state = awaitItem()
-            // Either Initial or first emission
-            assertTrue(
-                state is ContentUiState.Initial ||
-                    state is ContentUiState.Loading ||
-                    state is ContentUiState.Content
-            )
+            assertTrue("Expected Syncing state but got $state", state is ContentUiState.Syncing)
         }
     }
 
     @Test
     fun `shows Syncing state when no data and sync in progress`() = runTest {
-        // Given: Sync is fetching
-        moviesStateFlow.value = DataState.Fetching(bytesDownloaded = 5000, totalBytes = 10000)
-
-        every { mockRepository.observeTopLevelNavigation(ContentType.MOVIES, any(), any()) } returns
-            flowOf(NavigationResult.Categories(emptyList()))
+        // Given: ContentState is SyncingFirstTime
+        moviesContentStateFlow.value =
+            ContentState.SyncingFirstTime(phase = SyncPhase.FETCHING, progress = 50)
 
         // When: ViewModel is created
         viewModel = MoviesViewModel(mockRepository, mockPreferencesManager)
 
-        // Then: Should show syncing state
+        // Then: Should show syncing state with progress
         viewModel.uiState.test {
             val state = awaitItem()
             assertTrue("Expected Syncing state but got $state", state is ContentUiState.Syncing)
-            // Overall progress for Fetching at 50% = 5% (50% of 10%)
-            assertEquals(5, (state as ContentUiState.Syncing).progress)
+            assertEquals(50, (state as ContentUiState.Syncing).progress)
         }
     }
 
@@ -137,10 +134,9 @@ class MoviesViewModelTest {
 
     @Test
     fun `shows Groups state when grouping enabled and groups available`() = runTest {
-        // Given: Repository returns groups
+        // Given: ContentState is Ready with groups
         val groups = createMockGroupsMap()
-        every { mockRepository.observeTopLevelNavigation(ContentType.MOVIES, true, "-") } returns
-            flowOf(NavigationResult.Groups(groups))
+        moviesContentStateFlow.value = ContentState.Ready(NavigationResult.Groups(groups))
 
         // When: ViewModel is created
         viewModel = MoviesViewModel(mockRepository, mockPreferencesManager)
@@ -162,12 +158,9 @@ class MoviesViewModelTest {
 
     @Test
     fun `shows Categories state when grouping disabled`() = runTest {
-        // Given: Grouping disabled
-        every { mockPreferencesManager.isMoviesGroupingEnabled() } returns false
+        // Given: ContentState is Ready with categories
         val categories = createMockCategories()
-
-        every { mockRepository.observeTopLevelNavigation(ContentType.MOVIES, false, "-") } returns
-            flowOf(NavigationResult.Categories(categories))
+        moviesContentStateFlow.value = ContentState.Ready(NavigationResult.Categories(categories))
 
         // When: ViewModel is created
         viewModel = MoviesViewModel(mockRepository, mockPreferencesManager)
@@ -187,8 +180,11 @@ class MoviesViewModelTest {
 
     @Test
     fun `navigateToGroup transitions to Categories with breadcrumb`() = runTest {
-        // Given: Groups loaded
+        // Given: ContentState is Ready with groups
         val groups = createMockGroupsMap()
+        moviesContentStateFlow.value = ContentState.Ready(NavigationResult.Groups(groups))
+
+        // Mock observeTopLevelNavigation to return the same groups during navigation
         every { mockRepository.observeTopLevelNavigation(ContentType.MOVIES, true, "-") } returns
             flowOf(NavigationResult.Groups(groups))
 
@@ -214,8 +210,11 @@ class MoviesViewModelTest {
 
     @Test
     fun `navigateToCategory with no children shows Items state`() = runTest {
-        // Given: Repository returns categories then empty children
+        // Given: ContentState Ready with groups
         val groups = createMockGroupsMap()
+        moviesContentStateFlow.value = ContentState.Ready(NavigationResult.Groups(groups))
+
+        // Mock observeTopLevelNavigation to return groups when navigating to group
         every { mockRepository.observeTopLevelNavigation(ContentType.MOVIES, true, "-") } returns
             flowOf(NavigationResult.Groups(groups))
 
@@ -258,10 +257,9 @@ class MoviesViewModelTest {
 
     @Test
     fun `navigateBack from root returns false`() = runTest {
-        // Given: At root level
+        // Given: At root level with categories
         val categories = createMockCategories()
-        every { mockRepository.observeTopLevelNavigation(ContentType.MOVIES, any(), any()) } returns
-            flowOf(NavigationResult.Categories(categories))
+        moviesContentStateFlow.value = ContentState.Ready(NavigationResult.Categories(categories))
 
         viewModel = MoviesViewModel(mockRepository, mockPreferencesManager)
 
@@ -276,8 +274,7 @@ class MoviesViewModelTest {
     fun `navigateBack from group returns to root`() = runTest {
         // Given: At group level
         val groups = createMockGroupsMap()
-        every { mockRepository.observeTopLevelNavigation(ContentType.MOVIES, true, "-") } returns
-            flowOf(NavigationResult.Groups(groups))
+        moviesContentStateFlow.value = ContentState.Ready(NavigationResult.Groups(groups))
 
         viewModel = MoviesViewModel(mockRepository, mockPreferencesManager)
         viewModel.navigateToGroup("US")
@@ -302,8 +299,7 @@ class MoviesViewModelTest {
     fun `navigateBack from category returns to previous level`() = runTest {
         // Given: At category level after navigating through group
         val groups = createMockGroupsMap()
-        every { mockRepository.observeTopLevelNavigation(ContentType.MOVIES, true, "-") } returns
-            flowOf(NavigationResult.Groups(groups))
+        moviesContentStateFlow.value = ContentState.Ready(NavigationResult.Groups(groups))
 
         every { mockRepository.observeChildCategories(ContentType.MOVIES, "1") } returns
             flowOf(NavigationResult.Categories(emptyList()))
@@ -331,11 +327,9 @@ class MoviesViewModelTest {
 
     @Test
     fun `sealed class state types are mutually exclusive`() = runTest {
-        // Given: Categories loaded
+        // Given: ContentState Ready with categories
         val categories = createMockCategories()
-        every { mockPreferencesManager.isMoviesGroupingEnabled() } returns false
-        every { mockRepository.observeTopLevelNavigation(ContentType.MOVIES, false, "-") } returns
-            flowOf(NavigationResult.Categories(categories))
+        moviesContentStateFlow.value = ContentState.Ready(NavigationResult.Categories(categories))
 
         viewModel = MoviesViewModel(mockRepository, mockPreferencesManager)
 
@@ -361,16 +355,12 @@ class MoviesViewModelTest {
 
     @Test
     fun `error state is emitted when sync fails and no cache`() = runTest {
-        // Given: Sync failed with error
-        moviesStateFlow.value =
-            DataState.Error(
+        // Given: ContentState is Error
+        moviesContentStateFlow.value =
+            ContentState.Error(
                 error = RuntimeException("Network error"),
-                phase = SyncPhase.FETCHING,
-                hasCachedData = false,
+                phase = SyncPhase.FETCHING
             )
-
-        every { mockRepository.observeTopLevelNavigation(ContentType.MOVIES, any(), any()) } returns
-            flowOf(NavigationResult.Categories(emptyList()))
 
         // When: ViewModel is created
         viewModel = MoviesViewModel(mockRepository, mockPreferencesManager)
@@ -387,32 +377,30 @@ class MoviesViewModelTest {
 
     @Test
     fun `shows Syncing state with indeterminate progress when progress is null`() = runTest {
-        // Given: Sync is fetching with unknown total (indeterminate)
-        moviesStateFlow.value = DataState.Fetching(bytesDownloaded = 1000, totalBytes = null)
-
-        every { mockRepository.observeTopLevelNavigation(ContentType.MOVIES, any(), any()) } returns
-            flowOf(NavigationResult.Categories(emptyList()))
+        // Given: ContentState SyncingFirstTime with null progress
+        moviesContentStateFlow.value =
+            ContentState.SyncingFirstTime(phase = SyncPhase.FETCHING, progress = null)
 
         // When: ViewModel is created
         viewModel = MoviesViewModel(mockRepository, mockPreferencesManager)
 
-        // Then: Should show syncing state with 0 progress (no total known)
+        // Then: Should show syncing state with null progress
         viewModel.uiState.test {
             val state = awaitItem()
             assertTrue("Expected Syncing state but got $state", state is ContentUiState.Syncing)
-            assertEquals(0, (state as ContentUiState.Syncing).progress)
+            assertEquals(null, (state as ContentUiState.Syncing).progress)
         }
     }
 
     @Test
     fun `shows Content when data exists even during sync`() = runTest {
-        // Given: Sync is parsing but data exists
-        moviesStateFlow.value = DataState.Parsing(itemsParsed = 300, totalItems = 1000)
+        // Given: ContentState Ready with data (background sync is hidden)
         val categories = createMockCategories()
-
-        every { mockPreferencesManager.isMoviesGroupingEnabled() } returns false
-        every { mockRepository.observeTopLevelNavigation(ContentType.MOVIES, false, "-") } returns
-            flowOf(NavigationResult.Categories(categories))
+        moviesContentStateFlow.value =
+            ContentState.Ready(
+                data = NavigationResult.Categories(categories),
+                backgroundSync = null // Silent background sync
+            )
 
         // When: ViewModel is created
         viewModel = MoviesViewModel(mockRepository, mockPreferencesManager)
@@ -429,14 +417,9 @@ class MoviesViewModelTest {
 
     @Test
     fun `transitions from Syncing to Content when data arrives`() = runTest {
-        // Given: Initially persisting with no data
-        moviesStateFlow.value = DataState.Persisting(itemsWritten = 500, totalItems = 1000)
-        val categoriesFlow =
-            MutableStateFlow<NavigationResult>(NavigationResult.Categories(emptyList()))
-
-        every { mockPreferencesManager.isMoviesGroupingEnabled() } returns false
-        every { mockRepository.observeTopLevelNavigation(ContentType.MOVIES, false, "-") } returns
-            categoriesFlow
+        // Given: Initially SyncingFirstTime with no data
+        moviesContentStateFlow.value =
+            ContentState.SyncingFirstTime(phase = SyncPhase.PERSISTING, progress = 50)
 
         viewModel = MoviesViewModel(mockRepository, mockPreferencesManager)
 
@@ -447,11 +430,11 @@ class MoviesViewModelTest {
                 "Expected Syncing but got $syncingState",
                 syncingState is ContentUiState.Syncing
             )
-            // Persisting at 50% = 40 + (50 * 50/100) = 65%
-            assertEquals(65, (syncingState as ContentUiState.Syncing).progress)
+            assertEquals(50, (syncingState as ContentUiState.Syncing).progress)
 
-            // Simulate data arriving
-            categoriesFlow.value = NavigationResult.Categories(createMockCategories())
+            // Simulate data arriving - change to Ready
+            moviesContentStateFlow.value =
+                ContentState.Ready(NavigationResult.Categories(createMockCategories()))
 
             // Should transition to Content
             val contentState = awaitItem()
@@ -465,27 +448,27 @@ class MoviesViewModelTest {
     @Test
     fun `sync progress updates are reflected in Syncing state`() = runTest {
         // Given: Syncing with progress updates through different phases
-        moviesStateFlow.value = DataState.Fetching(bytesDownloaded = 1000, totalBytes = 10000)
-
-        every { mockRepository.observeTopLevelNavigation(ContentType.MOVIES, any(), any()) } returns
-            flowOf(NavigationResult.Categories(emptyList()))
+        moviesContentStateFlow.value =
+            ContentState.SyncingFirstTime(phase = SyncPhase.FETCHING, progress = 10)
 
         viewModel = MoviesViewModel(mockRepository, mockPreferencesManager)
 
         viewModel.uiState.test {
-            // Initial: Fetching at 10% = 1% overall
+            // Initial: Fetching at 10%
             val state1 = awaitItem()
             assertTrue(state1 is ContentUiState.Syncing)
-            assertEquals(1, (state1 as ContentUiState.Syncing).progress)
+            assertEquals(10, (state1 as ContentUiState.Syncing).progress)
 
-            // Update to Parsing at 50% = 10 + (50 * 30/100) = 25% overall
-            moviesStateFlow.value = DataState.Parsing(itemsParsed = 500, totalItems = 1000)
+            // Update to Parsing at 50%
+            moviesContentStateFlow.value =
+                ContentState.SyncingFirstTime(phase = SyncPhase.PARSING, progress = 50)
             val state2 = awaitItem()
             assertTrue(state2 is ContentUiState.Syncing)
-            assertEquals(25, (state2 as ContentUiState.Syncing).progress)
+            assertEquals(50, (state2 as ContentUiState.Syncing).progress)
 
-            // Update to Indexing = 90% overall
-            moviesStateFlow.value = DataState.Indexing
+            // Update to Indexing at 90%
+            moviesContentStateFlow.value =
+                ContentState.SyncingFirstTime(phase = SyncPhase.INDEXING, progress = 90)
             val state3 = awaitItem()
             assertTrue(state3 is ContentUiState.Syncing)
             assertEquals(90, (state3 as ContentUiState.Syncing).progress)
@@ -496,10 +479,9 @@ class MoviesViewModelTest {
 
     @Test
     fun `onSeparatorChanged resets to root`() = runTest {
-        // Given: Navigated into groups
+        // Given: ContentState Ready with groups, navigated into one
         val groups = createMockGroupsMap()
-        every { mockRepository.observeTopLevelNavigation(ContentType.MOVIES, true, "-") } returns
-            flowOf(NavigationResult.Groups(groups))
+        moviesContentStateFlow.value = ContentState.Ready(NavigationResult.Groups(groups))
 
         viewModel = MoviesViewModel(mockRepository, mockPreferencesManager)
         viewModel.navigateToGroup("US")
