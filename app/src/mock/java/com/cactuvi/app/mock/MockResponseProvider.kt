@@ -2,16 +2,22 @@ package com.cactuvi.app.mock
 
 import android.content.Context
 import android.util.Log
-import java.io.BufferedReader
-import java.io.InputStreamReader
+import java.io.InputStream
+import okio.Buffer
+import okio.buffer
+import okio.source
 
 /**
  * Utility class to load mock API responses from assets. Maps action query parameters to JSON files.
+ * Uses streaming (okio Buffer) for large files to avoid OutOfMemoryError.
  */
 object MockResponseProvider {
 
     private const val TAG = "MockResponseProvider"
     private const val MOCK_RESPONSES_DIR = "mock_responses"
+
+    /** Buffer size for streaming large files (64KB) */
+    private const val BUFFER_SIZE = 64 * 1024L
 
     /** Action parameter to JSON file mapping */
     private val actionToFileMap =
@@ -31,37 +37,69 @@ object MockResponseProvider {
         )
 
     /**
-     * Load mock response JSON for given action parameter.
+     * Load mock response as a streaming Buffer for given action parameter. This is memory-efficient
+     * for large JSON files (50MB+).
      *
      * @param context Android context to access assets
      * @param action The action query parameter (e.g., "get_vod_streams")
-     * @return JSON string content from assets, or empty array if not found
+     * @return Buffer containing JSON content, or empty array buffer if not found
      */
-    fun loadMockResponse(context: Context, action: String?): String {
+    fun loadMockResponseAsBuffer(context: Context, action: String?): Buffer {
         if (action == null) {
             Log.w(TAG, "Action parameter is null, returning empty array")
-            return "[]"
+            return Buffer().writeUtf8("[]")
         }
 
         val fileName = actionToFileMap[action]
         if (fileName == null) {
             Log.w(TAG, "Unknown action: $action, returning empty array")
-            return "[]"
+            return Buffer().writeUtf8("[]")
         }
 
         return try {
             val filePath = "$MOCK_RESPONSES_DIR/$fileName"
-            Log.d(TAG, "Loading mock response: $filePath")
+            Log.d(TAG, "Streaming mock response: $filePath")
 
-            val inputStream = context.assets.open(filePath)
-            val reader = BufferedReader(InputStreamReader(inputStream))
-            val content = reader.use { it.readText() }
+            val inputStream: InputStream = context.assets.open(filePath)
+            val buffer = Buffer()
 
-            Log.d(TAG, "Loaded ${content.length} bytes from $fileName")
-            content
+            // Stream content in chunks to avoid loading entire file into memory
+            inputStream.source().buffer().use { source ->
+                var totalBytes = 0L
+                while (!source.exhausted()) {
+                    val bytesRead = source.read(buffer, BUFFER_SIZE)
+                    if (bytesRead > 0) {
+                        totalBytes += bytesRead
+                    }
+                }
+                Log.d(TAG, "Streamed $totalBytes bytes from $fileName")
+            }
+
+            buffer
         } catch (e: Exception) {
             Log.e(TAG, "Error loading mock response for action: $action", e)
-            "[]"
+            Buffer().writeUtf8("[]")
+        }
+    }
+
+    /**
+     * Get the file size for an action's mock response (for Content-Length header).
+     *
+     * @param context Android context to access assets
+     * @param action The action query parameter
+     * @return File size in bytes, or -1 if unknown
+     */
+    fun getResponseSize(context: Context, action: String?): Long {
+        if (action == null) return 2L // "[]"
+
+        val fileName = actionToFileMap[action] ?: return 2L
+
+        return try {
+            val filePath = "$MOCK_RESPONSES_DIR/$fileName"
+            context.assets.openFd(filePath).use { it.length }
+        } catch (e: Exception) {
+            // AssetFileDescriptor not available for compressed assets
+            -1L
         }
     }
 

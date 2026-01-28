@@ -106,7 +106,10 @@ class MockServerManager private constructor() {
     /** Check if server is currently running. */
     fun isRunning(): Boolean = isStarted
 
-    /** Custom dispatcher to handle mock API requests. */
+    /**
+     * Custom dispatcher to handle mock API requests. Uses streaming Buffer for large responses to
+     * avoid OutOfMemoryError.
+     */
     private class MockApiDispatcher(private val context: Context) : Dispatcher() {
 
         override fun dispatch(request: RecordedRequest): MockResponse {
@@ -129,20 +132,18 @@ class MockServerManager private constructor() {
                     .setBody("{\"error\": \"Unsupported action: $action\"}")
             }
 
-            // Load mock response from assets
-            val responseBody = MockResponseProvider.loadMockResponse(context, action)
+            // Load mock response as streaming Buffer (memory-efficient for large files)
+            val responseBuffer = MockResponseProvider.loadMockResponseAsBuffer(context, action)
+            val responseSize = responseBuffer.size
 
-            // Return successful response
+            Log.d(TAG, "Returning mock response for action: $action ($responseSize bytes)")
+
+            // Return successful response with Buffer body
             return MockResponse()
                 .setResponseCode(200)
                 .setHeader("Content-Type", "application/json")
-                .setBody(responseBody)
-                .also {
-                    Log.d(
-                        TAG,
-                        "Returning mock response for action: $action (${responseBody.length} bytes)"
-                    )
-                }
+                .setHeader("Content-Length", responseSize.toString())
+                .setBody(responseBuffer)
         }
     }
 }
