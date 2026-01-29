@@ -3,8 +3,12 @@ package com.cactuvi.app.mock
 import android.content.Context
 import android.util.Log
 import com.cactuvi.app.BuildConfig
+import com.cactuvi.app.data.db.AppDatabase
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.runBlocking
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import okhttp3.mockwebserver.Dispatcher
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
@@ -12,13 +16,16 @@ import okhttp3.mockwebserver.RecordedRequest
 
 /**
  * Singleton manager for MockWebServer lifecycle. Handles starting/stopping the mock API server and
- * dispatching requests.
+ * dispatching requests. Supports selective proxying: API requests are mocked, stream requests are
+ * proxied to the real server.
  */
 class MockServerManager private constructor() {
 
     private var mockWebServer: MockWebServer? = null
     private var isStarted = false
     private lateinit var appContext: Context
+    private var database: AppDatabase? = null
+    private val proxyClient = OkHttpClient()
 
     companion object {
         private const val TAG = "MockServerManager"
@@ -38,14 +45,21 @@ class MockServerManager private constructor() {
      * NetworkOnMainThreadException.
      *
      * @param context Application context
+     * @param database Database instance for reading active source URL for stream proxying
      */
-    fun start(context: Context) {
+    fun start(context: Context, database: AppDatabase) {
         if (isStarted) {
             Log.d(TAG, "MockWebServer already started")
             return
         }
 
         appContext = context.applicationContext
+        this.database = database
+
+        // Log stream proxy configuration
+        val realServerUrl =
+            runBlocking { database.streamSourceDao().getActive()?.server } ?: "[no active source]"
+        Log.i(TAG, "Stream proxy enabled → $realServerUrl")
 
         // Start on background thread to avoid NetworkOnMainThreadException
         val latch = CountDownLatch(1)
@@ -53,7 +67,7 @@ class MockServerManager private constructor() {
                 try {
                     mockWebServer =
                         MockWebServer().apply {
-                            dispatcher = MockApiDispatcher(appContext)
+                            dispatcher = ProxyingDispatcher(appContext, database, proxyClient)
                             start(SERVER_PORT)
                         }
 
@@ -104,13 +118,20 @@ class MockServerManager private constructor() {
     }
 
     /** Check if server is currently running. */
-    fun isRunning(): Boolean = isStarted
+    fun isRunning(): Boolean {
+        return isStarted
+    }
 
     /**
-     * Custom dispatcher to handle mock API requests. Uses streaming Buffer for large responses to
-     * avoid OutOfMemoryError.
+     * Custom dispatcher that handles both mock API requests and stream proxying. API requests with
+     * action parameter are served from local JSON files. Stream requests (movie, live, series
+     * paths) are proxied to real IPTV server.
      */
-    private class MockApiDispatcher(private val context: Context) : Dispatcher() {
+    private class ProxyingDispatcher(
+        private val context: Context,
+        private val database: AppDatabase,
+        private val httpClient: OkHttpClient,
+    ) : Dispatcher() {
 
         override fun dispatch(request: RecordedRequest): MockResponse {
             val path = request.path ?: ""
@@ -122,6 +143,26 @@ class MockServerManager private constructor() {
             // Extract action query parameter
             val action = url?.queryParameter("action")
 
+            // Route request based on type
+            return if (action != null) {
+                // Has ?action= query param → Mock from local JSON
+                handleApiRequest(action)
+            } else if (
+                path.startsWith("/movie/") ||
+                    path.startsWith("/live/") ||
+                    path.startsWith("/series/")
+            ) {
+                // Stream path → Proxy to real server
+                handleStreamRequest(path)
+            } else {
+                // Unknown request → 404
+                Log.w(TAG, "Unknown request type: $path")
+                MockResponse().setResponseCode(404).setBody("{\"error\": \"Not found\"}")
+            }
+        }
+
+        /** Handle API requests by returning mock JSON responses. */
+        private fun handleApiRequest(action: String): MockResponse {
             Log.d(TAG, "Action parameter: $action")
 
             // Check if action is supported
@@ -144,6 +185,52 @@ class MockServerManager private constructor() {
                 .setHeader("Content-Type", "application/json")
                 .setHeader("Content-Length", responseSize.toString())
                 .setBody(responseBuffer)
+        }
+
+        /** Handle stream requests by proxying to the real IPTV server. */
+        private fun handleStreamRequest(path: String): MockResponse {
+            try {
+                // Get real server URL from active source
+                val realServerUrl = runBlocking {
+                    database.streamSourceDao().getActive()?.server ?: return@runBlocking null
+                }
+
+                if (realServerUrl == null) {
+                    Log.w(TAG, "No active source found - cannot proxy stream")
+                    return MockResponse()
+                        .setResponseCode(503)
+                        .setBody("{\"error\": \"No active source configured\"}")
+                }
+
+                // Build target URL: http://real-server.com/movie/user/pass/12345.mkv
+                val targetUrl = "${realServerUrl.trimEnd('/')}$path"
+                Log.d(TAG, "Proxying stream request to: $targetUrl")
+
+                // Forward request to real server
+                val proxyRequest = Request.Builder().url(targetUrl).get().build()
+
+                val proxyResponse = httpClient.newCall(proxyRequest).execute()
+
+                // Copy response from real server to mock response
+                val responseBody = proxyResponse.body?.bytes() ?: byteArrayOf()
+                val contentType = proxyResponse.header("Content-Type") ?: "application/octet-stream"
+
+                Log.d(
+                    TAG,
+                    "Proxied stream response: ${proxyResponse.code} (${responseBody.size} bytes)"
+                )
+
+                return MockResponse()
+                    .setResponseCode(proxyResponse.code)
+                    .setHeader("Content-Type", contentType)
+                    .setHeader("Content-Length", responseBody.size.toString())
+                    .setBody(okio.Buffer().write(responseBody))
+            } catch (e: Exception) {
+                Log.e(TAG, "Error proxying stream request", e)
+                return MockResponse()
+                    .setResponseCode(502)
+                    .setBody("{\"error\": \"Proxy error: ${e.message}\"}")
+            }
         }
     }
 }

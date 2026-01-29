@@ -43,16 +43,18 @@ object DataModule {
 
     /**
      * Provide XtreamApiService configured with mock server URL. Ensures MockServerManager is
-     * started before creating the service.
+     * started before creating the service. MockServerManager needs database access for proxying
+     * stream requests to the real server.
      */
     @Provides
     @Singleton
     fun provideXtreamApiService(
         @ApplicationContext context: Context,
         @ActiveSourceUrl baseUrl: String,
+        database: AppDatabase,
     ): XtreamApiService {
-        // Ensure mock server is running
-        MockServerManager.getInstance().start(context)
+        // Ensure mock server is running (needs database for stream proxying)
+        MockServerManager.getInstance().start(context, database)
         return ApiClient.createService(baseUrl)
     }
 
